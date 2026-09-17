@@ -162,11 +162,12 @@ async def receive_username(message: Message, state: FSMContext) -> None:
 
 @router.callback_query(F.data.startswith("join_nation_"))
 async def join_nation(call: CallbackQuery, state: FSMContext) -> None:
-    await call.answer()
     try:
         nation_id = int(call.data.rsplit("_", 1)[1])
     except (ValueError, AttributeError):
+        await call.answer("انتخاب ملت معتبر نیست.", show_alert=True)
         return
+    await call.answer()
 
     data = await state.get_data()
     username = data.get("username")
@@ -224,9 +225,10 @@ async def first_trade_tutorial(call: CallbackQuery, state: FSMContext) -> None:
     async with async_session() as session:
         user = await get_user(session, call.from_user.id)
         if user is None or user.home_nation_id is None:
-            await call.answer("حساب معاملاتی پیدا نشد.", show_alert=True)
             return
         nation = await session.get(Nation, user.home_nation_id)
+        if nation is None:
+            return
 
     rate = nation.exchange_rate
     received = Decimal("50") * rate
@@ -249,7 +251,6 @@ async def confirm_first_trade(call: CallbackQuery, state: FSMContext) -> None:
     async with async_session() as session:
         user = await get_user(session, call.from_user.id)
         if user is None or user.home_nation_id is None:
-            await call.answer("حساب معاملاتی پیدا نشد.", show_alert=True)
             return
 
         result = await session.execute(
@@ -257,7 +258,6 @@ async def confirm_first_trade(call: CallbackQuery, state: FSMContext) -> None:
         )
         nation = result.scalar_one_or_none()
         if nation is None:
-            await call.answer("ملتت پیدا نشد.", show_alert=True)
             return
 
         if user.balance < Decimal("50"):
@@ -309,4 +309,6 @@ async def founder(call: CallbackQuery, state: FSMContext) -> None:
 async def cancel_start(call: CallbackQuery, state: FSMContext) -> None:
     await call.answer()
     await state.clear()
-    await _safe_edit(call, "هر وقت آماده شدی /start بزن.", ReplyKeyboardRemove())
+    await _safe_edit(call, "هر وقت آماده شدی /start بزن.")
+    if call.message:
+        await call.message.answer("هر وقت آماده شدی /start بزن.", reply_markup=ReplyKeyboardRemove(), parse_mode="HTML")
