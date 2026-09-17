@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
 
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, Numeric, String, UniqueConstraint, func
+from sqlalchemy import DateTime, Enum as SAEnum, ForeignKey, Index, Integer, Numeric, String, UniqueConstraint, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -20,7 +20,6 @@ class ActivityType(StrEnum):
 
 class Nation(Base):
     __tablename__ = "nations"
-
     nation_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     group_id: Mapped[int | None] = mapped_column(nullable=True)
     name: Mapped[str] = mapped_column(String(100))
@@ -40,7 +39,6 @@ class Nation(Base):
 
 class User(Base):
     __tablename__ = "users"
-
     user_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     username: Mapped[str] = mapped_column(String(15), unique=True, nullable=False)
     home_nation_id: Mapped[int | None] = mapped_column(ForeignKey("nations.nation_id"))
@@ -53,7 +51,6 @@ class User(Base):
 class CurrencyHolding(Base):
     __tablename__ = "currency_holdings"
     __table_args__ = (UniqueConstraint("user_id", "nation_id", name="uq_currency_holding_user_nation"),)
-
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
     nation_id: Mapped[int] = mapped_column(ForeignKey("nations.nation_id", ondelete="CASCADE"), nullable=False)
@@ -64,7 +61,6 @@ class CurrencyHolding(Base):
 class Transaction(Base):
     __tablename__ = "transactions"
     __table_args__ = (Index("ix_transactions_user_created", "user_id", "created_at"),)
-
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.user_id"), nullable=False)
     nation_id: Mapped[int] = mapped_column(ForeignKey("nations.nation_id"), nullable=False)
@@ -79,18 +75,16 @@ class Transaction(Base):
 class UserActivity(Base):
     __tablename__ = "user_activities"
     __table_args__ = (Index("ix_user_activities_nation_created", "nation_id", "created_at"),)
-
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.user_id"), nullable=False)
     nation_id: Mapped[int] = mapped_column(ForeignKey("nations.nation_id"), nullable=False)
-    activity_type: Mapped[str] = mapped_column(String(10), nullable=False)
+    activity_type: Mapped[ActivityType] = mapped_column(SAEnum(ActivityType, name="activity_type", values_callable=lambda values: [item.value for item in values]), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
 class NationMemberHistory(Base):
     __tablename__ = "nation_member_history"
     __table_args__ = (Index("ix_nation_member_history_nation_recorded", "nation_id", "recorded_at"),)
-
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     nation_id: Mapped[int] = mapped_column(ForeignKey("nations.nation_id", ondelete="CASCADE"), nullable=False)
     member_count: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -100,7 +94,6 @@ class NationMemberHistory(Base):
 class RateHistory(Base):
     __tablename__ = "rate_history"
     __table_args__ = (Index("ix_rate_history_nation_calculated", "nation_id", "calculated_at"),)
-
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     nation_id: Mapped[int] = mapped_column(ForeignKey("nations.nation_id", ondelete="CASCADE"), nullable=False)
     rate: Mapped[Decimal] = mapped_column(Numeric(10, 4), nullable=False)
@@ -112,7 +105,6 @@ class RateHistory(Base):
 class TradePreview(Base):
     __tablename__ = "trade_previews"
     __table_args__ = (Index("ix_trade_previews_user_created", "user_id", "created_at"),)
-
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
     nation_id: Mapped[int] = mapped_column(ForeignKey("nations.nation_id", ondelete="CASCADE"), nullable=False)
@@ -124,7 +116,6 @@ class TradePreview(Base):
 
 class NationRank(Base):
     __tablename__ = "nation_ranks"
-
     nation_id: Mapped[int] = mapped_column(ForeignKey("nations.nation_id", ondelete="CASCADE"), primary_key=True)
     rank: Mapped[int] = mapped_column(Integer, nullable=False)
     calculated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
