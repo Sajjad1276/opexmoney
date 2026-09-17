@@ -18,33 +18,42 @@ from app.utils.name_filter import is_blocked_trader_name, is_valid_trader_name
 router = Router(name="onboarding_fix")
 
 USERNAME_CAPTION = """💹 <b>اسم معامله‌گرت رو انتخاب کن</b>
-─────────────────
-{user_mention}، این اسم روی تابلوی
-معاملات OPEX نمایش داده میشه.
+
+{user_mention}، این اسم روی تابلوی معاملات OPEX نمایش داده میشه.
 
 بنویس:
 · ۳ تا ۱۵ کاراکتر
 · فقط حروف انگلیسی و عدد
 · بدون فاصله، @ و علامت خاص"""
 
-INVALID_NAME = """🔴 این نام قابل قبول نیست.
+INVALID_NAME = """🔴 <b>این نام قابل قبول نیست.</b>
 
 فقط ۳ تا ۱۵ کاراکتر انگلیسی وارد کن.
 حروف و عدد مجازه، اما فاصله و علامت خاص نه.
 مثال: <code>Arman7</code>"""
 
-BLOCKED_NAME = """🔴 این نام قابل قبول نیست.
+BLOCKED_NAME = """🔴 <b>این نام قابل قبول نیست.</b>
 
 این نام شامل عبارت نامناسب یا مستهجن است.
 یک نام صحیح و مناسب برای معامله‌گر انتخاب کن."""
 
-CANCEL_TEXT = """{user_name}، ثبت‌نام لغو شد.
+CANCEL_TEXT = """<b>{user_name}، ثبت‌نام لغو شد.</b>
 
 هر وقت خواستی، /start بزن."""
 
+NAME_ACCEPTED_TEXT = """🎉 <b>تبریک! «{username}» با موفقیت ثبت شد.</b>
+
+اسم معامله‌گری تو آماده است و از این به بعد در OPEX با همین نام شناخته میشی."""
+
+NO_NATION_TEXT = """🌍 <b>هنوز هیچ ملتی در OPEX وجود نداره.</b>
+
+{user_mention}، تو اولین معامله‌گری هستی که وارد OPEX شده.
+
+برای شروع اقتصاد OPEX، اولین ملت تاریخ رو بساز."""
+
 
 async def _edit_onboarding_prompt(message: Message, state: FSMContext, text: str, reply_markup=None) -> bool:
-    """Edit the original trader-name prompt instead of sending a second flow message."""
+    """Edit the original trader-name prompt when it is still available."""
     data = await state.get_data()
     prompt_message_id = data.get("onboarding_prompt_message_id")
     prompt_chat_id = data.get("onboarding_prompt_chat_id")
@@ -119,32 +128,30 @@ async def accept_valid_name(message: Message, state: FSMContext) -> None:
     async with async_session() as session:
         if await username_exists(session, username):
             await message.answer(
-                f"🔴 «{html.escape(username)}» قبلاً ثبت شده.\n\nیه اسم دیگه انتخاب کن:",
+                f"🔴 <b>«{html.escape(username)}» قبلاً ثبت شده.</b>\n\nیه اسم دیگه انتخاب کن:",
                 parse_mode="HTML",
             )
             return
         nations = await get_active_nations(session, limit=3)
 
+    data = await state.get_data()
     await state.update_data(username=username)
+
+    # First transform the original name prompt into a clean confirmation.
+    confirmation = NAME_ACCEPTED_TEXT.format(username=html.escape(username))
+    if not await _edit_onboarding_prompt(message, state, confirmation):
+        await message.answer(confirmation, parse_mode="HTML")
+
+    # The nation-selection screen intentionally starts as a new message.
     await state.set_state(OnboardingStates.SELECT_NATION)
 
     if not nations:
-        text = (
-            f"🎉 <b>تبریک! «{html.escape(username)}» با موفقیت ثبت شد.</b>\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"{user_mention(message.from_user)}، حالا وقتشه وارد دنیای OPEX بشی.\n\n"
-            "⏳ هنوز هیچ ملتی وجود نداره.\n\n"
-            "تو اولین معامله‌گری هستی که وارد OPEX شده.\n"
-            "اولین ملت تاریخ رو بساز.\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        )
-        if not await _edit_onboarding_prompt(message, state, text, no_nation_keyboard()):
-            await message.answer(text, reply_markup=no_nation_keyboard(), parse_mode="HTML")
+        nation_text = NO_NATION_TEXT.format(user_mention=user_mention(message.from_user))
+        await message.answer(nation_text, reply_markup=no_nation_keyboard(), parse_mode="HTML")
         return
 
-    text = nation_list_text(message.from_user, username, nations)
-    if not await _edit_onboarding_prompt(message, state, text, nation_keyboard(nations)):
-        await message.answer(text, reply_markup=nation_keyboard(nations), parse_mode="HTML")
+    nation_text = nation_list_text(message.from_user, username, nations)
+    await message.answer(nation_text, reply_markup=nation_keyboard(nations), parse_mode="HTML")
 
 
 @router.callback_query(F.data == "cancel_start")
