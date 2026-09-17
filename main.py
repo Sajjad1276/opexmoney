@@ -34,6 +34,7 @@ def build_storage():
 async def prepare_database() -> None:
     async with engine.begin() as connection:
         await connection.run_sync(Base.metadata.create_all)
+
         statements = [
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS xr_balance NUMERIC(14,2) NOT NULL DEFAULT 0",
             "ALTER TABLE nations ADD COLUMN IF NOT EXISTS rate_prev NUMERIC(10,4) NOT NULL DEFAULT 1.0000",
@@ -44,6 +45,68 @@ async def prepare_database() -> None:
             "ALTER TABLE nations ADD COLUMN IF NOT EXISTS last_rate_update TIMESTAMP",
             "ALTER TABLE nations ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE",
             "ALTER TABLE nations ALTER COLUMN exchange_rate TYPE NUMERIC(12,4)",
+            """
+            DO $$
+            BEGIN
+                -- Telegram user IDs are 64-bit values. Older deployments created
+                -- these columns as INTEGER (int4), which fails for IDs > 2,147,483,647.
+                IF EXISTS (
+                    SELECT 1
+                    FROM information_schema.columns
+                    WHERE table_schema = current_schema()
+                      AND table_name = 'users'
+                      AND column_name = 'user_id'
+                      AND data_type = 'integer'
+                ) THEN
+                    ALTER TABLE currency_holdings DROP CONSTRAINT IF EXISTS currency_holdings_user_id_fkey;
+                    ALTER TABLE transactions DROP CONSTRAINT IF EXISTS transactions_user_id_fkey;
+                    ALTER TABLE user_activities DROP CONSTRAINT IF EXISTS user_activities_user_id_fkey;
+                    ALTER TABLE trade_previews DROP CONSTRAINT IF EXISTS trade_previews_user_id_fkey;
+
+                    ALTER TABLE users ALTER COLUMN user_id TYPE BIGINT USING user_id::BIGINT;
+                    ALTER TABLE currency_holdings ALTER COLUMN user_id TYPE BIGINT USING user_id::BIGINT;
+                    ALTER TABLE transactions ALTER COLUMN user_id TYPE BIGINT USING user_id::BIGINT;
+                    ALTER TABLE user_activities ALTER COLUMN user_id TYPE BIGINT USING user_id::BIGINT;
+                    ALTER TABLE trade_previews ALTER COLUMN user_id TYPE BIGINT USING user_id::BIGINT;
+
+                    ALTER TABLE currency_holdings
+                        ADD CONSTRAINT currency_holdings_user_id_fkey
+                        FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE;
+                    ALTER TABLE transactions
+                        ADD CONSTRAINT transactions_user_id_fkey
+                        FOREIGN KEY (user_id) REFERENCES users(user_id);
+                    ALTER TABLE user_activities
+                        ADD CONSTRAINT user_activities_user_id_fkey
+                        FOREIGN KEY (user_id) REFERENCES users(user_id);
+                    ALTER TABLE trade_previews
+                        ADD CONSTRAINT trade_previews_user_id_fkey
+                        FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE;
+                END IF;
+
+                -- Telegram chat IDs and founder user IDs are also 64-bit identifiers.
+                IF EXISTS (
+                    SELECT 1
+                    FROM information_schema.columns
+                    WHERE table_schema = current_schema()
+                      AND table_name = 'nations'
+                      AND column_name = 'group_id'
+                      AND data_type = 'integer'
+                ) THEN
+                    ALTER TABLE nations ALTER COLUMN group_id TYPE BIGINT USING group_id::BIGINT;
+                END IF;
+
+                IF EXISTS (
+                    SELECT 1
+                    FROM information_schema.columns
+                    WHERE table_schema = current_schema()
+                      AND table_name = 'nations'
+                      AND column_name = 'founder_user_id'
+                      AND data_type = 'integer'
+                ) THEN
+                    ALTER TABLE nations ALTER COLUMN founder_user_id TYPE BIGINT USING founder_user_id::BIGINT;
+                END IF;
+            END $$;
+            """,
             "INSERT INTO currency_holdings (user_id,nation_id,amount) SELECT user_id,home_nation_id,balance FROM users WHERE home_nation_id IS NOT NULL ON CONFLICT (user_id,nation_id) DO NOTHING",
         ]
         for statement in statements:
