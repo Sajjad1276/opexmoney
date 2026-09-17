@@ -15,6 +15,7 @@ from sqlalchemy import text
 from app.database.models import Base
 from app.database.session import async_session, engine
 from app.handlers.market import router as market_router
+from app.handlers.onboarding_fix import router as onboarding_fix_router
 from app.handlers.start import router as start_router
 from app.services.economic_engine import reset_daily_metrics, update_nation_rates, update_nation_ranks
 from config import settings
@@ -48,8 +49,6 @@ async def prepare_database() -> None:
             """
             DO $$
             BEGIN
-                -- Telegram user IDs are 64-bit values. Older deployments created
-                -- these columns as INTEGER (int4), which fails for IDs > 2,147,483,647.
                 IF EXISTS (
                     SELECT 1
                     FROM information_schema.columns
@@ -83,7 +82,6 @@ async def prepare_database() -> None:
                         FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE;
                 END IF;
 
-                -- Telegram chat IDs and founder user IDs are also 64-bit identifiers.
                 IF EXISTS (
                     SELECT 1
                     FROM information_schema.columns
@@ -135,7 +133,7 @@ async def run_daily_reset() -> None:
     try:
         async with async_session() as session:
             await reset_daily_metrics(session)
-        logger.info("Daily market metrics reset completed")
+        logger.info("Daily market reset completed")
     except Exception:
         logger.exception("Daily market reset failed")
 
@@ -152,6 +150,7 @@ async def main() -> None:
     await prepare_database()
     bot = Bot(token=settings.bot_token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     dp = Dispatcher(storage=build_storage())
+    dp.include_router(onboarding_fix_router)
     dp.include_router(start_router)
     dp.include_router(market_router)
     scheduler = build_scheduler()
