@@ -21,10 +21,11 @@ class ActivityType(StrEnum):
 class Nation(Base):
     __tablename__ = "nations"
     nation_id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    group_id: Mapped[int | None] = mapped_column(nullable=True)
+    # Telegram chat/user identifiers can exceed PostgreSQL INTEGER (int4).
+    group_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     name: Mapped[str] = mapped_column(String(100))
     currency_code: Mapped[str] = mapped_column(String(4))
-    founder_user_id: Mapped[int | None] = mapped_column(nullable=True)
+    founder_user_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     exchange_rate: Mapped[Decimal] = mapped_column(Numeric(12, 4), default=Decimal("1.0000"), nullable=False)
     rate_prev: Mapped[Decimal] = mapped_column(Numeric(10, 4), default=Decimal("1.0000"), nullable=False)
     rate_24h_open: Mapped[Decimal] = mapped_column(Numeric(10, 4), default=Decimal("1.0000"), nullable=False)
@@ -39,7 +40,7 @@ class Nation(Base):
 
 class User(Base):
     __tablename__ = "users"
-    user_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     username: Mapped[str] = mapped_column(String(15), unique=True, nullable=False)
     home_nation_id: Mapped[int | None] = mapped_column(ForeignKey("nations.nation_id"))
     balance: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("500.00"), nullable=False)
@@ -52,7 +53,7 @@ class CurrencyHolding(Base):
     __tablename__ = "currency_holdings"
     __table_args__ = (UniqueConstraint("user_id", "nation_id", name="uq_currency_holding_user_nation"),)
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
     nation_id: Mapped[int] = mapped_column(ForeignKey("nations.nation_id", ondelete="CASCADE"), nullable=False)
     amount: Mapped[Decimal] = mapped_column(Numeric(18, 4), default=Decimal("0"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
@@ -62,7 +63,7 @@ class Transaction(Base):
     __tablename__ = "transactions"
     __table_args__ = (Index("ix_transactions_user_created", "user_id", "created_at"),)
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.user_id"), nullable=False)
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.user_id"), nullable=False)
     nation_id: Mapped[int] = mapped_column(ForeignKey("nations.nation_id"), nullable=False)
     transaction_type: Mapped[str] = mapped_column(String(10), nullable=False)
     spend_xr: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False)
@@ -76,7 +77,7 @@ class UserActivity(Base):
     __tablename__ = "user_activities"
     __table_args__ = (Index("ix_user_activities_nation_created", "nation_id", "created_at"),)
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.user_id"), nullable=False)
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.user_id"), nullable=False)
     nation_id: Mapped[int] = mapped_column(ForeignKey("nations.nation_id"), nullable=False)
     activity_type: Mapped[ActivityType] = mapped_column(SAEnum(ActivityType, name="activity_type", values_callable=lambda values: [item.value for item in values]), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
@@ -106,7 +107,7 @@ class TradePreview(Base):
     __tablename__ = "trade_previews"
     __table_args__ = (Index("ix_trade_previews_user_created", "user_id", "created_at"),)
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
     nation_id: Mapped[int] = mapped_column(ForeignKey("nations.nation_id", ondelete="CASCADE"), nullable=False)
     side: Mapped[str] = mapped_column(String(4), nullable=False)
     spend: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False)
