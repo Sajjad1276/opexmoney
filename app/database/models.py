@@ -109,6 +109,19 @@ class RateHistory(Base):
     calculated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
+class TradePreview(Base):
+    __tablename__ = "trade_previews"
+    __table_args__ = (Index("ix_trade_previews_user_created", "user_id", "created_at"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    nation_id: Mapped[int] = mapped_column(ForeignKey("nations.nation_id", ondelete="CASCADE"), nullable=False)
+    side: Mapped[str] = mapped_column(String(4), nullable=False)
+    spend: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False)
+    preview_rate: Mapped[Decimal] = mapped_column(Numeric(10, 4), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
 class NationRank(Base):
     __tablename__ = "nation_ranks"
 
