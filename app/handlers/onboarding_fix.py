@@ -18,50 +18,60 @@ from app.utils.name_filter import is_blocked_trader_name, is_valid_trader_name
 
 router = Router(name="onboarding_fix")
 
-USERNAME_CAPTION = """💹 <b>اسم معامله‌گرت رو انتخاب کن</b>
+# Telegram does not expose a text-align control for bot messages. RLM markers
+# keep mixed Persian/Latin/emoji lines in an RTL paragraph direction and reduce
+# the visual jump to the left caused by mentions, numbers and symbols.
+RLM = "\u200f"
 
-{user_mention}، این اسم روی تابلوی معاملات OPEX نمایش داده میشه.
+
+def rtl_text(text: str) -> str:
+    return "\n".join(f"{RLM}{line}" if line else "" for line in text.split("\n"))
+
+
+USERNAME_CAPTION = rtl_text("""💹 <b>اسم معامله‌گرت رو انتخاب کن.</b>
+
+اسم انتخابی تو روی تابلوی معاملات OPEX نمایش داده میشه.
 
 بنویس:
 · ۳ تا ۱۵ کاراکتر
 · فقط حروف انگلیسی و عدد
-· بدون فاصله، @ و علامت خاص"""
+· بدون فاصله، @ و علامت خاص""")
 
-INVALID_NAME = """🔴 <b>این نام قابل قبول نیست.</b>
+INVALID_NAME = rtl_text("""🔴 <b>این نام قابل قبول نیست.</b>
 
 فقط ۳ تا ۱۵ کاراکتر انگلیسی وارد کن.
 حروف و عدد مجازه، اما فاصله و علامت خاص نه.
-مثال: <code>Arman7</code>"""
+مثال: <code>Arman7</code>""")
 
-BLOCKED_NAME = """🔴 <b>این نام قابل قبول نیست.</b>
+BLOCKED_NAME = rtl_text("""🔴 <b>این نام قابل قبول نیست.</b>
 
 این نام شامل عبارت نامناسب یا مستهجن است.
-یک نام صحیح و مناسب برای معامله‌گر انتخاب کن."""
+یک نام صحیح و مناسب برای معامله‌گر انتخاب کن.""")
 
-CANCEL_TEXT = """<b>{user_name}، ثبت‌نام لغو شد.</b>
+CANCEL_TEXT = rtl_text("""<b>{user_name}، ثبت‌نام لغو شد.</b>
 
-هر وقت خواستی، /start بزن."""
+هر وقت خواستی، /start بزن.""")
 
-NAME_ACCEPTED_TEXT = """🎉 <b>تبریک! «{username}» با موفقیت ثبت شد.</b>
+NAME_ACCEPTED_TEXT = rtl_text("""🎉 <b>تبریک! «{username}» با موفقیت ثبت شد.</b>
 
-اسم معامله‌گری تو آماده است و از این به بعد در OPEX با همین نام شناخته میشی."""
+اسم معامله‌گری تو آماده است و از این به بعد در OPEX با همین نام شناخته میشی.""")
 
-NO_NATION_TEXT = """🌍 <b>هنوز هیچ ملتی در OPEX وجود نداره.</b>
+NO_NATION_TEXT = rtl_text("""🌍 <b>هنوز هیچ ملتی در OPEX وجود نداره.</b>
 
-{user_mention}، تو اولین معامله‌گری هستی که وارد OPEX شده.
+تو اولین معامله‌گری هستی که وارد OPEX شدی، {user_mention}.
 
-برای شروع اقتصاد OPEX، اولین ملت تاریخ رو بساز."""
+برای شروع اقتصاد OPEX، اولین ملت تاریخ رو بساز.""")
 
 
 def clean_nation_list_text(user, trader_name: str, nations) -> str:
-    """Render nation selection without decorative separator lines."""
+    """Render nation selection as clean RTL paragraphs without separators."""
     lines = [
         f"🌍 <b>«{html.escape(trader_name)}»، حالا یک ملت انتخاب کن.</b>",
         "",
-        f"{user_mention(user)}، ارز ملتی که انتخاب می‌کنی پول اصلی حسابت میشه.",
+        f"ارز ملتی که انتخاب می‌کنی پول اصلی حسابت میشه، {user_mention(user)}.",
         "هر معامله‌ات مستقیم روی نرخ اون ارز اثر میذاره.",
         "",
-        "ملت‌های فعال:",
+        "<b>ملت‌های فعال</b>",
         "",
     ]
 
@@ -79,7 +89,7 @@ def clean_nation_list_text(user, trader_name: str, nations) -> str:
         "",
         "نرخ‌ها هر ۱۵ دقیقه آپدیت میشن.",
     ])
-    return "\n".join(lines)
+    return rtl_text("\n".join(lines))
 
 
 async def _edit_onboarding_prompt(message: Message, state: FSMContext, text: str, reply_markup=None) -> bool:
@@ -157,10 +167,10 @@ async def accept_valid_name(message: Message, state: FSMContext) -> None:
 
     async with async_session() as session:
         if await username_exists(session, username):
-            await message.answer(
-                f"🔴 <b>«{html.escape(username)}» قبلاً ثبت شده.</b>\n\nیه اسم دیگه انتخاب کن:",
-                parse_mode="HTML",
+            duplicate_text = rtl_text(
+                f"🔴 <b>«{html.escape(username)}» قبلاً ثبت شده.</b>\n\nیک اسم دیگه برای معامله‌گرت انتخاب کن."
             )
+            await message.answer(duplicate_text, parse_mode="HTML")
             return
         nations = await get_active_nations(session, limit=3)
 
