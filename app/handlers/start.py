@@ -38,8 +38,6 @@ def user_mention(user) -> str:
 
 
 def current_date_fa() -> str:
-    # The project currently has no calendar dependency. Keep the display stable
-    # until the shared date formatter is introduced in the economic UI layer.
     now = datetime.now()
     return to_fa(now.strftime("%Y/%m/%d"))
 
@@ -74,44 +72,29 @@ START_CAPTION = """🌐 <b>{bot_name}</b>
 ─────────────────
 سلام {user_name}.
 
-بازارهای جهانی <b>OPEX</b> هر روز
-میلیاردها واحد ارز جابه‌جا می‌کنند.
+بازارهای OPEX هر روز
+میلیاردها واحد ارز جابه‌جا می‌کنن.
 
-بعضی‌ها ثروت می‌سازند.
-بعضی‌ها ملت می‌سازند.
+تو کجا می‌ایستی؟"""
 
-<b>تو چی می‌خوای؟</b>
-
-<i>📅 {current_date}</i>"""
-
-USERNAME_CAPTION = """💹 <b>ثبت‌نام معامله‌گر</b>
+USERNAME_CAPTION = """💹 <b>اسم معامله‌گرت رو انتخاب کن</b>
 ─────────────────
-{user_mention}، بازارها با یک اسم
-می‌شناسنت.
+{user_mention}، این اسم روی تابلوی
+معاملات OPEX نمایش داده میشه.
 
-این اسم روی تابلوی معاملات جهانی
-نمایش داده میشه — برای همیشه.
+بنویس:
+· ۳ تا ۱۵ کاراکتر
+· فارسی یا انگلیسی
+· بدون فاصله، بدون @"""
 
-<b>اسم معامله‌گرت رو بنویس:</b>
+DUPLICATE_NAME = """🔴 «{user_input}» قبلاً ثبت شده.
 
-<i>• بین ۳ تا ۱۵ کاراکتر
-- فارسی یا انگلیسی
-- بدون فاصله و بدون @</i>
-─────────────────
-<i>🤖 {bot_name} | {current_date}</i>"""
+یه اسم دیگه انتخاب کن:"""
 
-DUPLICATE_NAME = """🔴 <b>این اسم قبلاً ثبت شده.</b>
-─────────────────
-<i>«{user_input}»</i> توسط یه معامله‌گر
-دیگه رزرو شده.
+LENGTH_ERROR = """🔴 «{user_input}» قابل قبول نیست.
 
-یه اسم منحصربه‌فرد انتخاب کن:"""
-
-LENGTH_ERROR = """🔴 <b>اسم باید بین ۳ تا ۱۵ کاراکتر باشه.</b>
-─────────────────
-<i>«{user_input}»</i> اشتباهه.
-
-دوباره امتحان کن:"""
+۳ تا ۱۵ کاراکتر، فارسی یا انگلیسی.
+دوباره بنویس:"""
 
 
 def nation_list_text(user, trader_name: str, nations: list[Nation]) -> str:
@@ -119,29 +102,26 @@ def nation_list_text(user, trader_name: str, nations: list[Nation]) -> str:
     lines = [
         f"✅ <b>«{html.escape(trader_name)}»</b> ثبت شد.",
         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-        f"{user_mention(user)} باید به یه ملت بپیوندی.",
+        f"{user_mention(user)}، حالا باید به یه ملت بپیوندی.",
         "",
-        "ارز اون ملت پایه حسابت میشه.",
-        "هر معامله‌ات روی قدرت اون ارز",
-        "تأثیر مستقیم داره.",
+        "ارز اون ملت، پول اصلی حسابت میشه.",
+        "هر معامله‌ات مستقیم روی نرخ اون ارز اثر میذاره.",
         "",
-        f"<b>🌍 ملت‌های فعال در {current_date_fa()}:</b>",
+        "<b>🌍 ملت‌های فعال:</b>",
         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
     ]
     for index, nation in enumerate(nations, start=1):
         change = get_rate_change(nation)
         lines.extend([
-            f"🏛 <b>{html.escape(nation.name)}</b>",
-            f"<code>{html.escape(nation.currency_code)}</code> — واحد پول رسمی",
-            f"{get_rate_emoji(change)} نرخ: <b>{fmt_rate(nation.exchange_rate)} ΩXR</b>  <i>({fmt_pct(change)} امروز)</i>",
-            f"👥 اعضای فعال: <b>{to_fa(nation.active_members_24h)}</b> نفر",
-            f"🏆 رتبه جهانی: <b>#{to_fa(nation.nation_rank or 0)}</b> از {to_fa(total_nations)}",
+            f"🏛 <b>{html.escape(nation.name)} · {html.escape(nation.currency_code)}</b>",
+            f"{get_rate_emoji(change)} <b>{fmt_rate(nation.exchange_rate)} ΩXR</b> · <i>{fmt_pct(change)} امروز</i>",
+            f"👥 {to_fa(nation.active_members_24h)} عضو · 🏆 رتبه #{to_fa(nation.nation_rank or 0)}",
         ])
         if index != len(nations):
             lines.append("─────────────────")
     lines.extend([
         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-        "<i>نرخ‌ها هر ۱۵ دقیقه به‌روز می‌شن.</i>",
+        "نرخ‌ها هر ۱۵ دقیقه آپدیت میشن.",
     ])
     return "\n".join(lines)
 
@@ -171,16 +151,12 @@ async def show_dashboard(message: Message, user: User) -> None:
         text = (
             "🌐 <b>OPEX MONEY</b>\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"{user_mention(message.from_user)}، خوش اومدی.\n\n"
-            f"🏛 ملت: <b>{html.escape(nation.name)}</b>\n"
-            f"👤 معامله‌گر: <b>{html.escape(user.username)}</b>\n"
-            f"💰 <code>{html.escape(nation.currency_code)}</code>: <b>{fmt_amount(balance)}</b>\n"
-            f"ΩXR: <b>{fmt_amount(user.xr_balance)}</b>\n\n"
-            f"{get_rate_emoji(change)} نرخ <code>{html.escape(nation.currency_code)}</code>: <b>{fmt_rate(nation.exchange_rate)} ΩXR</b> "
-            f"<i>({fmt_pct(change)} امروز)</i>\n"
-            f"🏆 رتبه جهانی: <b>#{to_fa(rank)}</b> از {to_fa(total_nations)}\n"
-            f"👥 اعضای فعال امروز: <b>{to_fa(active)}</b> نفر\n"
-            f"⏱ <i>آخرین آپدیت: {to_fa(minutes)} دقیقه پیش</i>\n"
+            f"{user_mention(message.from_user)}\n\n"
+            f"🏛 {html.escape(nation.name)} · {html.escape(user.username)}\n"
+            f"💰 <code>{html.escape(nation.currency_code)}</code>: <b>{fmt_amount(balance)}</b> · <code>ΩXR</code>: <b>{fmt_amount(user.xr_balance)}</b>\n\n"
+            f"{get_rate_emoji(change)} <code>{html.escape(nation.currency_code)}</code>: <b>{fmt_rate(nation.exchange_rate)} ΩXR</b> · <i>{fmt_pct(change)} امروز</i>\n"
+            f"🏆 رتبه #{to_fa(rank)} از {to_fa(total_nations)} · 👥 {to_fa(active)} فعال\n"
+            f"⏱ <i>{to_fa(minutes)} دقیقه پیش</i>\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         )
     await message.answer(text, reply_markup=main_menu(), parse_mode="HTML")
@@ -206,7 +182,6 @@ async def start(message: Message, state: FSMContext) -> None:
     try:
         await message.answer_photo("assets/welcome_banner.jpg", caption=caption, reply_markup=start_keyboard(), parse_mode="HTML")
     except (TelegramBadRequest, TypeError):
-        # Keep /start usable if the asset is absent in a local environment.
         await message.answer(caption, reply_markup=start_keyboard(), parse_mode="HTML")
 
 
@@ -219,17 +194,17 @@ async def start_player(call: CallbackQuery, state: FSMContext) -> None:
         user_mention=user_mention(call.from_user),
         current_date=current_date_fa(),
     )
-    await _safe_edit_caption(call, caption, cancel_keyboard())
+    if call.message and getattr(call.message, "photo", None):
+        await _safe_edit_caption(call, caption, cancel_keyboard())
+    else:
+        await _safe_edit_text(call, caption, cancel_keyboard())
     await call.answer()
 
 
 @router.message(OnboardingStates.SET_USERNAME_PLAYER)
 async def receive_username(message: Message, state: FSMContext) -> None:
     username = (message.text or "").strip()
-    if len(username) < 3 or len(username) > 15:
-        await message.answer(LENGTH_ERROR.format(user_input=html.escape(username)), parse_mode="HTML")
-        return
-    if not _valid_username(username):
+    if len(username) < 3 or len(username) > 15 or not _valid_username(username):
         await message.answer(LENGTH_ERROR.format(user_input=html.escape(username)), parse_mode="HTML")
         return
 
@@ -244,15 +219,11 @@ async def receive_username(message: Message, state: FSMContext) -> None:
         text = (
             f"✅ <b>«{html.escape(username)}»</b> ثبت شد.\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            "⏳ <b>بازارهای OPEX هنوز خالیه.</b>\n"
-            "─────────────────\n"
-            f"{user_mention(message.from_user)}، تو اولین نفری\n"
-            "که وارد این دنیا میشی.\n\n"
-            "یه گروه تلگرامی داری؟\n"
-            "اولین ملت تاریخ OPEX رو بساز.\n\n"
-            "<b>اسمت برای همیشه در تاریخ میمونه.</b>\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            "<i>🤖 OPEX MONEY | " + current_date_fa() + "</i>"
+            "⏳ هنوز هیچ ملتی وجود نداره.\n\n"
+            f"{user_mention(message.from_user)}، تو اولین نفری هستی\n"
+            "که وارد OPEX میشی.\n\n"
+            "اولین ملت تاریخ رو بساز.\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         )
         await message.answer(text, reply_markup=no_nation_keyboard(), parse_mode="HTML")
         return
@@ -265,13 +236,13 @@ async def join_nation(call: CallbackQuery, state: FSMContext) -> None:
     try:
         nation_id = int(call.data.rsplit("_", 1)[1])
     except (ValueError, AttributeError):
-        await call.answer("انتخاب ملت معتبر نیست.", show_alert=True)
+        await call.answer("⚠️ این ملت معتبر نیست.", show_alert=True)
         return
 
     data = await state.get_data()
     trader_name = data.get("username")
     if not trader_name:
-        await call.answer("فرآیند ثبت‌نام منقضی شده. دوباره /start بزن.", show_alert=True)
+        await call.answer("⏱ فرآیند ثبت‌نام منقضی شد. /start بزن.", show_alert=True)
         return
 
     async with async_session() as session:
@@ -290,7 +261,7 @@ async def join_nation(call: CallbackQuery, state: FSMContext) -> None:
         )
         nation = result.scalar_one_or_none()
         if nation is None:
-            await call.answer("این ملت دیگر در دسترس نیست.", show_alert=True)
+            await call.answer("⚠️ این ملت دیگه در دسترس نیست.", show_alert=True)
             return
 
         user = User(
@@ -319,21 +290,17 @@ async def join_nation(call: CallbackQuery, state: FSMContext) -> None:
         await session.commit()
 
         text = (
-            f"🏛 <b>به «{html.escape(nation.name)}» خوش اومدی!</b>\n"
+            f"🏛 <b>{html.escape(nation.name)}</b>\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"{user_mention(call.from_user)}، از این لحظه\n"
-            "شهروند رسمی این ملت هستی.\n\n"
-            "💰 <b>موجودی اولیه‌ات:</b>\n"
-            f"<b>۵۰۰ <code>{html.escape(nation.currency_code)}</code></b>\n"
-            f"<i>≈ {fmt_amount(initial_omx)} ΩXR در نرخ امروز</i>\n\n"
+            f"{user_mention(call.from_user)}، شهروند رسمی این ملت شدی.\n\n"
+            f"💰 موجودی اولیه:\n<b>۵۰۰ <code>{html.escape(nation.currency_code)}</code> ≈ {fmt_amount(initial_omx)} ΩXR</b>\n\n"
             "─────────────────\n"
-            f"📊 <b>وضعیت ملتت — {current_date_fa()}:</b>\n\n"
             f"{get_rate_emoji(get_rate_change(nation))} نرخ <code>{html.escape(nation.currency_code)}</code>: <b>{fmt_rate(nation.exchange_rate)} ΩXR</b>\n"
-            f"<i>({fmt_pct(get_rate_change(nation))} نسبت به دیروز)</i>\n\n"
-            f"🏆 رتبه جهانی: <b>#{to_fa(rank)}</b> از {to_fa(total_nations)} ملت\n"
-            f"👥 اعضای فعال: <b>{to_fa(nation.active_members_24h)}</b> نفر\n"
+            f"<i>{fmt_pct(get_rate_change(nation))} نسبت به دیروز</i>\n\n"
+            f"🏆 رتبه #{to_fa(rank)} از {to_fa(total_nations)}\n"
+            f"👥 {to_fa(nation.active_members_24h)} عضو فعال\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"<i>هر معامله‌ای که میکنی\nقدرت <code>{html.escape(nation.currency_code)}</code> رو تغییر میده.</i>"
+            f"هر معامله‌ات روی نرخ <code>{html.escape(nation.currency_code)}</code> اثر میذاره."
         )
 
     await state.clear()
@@ -353,24 +320,20 @@ async def first_trade_tutorial(call: CallbackQuery, state: FSMContext) -> None:
         user = await get_user(session, call.from_user.id)
         nation = await session.get(Nation, user.home_nation_id) if user and user.home_nation_id else None
     if not user or not nation:
-        await call.answer("اطلاعات معامله پیدا نشد.", show_alert=True)
+        await call.answer("⚠️ اطلاعات معامله پیدا نشد.", show_alert=True)
         return
 
     receive_omx = Decimal("50") * nation.exchange_rate
     change = get_rate_change(nation)
     text = (
-        "⚡ <b>اولین معامله‌ات</b>\n"
+        "⚡ <b>اولین معامله</b>\n"
         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"{user_mention(call.from_user)}، یاد میگیری\n"
-        "چطور بازارهای OPEX کار میکنه.\n\n"
+        f"📤 می‌فروشی:   <b>۵۰ <code>{html.escape(nation.currency_code)}</code></b>\n"
+        f"📥 دریافت می‌کنی: <b>{fmt_amount(receive_omx)} <code>ΩXR</code></b>\n\n"
         "─────────────────\n"
-        f"📤 <b>می‌فروشی:</b>\n<b>۵۰ <code>{html.escape(nation.currency_code)}</code></b>\n\n"
-        f"📥 <b>دریافت می‌کنی:</b>\n<b>{fmt_amount(receive_omx)} <code>ΩXR</code></b>\n\n"
-        "─────────────────\n"
-        f"💹 <b>نرخ لحظه‌ای:</b>\n<code>۱ {html.escape(nation.currency_code)} = {fmt_rate(nation.exchange_rate)} ΩXR</code>\n\n"
+        f"💹 نرخ: <code>۱ {html.escape(nation.currency_code)} = {fmt_rate(nation.exchange_rate)} ΩXR</code>\n"
         f"{get_rate_emoji(change)} تغییر ۲۴h: <b>{fmt_pct(change)}</b>\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        "<i>⏱ آخرین به‌روزرسانی: ۰ دقیقه پیش</i>"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     )
     await _safe_edit_text(call, text, trade_confirmation_keyboard())
     await call.answer()
@@ -384,28 +347,21 @@ async def confirm_first_trade(call: CallbackQuery, state: FSMContext) -> None:
         return
 
     async with async_session() as session:
-        user = (
-            await session.execute(
-                select(User).where(User.user_id == call.from_user.id).with_for_update()
-            )
-        ).scalar_one_or_none()
+        user = (await session.execute(select(User).where(User.user_id == call.from_user.id).with_for_update())).scalar_one_or_none()
         if not user or not user.home_nation_id:
-            await call.answer("حساب معامله پیدا نشد.", show_alert=True)
+            await call.answer("⚠️ حساب پیدا نشد. /start بزن.", show_alert=True)
             return
         nation = await session.get(Nation, user.home_nation_id, with_for_update=True)
         holding = await session.scalar(
             select(CurrencyHolding)
-            .where(
-                CurrencyHolding.user_id == user.user_id,
-                CurrencyHolding.nation_id == user.home_nation_id,
-            )
+            .where(CurrencyHolding.user_id == user.user_id, CurrencyHolding.nation_id == user.home_nation_id)
             .with_for_update()
         )
         if not nation or not holding:
-            await call.answer("حساب معامله پیدا نشد.", show_alert=True)
+            await call.answer("⚠️ حساب پیدا نشد. /start بزن.", show_alert=True)
             return
         if holding.amount < Decimal("50"):
-            await call.answer("موجودی برای این معامله کافی نیست.", show_alert=True)
+            await call.answer("🔴 موجودی کافی نیست.", show_alert=True)
             return
 
         rate = nation.exchange_rate
@@ -414,36 +370,22 @@ async def confirm_first_trade(call: CallbackQuery, state: FSMContext) -> None:
         user.balance = holding.amount
         user.xr_balance += receive_omx
         nation.trade_volume_24h += receive_omx
-        session.add(Transaction(
-            user_id=user.user_id,
-            nation_id=nation.nation_id,
-            transaction_type="sell",
-            spend_xr=receive_omx,
-            amount=Decimal("50"),
-            fee_xr=Decimal("0"),
-            rate=rate,
-        ))
-        session.add(UserActivity(
-            user_id=user.user_id,
-            nation_id=nation.nation_id,
-            activity_type="trade",
-        ))
+        session.add(Transaction(user_id=user.user_id, nation_id=nation.nation_id, transaction_type="sell", spend_xr=receive_omx, amount=Decimal("50"), fee_xr=Decimal("0"), rate=rate))
+        session.add(UserActivity(user_id=user.user_id, nation_id=nation.nation_id, activity_type="trade"))
         await session.commit()
 
         text = (
-            "✅ <b>معامله با موفقیت انجام شد!</b>\n"
+            "✅ <b>معامله انجام شد.</b>\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"📤 فروختی:    <s>۵۰ {html.escape(nation.currency_code)}</s>\n"
-            f"📥 دریافتی:   <b>{fmt_amount(receive_omx)} ΩXR</b>\n\n"
+            f"📤 فروختی:   <s>۵۰ {html.escape(nation.currency_code)}</s>\n"
+            f"📥 دریافتی:  <b>{fmt_amount(receive_omx)} ΩXR</b>\n\n"
             "─────────────────\n"
-            "📊 <b>موجودی جدیدت:</b>\n\n"
+            "💰 موجودی:\n"
             f"<code>{html.escape(nation.currency_code)}</code>: <b>{fmt_amount(holding.amount)}</b>\n"
-            f"<code>ΩXR</code>:    <b>{fmt_amount(user.xr_balance)}</b>\n\n"
+            f"<code>ΩXR</code>: <b>{fmt_amount(user.xr_balance)}</b>\n\n"
             "─────────────────\n"
-            "✨ <b>دستاورد باز شد:</b>\n"
-            "<i>«اولین قدم در بازارهای OPEX»</i>\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"<i>🤖 OPEX MONEY | {to_fa(user.user_id)}</i>"
+            "✨ <b>«اولین قدم در بازارهای OPEX» باز شد.</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         )
 
     await state.clear()
@@ -456,13 +398,15 @@ async def confirm_first_trade(call: CallbackQuery, state: FSMContext) -> None:
 @router.callback_query(F.data == "skip_first_trade")
 async def skip_first_trade(call: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
+    async with async_session() as session:
+        user = await get_user(session, call.from_user.id)
+        nation = await session.get(Nation, user.home_nation_id) if user and user.home_nation_id else None
+    currency_code = nation.currency_code if nation else "ارز"
+    balance = fmt_amount(nation and (await _get_holding_amount(call.from_user.id, nation.nation_id)) or Decimal("500")) if nation else "۵۰۰"
     text = (
-        f"باشه، {html.escape(call.from_user.first_name or 'معامله‌گر')}.\n"
-        "─────────────────\n"
-        "هر وقت آماده شدی از منوی\n"
-        "<b>💹 بازار</b> معامله‌ات رو شروع کن.\n\n"
-        "<i>موجودی فعلی:\n۵۰۰ <code>ارز ملت</code></i>\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        f"{html.escape(call.from_user.first_name or 'معامله‌گر')}، هر وقت آماده شدی\n"
+        "از 💹 بازار شروع کن.\n\n"
+        f"💰 موجودی: {balance} <code>{html.escape(currency_code)}</code>"
     )
     await _safe_edit_text(call, text)
     await call.answer()
@@ -470,21 +414,23 @@ async def skip_first_trade(call: CallbackQuery, state: FSMContext) -> None:
         await call.message.answer("🌐 <b>منوی اصلی آماده‌ست.</b>", reply_markup=main_menu(), parse_mode="HTML")
 
 
+async def _get_holding_amount(user_id: int, nation_id: int) -> Decimal:
+    async with async_session() as session:
+        holding = await session.scalar(select(CurrencyHolding).where(CurrencyHolding.user_id == user_id, CurrencyHolding.nation_id == nation_id))
+        return holding.amount if holding else Decimal("500")
+
+
 @router.callback_query(F.data == "start_founder")
 async def founder(call: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
-    await _safe_edit_text(call, "🏛 <b>ساخت ملت</b>\n─────────────────\nاین بخش در مرحله بعدی فعال میشه.", cancel_keyboard())
+    await _safe_edit_text(call, "🏛 <b>ساخت ملت</b>\n─────────────────\nاین قابلیت هنوز فعال نیست.\n\nبرای اطلاع از زمان راه‌اندازی، کانال OPEX رو دنبال کن.", cancel_keyboard())
     await call.answer()
 
 
 @router.callback_query(F.data == "cancel_start")
 async def cancel_start(call: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
-    text = (
-        f"{html.escape(call.from_user.first_name or 'معامله‌گر')}، هر وقت آماده شدی\n"
-        "دوباره برگرد.\n\n"
-        f"<i>@OPEX MONEY منتظرته.</i>"
-    )
+    text = f"{html.escape(call.from_user.first_name or 'معامله‌گر')}، هر وقت آماده شدی\nدوباره /start بزن."
     if call.message and hasattr(call.message, "edit_caption") and getattr(call.message, "photo", None):
         await _safe_edit_caption(call, text)
     else:
