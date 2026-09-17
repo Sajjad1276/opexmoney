@@ -34,6 +34,7 @@ class Nation(Base):
     nation_rank: Mapped[int | None] = mapped_column(Integer, nullable=True)
     last_rate_update: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     member_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
