@@ -2,40 +2,55 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Awaitable, Callable
+from typing import Any
 
 from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
+from aiogram.methods import SendMessage, SendPhoto
 from aiogram.types import Message
 
 logger = logging.getLogger(__name__)
 
 WARNING_DELETE_DELAY = 10.0
-_WARNING_MARKERS = ("🔴", "⚠️", "⚠", "❌")
+
+_WARNING_PREFIXES = (
+    "🔴", "⚠️", "⚠", "❌", "⛔", "🚫", "❗", "‼️",
+    "خطا:", "خطا ", "هشدار:", "هشدار ",
+)
 
 
 def is_warning_text(text: str | None) -> bool:
-    """Return True for bot messages explicitly presented as warnings/errors."""
+    """Return True when a bot message is explicitly presented as a warning/error."""
     if not text:
         return False
-    value = text.lstrip()
-    if value.startswith(_WARNING_MARKERS):
-        return True
-    lowered = value.casefold()
-    return lowered.startswith(("خطا:", "خطا ", "هشدار:", "هشدار "))
+    value = text.lstrip().casefold()
+    return value.startswith(tuple(prefix.casefold() for prefix in _WARNING_PREFIXES))
 
 
-async def delete_message_later(bot: Bot, chat_id: int, message_id: int, delay: float = WARNING_DELETE_DELAY) -> None:
+async def delete_message_later(
+    bot: Bot,
+    chat_id: int,
+    message_id: int,
+    delay: float = WARNING_DELETE_DELAY,
+) -> None:
     await asyncio.sleep(delay)
     try:
         await bot.delete_message(chat_id=chat_id, message_id=message_id)
     except (TelegramBadRequest, TelegramForbiddenError):
+        # Already deleted, not deletable, or insufficient Telegram permissions.
         return
     except Exception:
-        logger.exception("Failed to auto-delete warning message %s in chat %s", message_id, chat_id)
+        logger.exception(
+            "Failed to auto-delete warning message %s in chat %s",
+            message_id,
+            chat_id,
+        )
 
 
-def schedule_warning_deletion(message: Message, delay: float = WARNING_DELETE_DELAY) -> None:
+def schedule_warning_deletion(
+    message: Message,
+    delay: float = WARNING_DELETE_DELAY,
+) -> None:
     if message.chat is None or not message.message_id:
         return
     asyncio.create_task(
@@ -49,33 +64,34 @@ def schedule_warning_deletion(message: Message, delay: float = WARNING_DELETE_DE
 
 
 def install_warning_auto_delete() -> None:
-    """Install one global hook for warning/error messages sent by the bot."""
+    """Globally watch Telegram method execution so Message.answer() is covered too.
+
+    In aiogram 3, Message.answer() creates a SendMessage method object and the
+    Bot executes it through Bot.__call__. Patching only Bot.send_message misses
+    that path. This hook therefore sits at the common execution point and
+    catches both bot.send_message(...) and message.answer(...).
+    """
     if getattr(Bot, "_opex_warning_auto_delete_installed", False):
         return
 
-    original_send_message: Callable[..., Awaitable[Message]] = Bot.send_message
-    original_send_photo: Callable[..., Awaitable[Message]] = Bot.send_photo
+    original_call = Bot.__call__
 
-    async def send_message_with_auto_delete(self: Bot, *args, **kwargs):
-        message = await original_send_message(self, *args, **kwargs)
-        text = kwargs.get("text")
-        if text is None and len(args) > 1:
-            text = args[1]
-        if is_warning_text(text):
-            schedule_warning_deletion(message)
-        return message
+    async def call_with_warning_auto_delete(self: Bot, method: Any, request_timeout: int | None = None):
+        result = await original_call(self, method, request_timeout=request_timeout)
 
-    async def send_photo_with_auto_delete(self: Bot, *args, **kwargs):
-        message = await original_send_photo(self, *args, **kwargs)
-        caption = kwargs.get("caption")
-        if caption is None and len(args) > 2:
-            caption = args[2]
-        if is_warning_text(caption):
-            schedule_warning_deletion(message)
-        return message
+        if isinstance(result, Message):
+            text: str | None = None
+            if isinstance(method, SendMessage):
+                text = method.text
+            elif isinstance(method, SendPhoto):
+                text = method.caption
 
-    Bot.send_message = send_message_with_auto_delete  # type: ignore[method-assign]
-    Bot.send_photo = send_photo_with_auto_delete  # type: ignore[method-assign]
+            if is_warning_text(text):
+                schedule_warning_deletion(result)
+
+        return result
+
+    Bot.__call__ = call_with_warning_auto_delete  # type: ignore[method-assign]
     Bot._opex_warning_auto_delete_installed = True
 
 
