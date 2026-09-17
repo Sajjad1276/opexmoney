@@ -97,6 +97,18 @@ class NationMemberHistory(Base):
     recorded_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
+class RateHistory(Base):
+    __tablename__ = "rate_history"
+    __table_args__ = (Index("ix_rate_history_nation_calculated", "nation_id", "calculated_at"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    nation_id: Mapped[int] = mapped_column(ForeignKey("nations.nation_id", ondelete="CASCADE"), nullable=False)
+    rate: Mapped[Decimal] = mapped_column(Numeric(10, 4), nullable=False)
+    volume: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False)
+    active_members: Mapped[int] = mapped_column(Integer, nullable=False)
+    calculated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
 class NationRank(Base):
     __tablename__ = "nation_ranks"
 
