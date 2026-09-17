@@ -5,15 +5,13 @@ from __future__ import annotations
 import re
 import unicodedata
 
-# The trader name is restricted to ASCII letters, so this list targets
-# common English sexual, vulgar, abusive, and otherwise inappropriate terms.
-# Keep the user-facing response generic instead of echoing the blocked term.
+# Common English sexual, vulgar, abusive, and otherwise inappropriate names.
+# User-facing messages never reveal which blocked term matched.
 BLOCKED_TERMS = frozenset(
     {
         "anal",
         "anus",
         "arse",
-        "ass",
         "balls",
         "bastard",
         "bitch",
@@ -45,20 +43,18 @@ BLOCKED_TERMS = frozenset(
         "sex",
         "shit",
         "slut",
-        "tit",
         "tits",
         "vagina",
         "whore",
     }
 )
 
-# Prevent trivial separator insertion such as f.u.c.k or f-u-c-k.
 SEPARATOR_RE = re.compile(r"[^a-z0-9]+")
 ASCII_NAME_RE = re.compile(r"^[A-Za-z]{3,15}$")
 
 
 def normalize_name(value: str) -> str:
-    """Normalize a candidate for reliable duplicate/profanity checks."""
+    """Normalize a candidate for reliable profanity checks."""
     value = unicodedata.normalize("NFKC", value).strip().lower()
     return SEPARATOR_RE.sub("", value)
 
@@ -69,8 +65,13 @@ def is_valid_trader_name(value: str) -> bool:
 
 
 def is_blocked_trader_name(value: str) -> bool:
-    """Detect blocked words, including simple separator/punctuation bypasses."""
+    """Detect blocked terms while avoiding short-word false positives."""
+    raw = unicodedata.normalize("NFKC", value).strip().lower()
     normalized = normalize_name(value)
     if not normalized:
         return False
-    return any(term in normalized for term in BLOCKED_TERMS)
+
+    # Exact matching handles normal valid names. The normalized check handles
+    # punctuation-separated variants such as f.u.c.k, even though those names
+    # are rejected by the format validator as well.
+    return raw in BLOCKED_TERMS or normalized in BLOCKED_TERMS
