@@ -43,7 +43,7 @@ def current_date_fa() -> str:
 
 
 def _valid_username(value: str) -> bool:
-    return bool(re.fullmatch(r"[A-Za-z\u0600-\u06FF]{3,15}", value))
+    return bool(re.fullmatch(r"[A-Za-z]{3,15}", value))
 
 
 async def _safe_edit_text(call: CallbackQuery, text: str, reply_markup=None) -> bool:
@@ -83,9 +83,9 @@ USERNAME_CAPTION = """💹 <b>اسم معامله‌گرت رو انتخاب ک�
 معاملات OPEX نمایش داده میشه.
 
 بنویس:
-· ۳ تا ۱۵ کاراکتر
-· فارسی یا انگلیسی
-· بدون فاصله، بدون @"""
+· ۳ تا ۱۵ حرف انگلیسی
+· فقط حروف A-Z
+· بدون فاصله، عدد و @"""
 
 DUPLICATE_NAME = """🔴 «{user_input}» قبلاً ثبت شده.
 
@@ -93,7 +93,7 @@ DUPLICATE_NAME = """🔴 «{user_input}» قبلاً ثبت شده.
 
 LENGTH_ERROR = """🔴 «{user_input}» قابل قبول نیست.
 
-۳ تا ۱۵ کاراکتر، فارسی یا انگلیسی.
+فقط ۳ تا ۱۵ حرف انگلیسی وارد کن.
 دوباره بنویس:"""
 
 
@@ -213,6 +213,7 @@ async def receive_username(message: Message, state: FSMContext) -> None:
             await message.answer(DUPLICATE_NAME.format(user_input=html.escape(username)), parse_mode="HTML")
             return
         await state.update_data(username=username)
+        await state.set_state(OnboardingStates.SELECT_NATION)
         nations = await get_active_nations(session, limit=3)
 
     if not nations:
@@ -293,7 +294,7 @@ async def join_nation(call: CallbackQuery, state: FSMContext) -> None:
             f"🏛 <b>{html.escape(nation.name)}</b>\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
             f"{user_mention(call.from_user)}، شهروند رسمی این ملت شدی.\n\n"
-            f"💰 موجودی اولیه:\n<b>۵۰۰ <code>{html.escape(nation.currency_code)}</code> ≈ {fmt_amount(initial_omx)} ΩXR</b>\n\n"
+            f"💰 موجودی اولیه:\n<b>۵۰۰ <code>{html.escape(nation.currency_code)} ≈ {fmt_amount(initial_omx)} ΩXR</b>\n\n"
             "─────────────────\n"
             f"{get_rate_emoji(get_rate_change(nation))} نرخ <code>{html.escape(nation.currency_code)}</code>: <b>{fmt_rate(nation.exchange_rate)} ΩXR</b>\n"
             f"<i>{fmt_pct(get_rate_change(nation))} نسبت به دیروز</i>\n\n"
@@ -430,11 +431,11 @@ async def founder(call: CallbackQuery, state: FSMContext) -> None:
 @router.callback_query(F.data == "cancel_start")
 async def cancel_start(call: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
-    text = f"{html.escape(call.from_user.first_name or 'معامله‌گر')}، هر وقت آماده شدی\nدوباره /start بزن."
-    if call.message and hasattr(call.message, "edit_caption") and getattr(call.message, "photo", None):
+    text = f"{html.escape(call.from_user.first_name or 'معامله‌گر')}، ثبت‌نام لغو شد.\n\nهر وقت خواستی، /start بزن."
+    if call.message and getattr(call.message, "photo", None):
         await _safe_edit_caption(call, text)
     else:
         await _safe_edit_text(call, text)
     if call.message:
-        await call.message.answer("هر وقت آماده شدی دوباره /start بزن.", reply_markup=ReplyKeyboardRemove(), parse_mode="HTML")
+        await call.message.answer("\u2063", reply_markup=ReplyKeyboardRemove())
     await call.answer()
