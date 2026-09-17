@@ -78,7 +78,9 @@ async def cancel_start_fix(call: CallbackQuery, state: FSMContext) -> None:
         else:
             await _safe_edit_text(call, text)
         if call.message:
-            await call.message.answer("", reply_markup=ReplyKeyboardRemove())
+            # Telegram requires non-empty message text to remove a reply keyboard.
+            # The invisible separator keeps the chat visually clean.
+            await call.message.answer("\u2063", reply_markup=ReplyKeyboardRemove())
         await call.answer()
     except TelegramBadRequest:
         await call.answer("ثبت‌نام لغو شد.", show_alert=False)
