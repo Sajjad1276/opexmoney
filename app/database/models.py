@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
 
-from sqlalchemy import DateTime, Enum as SAEnum, ForeignKey, Index, Integer, Numeric, String, UniqueConstraint, func
+from sqlalchemy import BigInteger, DateTime, Enum as SAEnum, ForeignKey, Index, Integer, Numeric, String, UniqueConstraint, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -75,7 +75,7 @@ class Transaction(Base):
 class UserActivity(Base):
     __tablename__ = "user_activities"
     __table_args__ = (Index("ix_user_activities_nation_created", "nation_id", "created_at"),)
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.user_id"), nullable=False)
     nation_id: Mapped[int] = mapped_column(ForeignKey("nations.nation_id"), nullable=False)
     activity_type: Mapped[ActivityType] = mapped_column(SAEnum(ActivityType, name="activity_type", values_callable=lambda values: [item.value for item in values]), nullable=False)
@@ -94,7 +94,7 @@ class NationMemberHistory(Base):
 class RateHistory(Base):
     __tablename__ = "rate_history"
     __table_args__ = (Index("ix_rate_history_nation_calculated", "nation_id", "calculated_at"),)
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     nation_id: Mapped[int] = mapped_column(ForeignKey("nations.nation_id", ondelete="CASCADE"), nullable=False)
     rate: Mapped[Decimal] = mapped_column(Numeric(10, 4), nullable=False)
     volume: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False)
