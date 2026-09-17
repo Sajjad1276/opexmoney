@@ -15,7 +15,7 @@ _WARNING_MARKERS = ("🔴", "⚠️", "⚠", "❌")
 
 
 def is_warning_text(text: str | None) -> bool:
-    """Return True only for bot messages that are presented as warnings/errors."""
+    """Return True for bot messages explicitly presented as warnings/errors."""
     if not text:
         return False
     value = text.lstrip()
@@ -30,7 +30,6 @@ async def delete_message_later(bot: Bot, chat_id: int, message_id: int, delay: f
     try:
         await bot.delete_message(chat_id=chat_id, message_id=message_id)
     except (TelegramBadRequest, TelegramForbiddenError):
-        # The message may already be gone or the bot may not have delete rights.
         return
     except Exception:
         logger.exception("Failed to auto-delete warning message %s in chat %s", message_id, chat_id)
@@ -50,11 +49,7 @@ def schedule_warning_deletion(message: Message, delay: float = WARNING_DELETE_DE
 
 
 def install_warning_auto_delete() -> None:
-    """Install a process-wide hook so warning/error messages auto-delete after 10s.
-
-    This covers Message.answer/send_message and photo captions without requiring
-    every handler to remember a separate delete task.
-    """
+    """Install one global hook for warning/error messages sent by the bot."""
     if getattr(Bot, "_opex_warning_auto_delete_installed", False):
         return
 
@@ -64,8 +59,8 @@ def install_warning_auto_delete() -> None:
     async def send_message_with_auto_delete(self: Bot, *args, **kwargs):
         message = await original_send_message(self, *args, **kwargs)
         text = kwargs.get("text")
-        if text is None and args:
-            text = args[2] if len(args) > 2 else None
+        if text is None and len(args) > 1:
+            text = args[1]
         if is_warning_text(text):
             schedule_warning_deletion(message)
         return message
