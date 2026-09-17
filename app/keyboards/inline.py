@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from aiogram.enums import ButtonStyle
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
