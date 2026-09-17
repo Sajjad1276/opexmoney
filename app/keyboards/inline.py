@@ -13,32 +13,32 @@ def start_keyboard() -> InlineKeyboardMarkup:
 
 def cancel_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="❌ انصراف", callback_data="cancel_start", style=ButtonStyle.DANGER)
+        InlineKeyboardButton(text="❌ انصراف", callback_data="cancel_start", style=ButtonStyle.DANGER),
     ]])
 
 
 def nation_keyboard(nations) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text=f"پیوستن به {nation.name}", callback_data=f"join_nation_{nation.nation_id}", style=ButtonStyle.SUCCESS)
+        InlineKeyboardButton(text=f"🏛 پیوستن به {nation.name}", callback_data=f"join_{nation.nation_id}", style=ButtonStyle.SUCCESS),
     ] for nation in nations])
 
 
 def no_nation_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="🏛 ساخت ملت", callback_data="start_founder", style=ButtonStyle.PRIMARY)
+        InlineKeyboardButton(text="👑 ساخت اولین ملت تاریخ", callback_data="start_founder", style=ButtonStyle.PRIMARY),
     ]])
 
 
 def first_trade_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="⚡ اولین معامله‌ام رو انجام بده", callback_data="first_trade_tutorial", style=ButtonStyle.SUCCESS)
+        InlineKeyboardButton(text="⚡ اولین معامله‌ام رو انجام بده", callback_data="first_trade_tutorial", style=ButtonStyle.SUCCESS),
     ]])
 
 
 def trade_confirmation_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(text="✅ تأیید معامله", callback_data="confirm_first_trade", style=ButtonStyle.SUCCESS),
-        InlineKeyboardButton(text="❌ بعداً", callback_data="skip_first_trade", style=ButtonStyle.DANGER),
+        InlineKeyboardButton(text="⏭ بعداً", callback_data="skip_first_trade"),
     ]])
 
 
