@@ -8,11 +8,12 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from app.database.session import async_session
-from app.handlers.start import _safe_edit_caption, _safe_edit_text, nation_list_text, user_mention
+from app.handlers.start import _safe_edit_caption, _safe_edit_text, user_mention
 from app.keyboards.inline import cancel_keyboard, nation_keyboard, no_nation_keyboard
 from app.services.nation_service import get_active_nations
 from app.services.user_service import username_exists
 from app.states.onboarding import OnboardingStates
+from app.utils.formatting import fmt_pct, fmt_rate, get_rate_change, get_rate_emoji, to_fa
 from app.utils.name_filter import is_blocked_trader_name, is_valid_trader_name
 
 router = Router(name="onboarding_fix")
@@ -50,6 +51,35 @@ NO_NATION_TEXT = """🌍 <b>هنوز هیچ ملتی در OPEX وجود ندار
 {user_mention}، تو اولین معامله‌گری هستی که وارد OPEX شده.
 
 برای شروع اقتصاد OPEX، اولین ملت تاریخ رو بساز."""
+
+
+def clean_nation_list_text(user, trader_name: str, nations) -> str:
+    """Render nation selection without decorative separator lines."""
+    lines = [
+        f"🌍 <b>«{html.escape(trader_name)}»، حالا یک ملت انتخاب کن.</b>",
+        "",
+        f"{user_mention(user)}، ارز ملتی که انتخاب می‌کنی پول اصلی حسابت میشه.",
+        "هر معامله‌ات مستقیم روی نرخ اون ارز اثر میذاره.",
+        "",
+        "ملت‌های فعال:",
+        "",
+    ]
+
+    for index, nation in enumerate(nations, start=1):
+        change = get_rate_change(nation)
+        lines.extend([
+            f"🏛 <b>{html.escape(nation.name)} · {html.escape(nation.currency_code)}</b>",
+            f"{get_rate_emoji(change)} <b>{fmt_rate(nation.exchange_rate)} ΩXR</b> · <i>{fmt_pct(change)} امروز</i>",
+            f"👥 {to_fa(nation.active_members_24h)} عضو · 🏆 رتبه #{to_fa(nation.nation_rank or 0)}",
+        ])
+        if index != len(nations):
+            lines.append("")
+
+    lines.extend([
+        "",
+        "نرخ‌ها هر ۱۵ دقیقه آپدیت میشن.",
+    ])
+    return "\n".join(lines)
 
 
 async def _edit_onboarding_prompt(message: Message, state: FSMContext, text: str, reply_markup=None) -> bool:
@@ -134,24 +164,29 @@ async def accept_valid_name(message: Message, state: FSMContext) -> None:
             return
         nations = await get_active_nations(session, limit=3)
 
-    data = await state.get_data()
     await state.update_data(username=username)
 
-    # First transform the original name prompt into a clean confirmation.
+    # The original name-entry message becomes the standalone confirmation.
     confirmation = NAME_ACCEPTED_TEXT.format(username=html.escape(username))
     if not await _edit_onboarding_prompt(message, state, confirmation):
         await message.answer(confirmation, parse_mode="HTML")
 
-    # The nation-selection screen intentionally starts as a new message.
+    # Nation selection is deliberately a NEW message after the confirmation.
     await state.set_state(OnboardingStates.SELECT_NATION)
 
     if not nations:
-        nation_text = NO_NATION_TEXT.format(user_mention=user_mention(message.from_user))
-        await message.answer(nation_text, reply_markup=no_nation_keyboard(), parse_mode="HTML")
+        await message.answer(
+            NO_NATION_TEXT.format(user_mention=user_mention(message.from_user)),
+            reply_markup=no_nation_keyboard(),
+            parse_mode="HTML",
+        )
         return
 
-    nation_text = nation_list_text(message.from_user, username, nations)
-    await message.answer(nation_text, reply_markup=nation_keyboard(nations), parse_mode="HTML")
+    await message.answer(
+        clean_nation_list_text(message.from_user, username, nations),
+        reply_markup=nation_keyboard(nations),
+        parse_mode="HTML",
+    )
 
 
 @router.callback_query(F.data == "cancel_start")
