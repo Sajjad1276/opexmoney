@@ -17,6 +17,12 @@ def cancel_keyboard() -> InlineKeyboardMarkup:
     ]])
 
 
+def founder_cancel_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="❌ بستن", callback_data="cancel_founder", style=ButtonStyle.DANGER),
+    ]])
+
+
 def nation_keyboard(nations) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(text=f"🏛 پیوستن به {nation.name}", callback_data=f"join_{nation.nation_id}", style=ButtonStyle.SUCCESS),
