@@ -282,6 +282,33 @@ async def join_nation(call: CallbackQuery, state: FSMContext) -> None:
     async with async_session() as session:
         existing = await get_user(session, call.from_user.id)
         if existing is not None:
+            # A partial DB registration can safely finish here after restart/deploy.
+            if existing.home_nation_id is None:
+                holding = await session.scalar(
+                    select(CurrencyHolding).where(
+                        CurrencyHolding.user_id == existing.user_id,
+                        CurrencyHolding.nation_id == nation.nation_id,
+                    )
+                )
+                if holding is None:
+                    existing.home_nation_id = nation.nation_id
+                    existing.balance = Decimal("500.00")
+                    session.add(
+                        CurrencyHolding(
+                            user_id=existing.user_id,
+                            nation_id=nation.nation_id,
+                            amount=Decimal("500.00"),
+                        )
+                    )
+                    nation.member_count += 1
+                    session.add(
+                        UserActivity(
+                            user_id=existing.user_id,
+                            nation_id=nation.nation_id,
+                            activity_type="login",
+                        )
+                    )
+                    await session.commit()
             await state.clear()
             await call.answer()
             if call.message:
