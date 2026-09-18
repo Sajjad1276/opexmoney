@@ -298,64 +298,91 @@ async def join_nation(call: CallbackQuery, state: FSMContext) -> None:
     if not trader_name:
         await call.answer("⏱ فرآیند ثبت‌نام منقضی شد. /start بزن.", show_alert=True)
         return
-    async with async_session() as session:
-        result = await session.execute(
-            select(Nation)
-            .where(
-                Nation.nation_id == nation_id,
-                Nation.is_active.is_(True),
-            )
-            .with_for_update()
-        )
-        nation = result.scalar_one_or_none()
-        if nation is None:
-            await call.answer("⚠️ این ملت دیگه در دسترس نیست.", show_alert=True)
-            return
 
-        existing = await get_user(session, call.from_user.id)
-        if existing is not None:
-            # A partial DB registration can safely finish here after restart/deploy.
-            if existing.home_nation_id is None:
-                holding = await session.scalar(
-                    select(CurrencyHolding).where(
-                        CurrencyHolding.user_id == existing.user_id,
-                        CurrencyHolding.nation_id == nation.nation_id,
+    async with async_session() as session:
+        async with session.begin():
+            result = await session.execute(
+                select(Nation).where(
+                    Nation.nation_id == nation_id,
+                    Nation.is_active.is_(True),
+                ).with_for_update()
+            )
+            nation = result.scalar_one_or_none()
+            if nation is None:
+                await call.answer("⚠️ این ملت دیگه در دسترس نیست.", show_alert=True)
+                return
+
+            existing = await get_user(session, call.from_user.id)
+            if existing is not None:
+                if existing.home_nation_id is None:
+                    holding = await session.scalar(
+                        select(CurrencyHolding).where(
+                            CurrencyHolding.user_id == existing.user_id,
+                            CurrencyHolding.nation_id == nation.nation_id,
+                        )
                     )
-                )
-                if holding is None:
-                    existing.home_nation_id = nation.nation_id
-                    existing.balance = Decimal("500.00")
-                    session.add(
-                        CurrencyHolding(
+                    if holding is None:
+                        existing.home_nation_id = nation.nation_id
+                        existing.balance = Decimal("500.00")
+                        session.add(CurrencyHolding(
                             user_id=existing.user_id,
                             nation_id=nation.nation_id,
                             amount=Decimal("500.00"),
-                        )
-                    )
-                    nation.member_count += 1
-                    session.add(
-                        UserActivity(
+                        ))
+                        nation.member_count += 1
+                        session.add(UserActivity(
                             user_id=existing.user_id,
                             nation_id=nation.nation_id,
                             activity_type="login",
-                        )
-                    )
-                    await session.commit()
-            await state.clear()
-            await call.answer()
-            if call.message:
-                await show_dashboard(call.message, existing)
-            return
-        user = User(user_id=call.from_user.id, username=trader_name, home_nation_id=nation.nation_id, balance=Decimal("500.00"), xr_balance=Decimal("0.00"), role="player")
-        holding = CurrencyHolding(user_id=user.user_id, nation_id=nation.nation_id, amount=Decimal("500.00"))
-        nation.member_count += 1
-        session.add_all([user, holding, UserActivity(user_id=user.user_id, nation_id=nation.nation_id, activity_type="login")])
-        await session.flush()
-        rank = await get_nation_rank(session, nation.nation_id)
-        total_nations = await session.scalar(select(func.count(Nation.nation_id)).where(Nation.is_active.is_(True))) or 0
-        initial_omx = Decimal("500") * nation.exchange_rate
-        await session.commit()
-        text = (f"🏛 <b>{html.escape(nation.name)}</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" f"{user_mention(call.from_user)}، شهروند رسمی این ملت شدی.\n\n" f"💰 موجودی اولیه:\n<b>۵۰۰ <code>{html.escape(nation.currency_code)}</code> ≈ {fmt_amount(initial_omx)} ΩXR</b>\n\n" "─────────────────\n" f"{get_rate_emoji(get_rate_change(nation))} نرخ <code>{html.escape(nation.currency_code)}</code>: <b>{fmt_rate(nation.exchange_rate)} ΩXR</b>\n" f"<i>{fmt_pct(get_rate_change(nation))} نسبت به دیروز</i>\n\n" f"🏆 رتبه #{to_fa(rank)} از {to_fa(total_nations)}\n👥 {to_fa(nation.active_members_24h)} عضو فعال\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" f"هر معامله‌ات روی نرخ <code>{html.escape(nation.currency_code)}</code> اثر میذاره.")
+                        ))
+                await state.clear()
+                await call.answer()
+                if call.message:
+                    await show_dashboard(call.message, existing)
+                return
+
+            user = User(
+                user_id=call.from_user.id,
+                username=trader_name,
+                home_nation_id=nation.nation_id,
+                balance=Decimal("500.00"),
+                xr_balance=Decimal("0.00"),
+                role="player",
+            )
+            holding = CurrencyHolding(
+                user_id=user.user_id,
+                nation_id=nation.nation_id,
+                amount=Decimal("500.00"),
+            )
+            nation.member_count += 1
+            session.add_all([
+                user,
+                holding,
+                UserActivity(
+                    user_id=user.user_id,
+                    nation_id=nation.nation_id,
+                    activity_type="login",
+                ),
+            ])
+            await session.flush()
+            rank = await get_nation_rank(session, nation.nation_id)
+            total_nations = await session.scalar(
+                select(func.count(Nation.nation_id)).where(Nation.is_active.is_(True))
+            ) or 0
+            initial_omx = Decimal("500") * nation.exchange_rate
+
+    text = (
+        f"🏛 <b>{html.escape(nation.name)}</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"{user_mention(call.from_user)}، شهروند رسمی این ملت شدی.\n\n"
+        f"💰 موجودی اولیه:\n<b>۵۰۰ <code>{html.escape(nation.currency_code)}</code> ≈ {fmt_amount(initial_omx)} ΩXR</b>\n\n"
+        "─────────────────\n"
+        f"{get_rate_emoji(get_rate_change(nation))} نرخ <code>{html.escape(nation.currency_code)}</code>: <b>{fmt_rate(nation.exchange_rate)} ΩXR</b>\n"
+        f"<i>{fmt_pct(get_rate_change(nation))} نسبت به دیروز</i>\n\n"
+        f"🏆 رتبه #{to_fa(rank)} از {to_fa(total_nations)}\n"
+        f"👥 {to_fa(nation.active_members_24h)} عضو فعال\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"هر معامله‌ات روی نرخ <code>{html.escape(nation.currency_code)}</code> اثر میذاره."
+    )
     await state.clear()
     await state.update_data(first_trade_available=True)
     await _safe_edit_text(call, text, first_trade_keyboard())
@@ -385,36 +412,37 @@ async def first_trade_tutorial(call: CallbackQuery, state: FSMContext) -> None:
 async def confirm_first_trade(call: CallbackQuery, state: FSMContext) -> None:
     data = await state.get_data()
     if not data.get("first_trade_available"):
-        await call.answer()
-        return
+            await call.answer()
+            return
     async with async_session() as session:
-        user = (await session.execute(select(User).where(User.user_id == call.from_user.id).with_for_update())).scalar_one_or_none()
-        if not user or not user.home_nation_id:
-            await call.answer("⚠️ حساب پیدا نشد. /start بزن.", show_alert=True)
-            return
-        nation = await session.get(Nation, user.home_nation_id, with_for_update=True)
-        holding = await session.scalar(select(CurrencyHolding).where(CurrencyHolding.user_id == user.user_id, CurrencyHolding.nation_id == user.home_nation_id).with_for_update())
-        if not nation or not holding:
-            await call.answer("⚠️ حساب پیدا نشد. /start بزن.", show_alert=True)
-            return
-        if holding.amount < Decimal("50"):
-            await call.answer("🔴 موجودی کافی نیست.", show_alert=True)
-            return
-        rate = nation.exchange_rate
-        receive_omx = Decimal("50") * rate
-        holding.amount -= Decimal("50")
-        user.balance = holding.amount
-        user.xr_balance += receive_omx
-        nation.trade_volume_24h += receive_omx
-        session.add(Transaction(user_id=user.user_id, nation_id=nation.nation_id, transaction_type="sell", spend_xr=receive_omx, amount=Decimal("50"), fee_xr=Decimal("0"), rate=rate))
-        session.add(UserActivity(user_id=user.user_id, nation_id=nation.nation_id, activity_type="trade"))
-        await session.commit()
-        text = ("✅ <b>معامله انجام شد.</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" f"📤 فروختی:   <s>۵۰ {html.escape(nation.currency_code)}</s>\n📥 دریافتی:  <b>{fmt_amount(receive_omx)} ΩXR</b>\n\n─────────────────\n" f"💰 موجودی:\n<code>{html.escape(nation.currency_code)}</code>: <b>{fmt_amount(holding.amount)}</b>\n<code>ΩXR</code>: <b>{fmt_amount(user.xr_balance)}</b>\n\n─────────────────\n" "✨ <b>«اولین قدم در بازارهای OPEX» باز شد.</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            async with session.begin():
+                user = (await session.execute(select(User).where(User.user_id == call.from_user.id).with_for_update())).scalar_one_or_none()
+            if not user or not user.home_nation_id:
+                await call.answer("⚠️ حساب پیدا نشد. /start بزن.", show_alert=True)
+                return
+            nation = await session.get(Nation, user.home_nation_id, with_for_update=True)
+            holding = await session.scalar(select(CurrencyHolding).where(CurrencyHolding.user_id == user.user_id, CurrencyHolding.nation_id == user.home_nation_id).with_for_update())
+            if not nation or not holding:
+                await call.answer("⚠️ حساب پیدا نشد. /start بزن.", show_alert=True)
+                return
+            if holding.amount < Decimal("50"):
+                await call.answer("🔴 موجودی کافی نیست.", show_alert=True)
+                return
+            rate = nation.exchange_rate
+            receive_omx = Decimal("50") * rate
+            holding.amount -= Decimal("50")
+            user.balance = holding.amount
+            user.xr_balance += receive_omx
+            nation.trade_volume_24h += receive_omx
+            session.add(Transaction(user_id=user.user_id, nation_id=nation.nation_id, transaction_type="sell", spend_xr=receive_omx, amount=Decimal("50"), fee_xr=Decimal("0"), rate=rate))
+            session.add(UserActivity(user_id=user.user_id, nation_id=nation.nation_id, activity_type="trade"))
+            await session.commit()
+    text = ("✅ <b>معامله انجام شد.</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" f"📤 فروختی:   <s>۵۰ {html.escape(nation.currency_code)}</s>\n📥 دریافتی:  <b>{fmt_amount(receive_omx)} ΩXR</b>\n\n─────────────────\n" f"💰 موجودی:\n<code>{html.escape(nation.currency_code)}</code>: <b>{fmt_amount(holding.amount)}</b>\n<code>ΩXR</code>: <b>{fmt_amount(user.xr_balance)}</b>\n\n─────────────────\n" "✨ <b>«اولین قدم در بازارهای OPEX» باز شد.</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     await state.clear()
     await _safe_edit_text(call, text)
     await call.answer()
     if call.message:
-        await call.message.answer("🌐 <b>منوی اصلی آماده‌ست.</b>", reply_markup=main_menu(), parse_mode="HTML")
+    await call.message.answer("🌐 <b>منوی اصلی آماده‌ست.</b>", reply_markup=main_menu(), parse_mode="HTML")
 
 
 @router.callback_query(F.data == "skip_first_trade")
