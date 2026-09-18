@@ -388,6 +388,8 @@ async def confirm_founder(
             logger.exception("Nation creation failed")
             await call.answer("⚠️ تأسیس ملت انجام نشد. دوباره امتحان کن.", show_alert=True)
             return
+        async with session.begin():
+            await clear_draft(session, call.from_user.id)
 
     await state.clear()
     await call.answer()
