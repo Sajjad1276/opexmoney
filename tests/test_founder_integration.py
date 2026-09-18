@@ -62,6 +62,34 @@ async def test_create_nation_is_atomic_and_initializes_founder():
 
 
 @pytest.mark.asyncio
+async def test_create_nation_works_before_first_currency_holding():
+    async with async_session() as session:
+        async with session.begin():
+            session.add(User(user_id=910006, username="testuser6"))
+
+    async with async_session() as session:
+        nation = await create_nation(
+            session=session,
+            founder_user_id=910006,
+            group_id=-100910009,
+            nation_name="First Kingdom",
+            currency_code="KIN",
+        )
+
+    async with async_session() as session:
+        user = await session.get(User, 910006)
+        holding = await session.scalar(
+            select(CurrencyHolding).where(
+                CurrencyHolding.user_id == 910006,
+                CurrencyHolding.nation_id == nation.nation_id,
+            )
+        )
+        assert user.role == "founder"
+        assert user.home_nation_id == nation.nation_id
+        assert holding.amount == Decimal("1000.0000")
+
+
+@pytest.mark.asyncio
 async def test_founder_constraints_reject_duplicate_group_and_currency():
     async with async_session() as session:
         async with session.begin():
@@ -122,6 +150,6 @@ async def cleanup_test_rows():
     yield
     async with async_session() as session:
         async with session.begin():
-            await session.execute(delete(CurrencyHolding).where(CurrencyHolding.user_id >= 910001, CurrencyHolding.user_id <= 910005))
+            await session.execute(delete(CurrencyHolding).where(CurrencyHolding.user_id >= 910001, CurrencyHolding.user_id <= 910006))
             await session.execute(delete(User).where(User.user_id >= 910001, User.user_id <= 910005))
             await session.execute(delete(Nation).where(Nation.group_id >= -100910008, Nation.group_id <= -100910001))
