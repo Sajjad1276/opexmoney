@@ -92,9 +92,17 @@ async def test_draft_survives_new_memory_storage():
         assert draft.step_key == "FounderStates:SET_NATION_NAME"
         print("RESTART|PASS|MemoryStorage replaced|draft remains in PostgreSQL")
 
+    from sqlalchemy import delete
+    from app.database.models import OnboardingDraft
+
     async with __import__("app.database.session", fromlist=["async_session"]).async_session() as session:
         async with session.begin():
-            await session.delete(draft)
+            await session.execute(
+                delete(OnboardingDraft).where(OnboardingDraft.player_id == user_id)
+            )
+            user = await session.get(User, user_id)
+            if user is not None:
+                await session.delete(user)
 
 
 def test_production_storage_requires_redis(monkeypatch):
