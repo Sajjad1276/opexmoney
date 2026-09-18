@@ -9,6 +9,7 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
+from app.database.models import User
 from app.database.session import async_session
 from app.handlers.start import _safe_edit_caption, _safe_edit_text, start as restart_flow, user_mention
 from app.keyboards.inline import cancel_keyboard, nation_selection_keyboard
@@ -159,11 +160,25 @@ async def accept_valid_name(message: Message, state: FSMContext) -> None:
     async with async_session() as session:
         async with session.begin():
             if await username_exists(session, username):
-                duplicate_text = rtl_text(
-                    f"🔴 <b>«{html.escape(username)}» قبلاً ثبت شده.</b>\n\nیک اسم دیگه برای معامله‌گرت انتخاب کن."
-                )
-                await message.answer(duplicate_text, parse_mode="HTML")
-                return
+                existing = await session.get(User, message.from_user.id)
+                if existing is None or existing.username != username:
+                    duplicate_text = rtl_text(
+                        f"🔴 <b>«{html.escape(username)}» قبلاً ثبت شده.</b>\n\nیک اسم دیگه برای معامله‌گرت انتخاب کن."
+                    )
+                    await message.answer(duplicate_text, parse_mode="HTML")
+                    return
+            user = await session.get(User, message.from_user.id)
+            if user is None:
+                session.add(User(
+                    user_id=message.from_user.id,
+                    username=username,
+                    home_nation_id=None,
+                    balance=0,
+                    xr_balance=0,
+                    role="player",
+                ))
+            else:
+                user.username = username
             nations = await get_active_nations(session, limit=3)
 
     await state.update_data(username=username)
