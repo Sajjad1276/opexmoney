@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from aiogram import F, Router
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, InlineKeyboardButton, Message
 from sqlalchemy import select
 
 from app.database.models import Nation, User
