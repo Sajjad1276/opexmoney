@@ -231,7 +231,6 @@ async def confirm_founder(call: CallbackQuery, state: FSMContext, bot: Bot) -> N
                 group_id=int(group_id),
                 nation_name=nation_name,
                 currency_code=currency_code,
-                founder_username=None,
             )
         except ValueError as exc:
             await call.answer(str(exc), show_alert=True)
