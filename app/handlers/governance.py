@@ -132,9 +132,11 @@ async def governance_active(call: CallbackQuery):
     if len(overrides) > 12:
         lines.append(f"\n... و {to_fa(len(overrides) - 12)} قانون دیگر")
 
-    await call.message.edit_text(
+    await keyboard_manager.edit_inline(
+        call.message,
         "\n".join(lines),
-        reply_markup=governance_main_keyboard(user.role == "founder"),
+        kind="inline:governance",
+        markup=governance_main_keyboard(user.role == "founder"),
         parse_mode="HTML",
     )
     await call.answer()
@@ -155,12 +157,15 @@ async def governance_new(call: CallbackQuery, state: FSMContext):
         return
 
     await state.clear()
-    await call.message.edit_text(
+    await clear_draft(call.from_user.id)
+    await keyboard_manager.edit_inline(
+        call.message,
         "📝 <b>ثبت طرح جدید</b>\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
         "یک قانون از فهرست مجاز انتخاب کن.\n"
         "هیچ قانون خارج از این فهرست قابل ثبت نیست.",
-        reply_markup=governance_rule_keyboard(
+        kind="inline:governance",
+        markup=governance_rule_keyboard(
             [(key, definition.title_fa) for key, definition in RULE_REGISTRY.items()]
         ),
         parse_mode="HTML",
@@ -191,6 +196,11 @@ async def governance_select_rule(call: CallbackQuery, state: FSMContext):
 
     await state.set_state(GovernanceStates.WAITING_VALUE)
     await state.update_data(rule_key=key)
+    await save_draft(
+        call.from_user.id,
+        "governance.waiting_value",
+        {"rule_key": key},
+    )
 
     range_text = (
         f"بین {html.escape(_format_value(rule, rule.min_value))} "
@@ -198,12 +208,15 @@ async def governance_select_rule(call: CallbackQuery, state: FSMContext):
     )
     scope_text = "برای ملت خودت" if rule.target_scope == "nation" else "در سطح جهانی"
 
-    await call.message.edit_text(
+    await keyboard_manager.edit_inline(
+        call.message,
         f"⚙️ <b>{html.escape(rule.title_fa)}</b>\n"
         f"مقدار فعلی: <b>{html.escape(_format_value(rule, current))}</b>\n"
         f"بازه امن: <b>{range_text}</b>\n"
         f"دامنه: {scope_text}\n\n"
         "مقدار پیشنهادی رو به عدد بفرست.",
+        kind="inline:governance-value",
+        markup=governance_cancel_keyboard(),
         parse_mode="HTML",
     )
     await call.answer()
@@ -243,23 +256,31 @@ async def governance_receive_value(message: Message, state: FSMContext):
                 player_id=user.user_id,
             )
 
-    await state.update_data(
-        rule_key=key,
-        proposed_value=str(parsed),
-        target_scope=rule.target_scope,
-        target_id=target_id,
-        current_value=str(current),
-    )
+    draft_data = {
+        "rule_key": key,
+        "proposed_value": str(parsed),
+        "target_scope": rule.target_scope,
+        "target_id": target_id,
+        "current_value": str(current),
+    }
+    await state.update_data(**draft_data)
     await state.set_state(GovernanceStates.CONFIRM_PROPOSAL)
+    await save_draft(
+        message.from_user.id,
+        "governance.confirm_proposal",
+        draft_data,
+    )
 
-    await message.answer(
+    await keyboard_manager.send(
+        message,
         "📋 <b>پیش‌نمایش طرح</b>\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
         f"قانون: <b>{html.escape(rule.title_fa)}</b>\n"
         f"مقدار فعلی: <b>{html.escape(_format_value(rule, current))}</b>\n"
         f"مقدار پیشنهادی: <b>{html.escape(_format_value(rule, parsed))}</b>\n\n"
         "بعد از ثبت، طرح وارد صف رأی‌گیری میشه.",
-        reply_markup=governance_confirm_keyboard(),
+        kind="inline:governance-confirm",
+        markup=governance_confirm_keyboard(),
         parse_mode="HTML",
     )
 
@@ -291,14 +312,17 @@ async def governance_confirm(call: CallbackQuery, state: FSMContext):
                 await call.answer(str(exc), show_alert=True)
                 return
 
+    await clear_draft(call.from_user.id)
     await state.clear()
-    await call.message.edit_text(
+    await keyboard_manager.edit_inline(
+        call.message,
         "✅ <b>طرح ثبت شد.</b>\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
         f"شماره طرح: <b>#{proposal.id}</b>\n"
         "⏱ رأی‌گیری طبق چرخه اقتصادی باز میشه.\n"
         "برای دیدن وضعیت طرح‌ها برو به «رأی‌گیری‌های جاری».",
-        reply_markup=governance_main_keyboard(False),
+        kind="inline:governance",
+        markup=governance_main_keyboard(False),
         parse_mode="HTML",
     )
     await call.answer("✅ طرح ثبت شد")
