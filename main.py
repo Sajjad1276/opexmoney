@@ -11,19 +11,30 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.storage.redis import RedisStorage
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+
 from app.database.session import async_session, engine
-from app.handlers.market import router as market_router
+from app.diagnostics.flow_trace import FlowTraceMiddleware
+from app.diagnostics.self_test import run_startup_smoke_test
 from app.handlers.founder import founder_router
+from app.handlers.governance import governance_router
+from app.handlers.market import router as market_router
 from app.handlers.nation import nation_router
 from app.handlers.onboarding_fix import router as onboarding_fix_router
-from app.handlers.start import router as start_router
 from app.handlers.sections import router as sections_router
-from app.diagnostics.self_test import run_startup_smoke_test
-from app.diagnostics.flow_trace import FlowTraceMiddleware
-from app.services.economic_engine import reset_daily_metrics, update_nation_rates, update_nation_ranks
+from app.handlers.start import router as start_router
+from app.services.economic_engine import (
+    create_behavior_snapshot,
+    reset_daily_metrics,
+    update_nation_rates,
+    update_nation_ranks,
+)
+from app.services.governance_service import governance_cycle
 from config import settings
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(name)s | %(message)s")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+)
 logger = logging.getLogger("opexmoney")
 
 
@@ -40,7 +51,8 @@ async def run_rate_job() -> None:
         async with async_session() as session:
             async with session.begin():
                 await update_nation_rates(session)
-        logger.info("Nation rate engine completed")
+                await create_behavior_snapshot(session)
+        logger.info("Nation rate engine and behavior snapshot completed")
     except Exception:
         logger.exception("Nation rate engine failed")
 
@@ -65,16 +77,93 @@ async def run_daily_reset() -> None:
         logger.exception("Daily market reset failed")
 
 
-def build_scheduler() -> AsyncIOScheduler:
+async def run_governance_job(bot: Bot) -> None:
+    try:
+        async with async_session() as session:
+            async with session.begin():
+                result = await governance_cycle(session)
+                suspended = result.circuit_suspended
+            if suspended:
+                founder_ids = list(
+                    (
+                        await session.execute(
+                            __import__("sqlalchemy").select(
+                                __import__("app.database.models", fromlist=["User"]).User.user_id
+                            ).where(
+                                __import__("app.database.models", fromlist=["User"]).User.role == "founder"
+                            )
+                        )
+                    ).scalars().all()
+                )
+        if suspended:
+            for founder_id in founder_ids:
+                try:
+                    await bot.send_message(
+                        founder_id,
+                        "🚨 <b>ترمز ایمنی اقتصاد فعال شد.</b>\n"
+                        "جهش غیرعادی ثروت شناسایی شد و قوانین فعال برای مدت کوتاه معلق شدند.\n"
+                        "بعد از پایدار شدن بازار، قوانین دوباره بررسی میشن.",
+                        parse_mode="HTML",
+                    )
+                except Exception:
+                    logger.exception(
+                        "Could not notify founder %s about circuit breaker",
+                        founder_id,
+                    )
+        logger.info(
+            "Governance cycle completed | activated=%s revoked=%s suspended=%s temporal=%s",
+            result.activated,
+            result.revoked,
+            result.circuit_suspended,
+            result.temporal_rotated,
+        )
+    except Exception:
+        logger.exception("Governance cycle failed")
+
+
+def build_scheduler(bot: Bot) -> AsyncIOScheduler:
     scheduler = AsyncIOScheduler()
-    scheduler.add_job(run_rate_job, CronTrigger(minute="*/15"), id="rate_engine_15m", replace_existing=True, max_instances=1, coalesce=True)
-    scheduler.add_job(run_rank_job, CronTrigger(minute=0), id="nation_rank_hourly", replace_existing=True, max_instances=1, coalesce=True)
-    scheduler.add_job(run_daily_reset, CronTrigger(hour=0, minute=0), id="daily_market_reset", replace_existing=True, max_instances=1, coalesce=True)
+    scheduler.add_job(
+        run_rate_job,
+        CronTrigger(minute="*/15"),
+        id="rate_engine_15m",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+    scheduler.add_job(
+        run_rank_job,
+        CronTrigger(minute=0),
+        id="nation_rank_hourly",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+    scheduler.add_job(
+        run_governance_job,
+        CronTrigger(minute=5),
+        args=[bot],
+        id="governance_cycle",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+    scheduler.add_job(
+        run_daily_reset,
+        CronTrigger(hour=0, minute=0),
+        id="daily_market_reset",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
     return scheduler
 
 
 async def main() -> None:
-    bot = Bot(token=settings.bot_token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+    bot = Bot(
+        token=settings.bot_token,
+        default=DefaultBotProperties(parse_mode=ParseMode.HTML),
+    )
     dp = Dispatcher(storage=build_storage())
     flow_trace = FlowTraceMiddleware()
     dp.message.middleware(flow_trace)
@@ -84,29 +173,48 @@ async def main() -> None:
     async def errors_handler(event: ErrorEvent):
         update = event.update
         exception = event.exception
-        logger.error("Update %s caused error %s", update, exception, exc_info=True)
+        logger.error(
+            "Update %s caused error %s",
+            update,
+            exception,
+            exc_info=True,
+        )
         try:
             if update.message:
-                await update.message.answer("⚠️ یه مشکل موقت پیش اومد. لطفاً دوباره امتحان کن.")
+                await update.message.answer(
+                    "⚠️ یه مشکل موقت پیش اومد. لطفاً دوباره امتحان کن."
+                )
             elif update.callback_query:
-                await update.callback_query.answer("⚠️ خطا، دوباره امتحان کن", show_alert=True)
+                await update.callback_query.answer(
+                    "⚠️ خطا، دوباره امتحان کن",
+                    show_alert=True,
+                )
         except Exception:
             logger.exception("Failed to send user-facing error message")
         return True
+
     dp.include_router(onboarding_fix_router)
     dp.include_router(start_router)
     dp.include_router(market_router)
     dp.include_router(founder_router)
     dp.include_router(nation_router)
+    dp.include_router(governance_router)
     dp.include_router(sections_router)
-    smoke_ok = await run_startup_smoke_test(dp)
+
+    scheduler = build_scheduler(bot)
+    smoke_ok = await run_startup_smoke_test(dp, scheduler)
     if not smoke_ok:
-        logger.error("Startup smoke test failed; bot will continue only for diagnosis")
-    scheduler = build_scheduler()
+        logger.error(
+            "Startup smoke test failed; bot will continue only for diagnosis"
+        )
+
     scheduler.start()
     logger.info("OPEX MONEY is online")
     try:
-        await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
+        await dp.start_polling(
+            bot,
+            allowed_updates=dp.resolve_used_update_types(),
+        )
     finally:
         scheduler.shutdown(wait=False)
         await bot.session.close()
