@@ -15,6 +15,7 @@ from app.database.models import Nation, User
 from app.database.session import async_session
 from app.handlers.start import _safe_edit_caption, _safe_edit_text, start as restart_flow, user_mention
 from app.keyboards.inline import cancel_keyboard, nation_selection_keyboard
+from app.services.keyboard_state import KeyboardKind, keyboard_manager
 from app.services.nation_service import get_active_nations
 from app.services.temporal_service import ensure_temporal_profile
 from app.services.user_service import get_user, is_fully_registered, username_exists
@@ -85,11 +86,17 @@ async def show_nation_selection(
     await state.set_state(OnboardingStates.SELECT_NATION)
 
     if not nations:
-        await message.answer(
-            "🌍 هنوز هیچ ملتی تأسیس نشده!\n"
-            "تو می‌تونی اولین بنیان‌گذار باشی.\n"
-            "اولین ملت رو از همین‌جا بساز.",
-            reply_markup=nation_selection_keyboard([]),
+        await keyboard_manager.send_message(
+            message.bot,
+            chat_id=message.chat.id,
+            text=(
+                "🌍 هنوز هیچ ملتی تأسیس نشده!\n"
+                "تو می‌تونی اولین بنیان‌گذار باشی.\n"
+                "اولین ملت رو از همین‌جا بساز."
+            ),
+            kind=KeyboardKind.INLINE,
+            name="nation_selection",
+            markup=nation_selection_keyboard([]),
         )
         return
 
@@ -99,9 +106,13 @@ async def show_nation_selection(
         for nation in nations[:4]
     )
     lines.append("ملت جدید هم می‌تونی تأسیس کنی.")
-    await message.answer(
-        "\n".join(lines),
-        reply_markup=nation_selection_keyboard(nations[:4]),
+    await keyboard_manager.send_message(
+        message.bot,
+        chat_id=message.chat.id,
+        text="\n".join(lines),
+        kind=KeyboardKind.INLINE,
+        name="nation_selection",
+        markup=nation_selection_keyboard(nations[:4]),
         parse_mode="HTML",
     )
 
@@ -134,29 +145,34 @@ def clean_nation_list_text(user, trader_name: str, nations) -> str:
     return rtl_text("\n".join(lines))
 
 
-async def _edit_onboarding_prompt(message: Message, state: FSMContext, text: str, reply_markup=None) -> bool:
-    """Edit the original trader-name prompt when it is still available."""
+async def _edit_onboarding_prompt(message: Message, state: FSMContext, text: str, markup=None) -> bool:
+    """Edit the original trader-name prompt through the keyboard manager."""
     data = await state.get_data()
     prompt_message_id = data.get("onboarding_prompt_message_id")
     prompt_chat_id = data.get("onboarding_prompt_chat_id")
     if not prompt_message_id or not prompt_chat_id:
         return False
-
     try:
         if data.get("onboarding_prompt_has_photo"):
-            await message.bot.edit_message_caption(
+            await keyboard_manager.edit_caption_id(
+                message.bot,
                 chat_id=prompt_chat_id,
                 message_id=prompt_message_id,
                 caption=text,
-                reply_markup=reply_markup,
+                kind=KeyboardKind.INLINE if markup is not None else KeyboardKind.NONE,
+                name="onboarding_username" if markup is not None else "none",
+                markup=markup,
                 parse_mode="HTML",
             )
         else:
-            await message.bot.edit_message_text(
+            await keyboard_manager.edit_message_id(
+                message.bot,
                 chat_id=prompt_chat_id,
                 message_id=prompt_message_id,
                 text=text,
-                reply_markup=reply_markup,
+                kind=KeyboardKind.INLINE if markup is not None else KeyboardKind.NONE,
+                name="onboarding_username" if markup is not None else "none",
+                markup=markup,
                 parse_mode="HTML",
             )
         return True
