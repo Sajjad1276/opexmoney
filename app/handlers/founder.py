@@ -15,7 +15,7 @@ from app.database.models import CurrencyHolding, Nation, User
 from app.database.session import async_session
 from app.keyboards.reply import main_menu
 from app.services.nation_service import create_nation
-from app.services.user_service import get_user
+from app.services.user_service import get_user, is_user_registered
 from app.states.founder import FounderStates
 from app.states.onboarding import OnboardingStates
 from app.utils.validators import validate_currency_code, validate_nation_name
@@ -53,36 +53,16 @@ def _group_id_is_valid(value: str) -> bool:
     return bool(re.fullmatch(r"-100\d{9,10}", value.strip()))
 
 
-async def _registered_user(
-    telegram_id: int,
-) -> tuple[bool, User | None]:
-    async with async_session() as session:
-        async with session.begin():
-            user = await session.get(User, telegram_id)
-            if user is None:
-                return False, None
-
-            holding = await session.execute(
-                select(CurrencyHolding.id)
-                .where(CurrencyHolding.user_id == telegram_id)
-                .limit(1)
-            )
-            if holding.scalar_one_or_none() is None:
-                return False, user
-
-            return True, user
-
-
 @founder_router.callback_query(
     F.data == "found_nation",
     StateFilter(None, OnboardingStates.SELECT_NATION),
 )
 async def start_founder(call: CallbackQuery, state: FSMContext) -> None:
-    registered, user = await _registered_user(call.from_user.id)
-
-    if not registered:
-        await call.answer("⚠️ اول باید وارد بازی بشی.", show_alert=True)
-        return
+    async with async_session() as session:
+        if not await is_user_registered(session, call.from_user.id):
+            await call.answer("⚠️ اول باید وارد بازی بشی.", show_alert=True)
+            return
+        user = await get_user(session, call.from_user.id)
 
     if user and user.role == "founder":
         await call.answer(
