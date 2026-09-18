@@ -33,6 +33,15 @@ Validator = Callable[[str], bool]
 Action = Callable[..., Awaitable[None]]
 
 
+def _decimal_input(value: str) -> bool:
+    try:
+        number = Decimal(value.strip().replace(",", "").replace("٬", "").replace("٫", "."))
+    except (InvalidOperation, ValueError):
+        return False
+    return number.is_finite()
+
+
+
 @dataclass(frozen=True)
 class StepDefinition:
     state: Any
