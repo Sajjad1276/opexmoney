@@ -102,17 +102,16 @@ async def _known_groups() -> list[dict]:
         async with session.begin():
             await _ensure_founder_schema(session)
             result = await session.execute(
-            text(
-                """
-                SELECT group_id, title
-                FROM bot_groups
-                WHERE is_active = TRUE
-                ORDER BY title ASC
-                """
+                text(
+                    """
+                    SELECT group_id, title
+                    FROM bot_groups
+                    WHERE is_active = TRUE
+                    ORDER BY title ASC
+                    """
+                )
             )
             return [dict(row) for row in result.mappings().all()]
-
-
 async def _register_group(update: ChatMemberUpdated) -> None:
     chat = update.chat
     if chat.type not in {"group", "supergroup"}:
@@ -223,19 +222,20 @@ async def start_founder(call: CallbackQuery, state: FSMContext) -> None:
         async with session.begin():
             await _ensure_founder_schema(session)
             for group in groups:
-            active = await session.scalar(
-                text(
-                    """
-                    SELECT 1
-                    FROM nations
-                    WHERE group_id = :group_id AND is_active = TRUE
-                    LIMIT 1
-                    """
-                ),
-                {"group_id": group["group_id"]},
-            )
+                active = await session.scalar(
+                    text(
+                        """
+                        SELECT 1
+                        FROM nations
+                        WHERE group_id = :group_id AND is_active = TRUE
+                        LIMIT 1
+                        """
+                    ),
+                    {"group_id": group["group_id"]},
+                )
                 if active is None:
                     available.append(group)
+
 
     if not available:
         await state.clear()
