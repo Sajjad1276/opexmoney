@@ -157,13 +157,14 @@ async def accept_valid_name(message: Message, state: FSMContext) -> None:
         return
 
     async with async_session() as session:
-        if await username_exists(session, username):
+        async with session.begin():
+            if await username_exists(session, username):
             duplicate_text = rtl_text(
                 f"🔴 <b>«{html.escape(username)}» قبلاً ثبت شده.</b>\n\nیک اسم دیگه برای معامله‌گرت انتخاب کن."
             )
-            await message.answer(duplicate_text, parse_mode="HTML")
-            return
-        nations = await get_active_nations(session, limit=3)
+                await message.answer(duplicate_text, parse_mode="HTML")
+                return
+            nations = await get_active_nations(session, limit=3)
 
     await state.update_data(username=username)
 
