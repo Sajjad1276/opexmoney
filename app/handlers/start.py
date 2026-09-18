@@ -15,8 +15,8 @@ from sqlalchemy import func, select
 
 from app.database.models import CurrencyHolding, Nation, Transaction, User, UserActivity
 from app.database.session import async_session
-from app.keyboards.inline import cancel_keyboard, first_trade_keyboard, founder_cancel_keyboard, no_nation_keyboard, nation_keyboard, start_keyboard, trade_confirmation_keyboard
-from app.keyboards.reply import main_menu
+from app.keyboards.inline import cancel_keyboard, first_trade_keyboard, nation_keyboard, trade_confirmation_keyboard
+from app.keyboards.reply import get_welcome_keyboard, main_menu
 from app.services.nation_service import get_active_nations, get_nation_rank
 from app.services.user_service import get_registration_status, get_user, username_exists
 from app.states.onboarding import OnboardingStates
@@ -166,7 +166,7 @@ async def continue_registration(
     if not nations:
         await message.answer(
             "⚠️ ثبت‌نامت ناقصه، اما هنوز هیچ ملتی برای پیوستن وجود نداره.",
-            reply_markup=no_nation_keyboard(),
+            reply_markup=None,
         )
         return
 
@@ -215,24 +215,29 @@ async def start(message: Message, state: FSMContext) -> None:
         user_name=html.escape(message.from_user.first_name or "معامله‌گر"),
         current_date=current_date_fa(),
     )
-    try:
-        await message.answer_photo(
-            "assets/welcome_banner.jpg",
-            caption=caption,
-            reply_markup=start_keyboard(),
-            parse_mode="HTML",
-        )
-    except (TelegramBadRequest, TypeError):
-        await message.answer(
-            caption,
-            reply_markup=start_keyboard(),
-            parse_mode="HTML",
-        )
+    await message.answer(
+        caption,
+        reply_markup=get_welcome_keyboard(),
+        parse_mode="HTML",
+    )
 
 
-@router.callback_query(F.data == "start_help")
-async def start_help(call: CallbackQuery) -> None:
-    text = (
+@router.message(F.text == "🎮 شروع بازی")
+async def start_game_button(message: Message, state: FSMContext) -> None:
+    await state.clear()
+    await state.set_state(OnboardingStates.SET_USERNAME_PLAYER)
+    await message.answer(
+        USERNAME_CAPTION.format(
+            user_mention=user_mention(message.from_user),
+        ),
+        reply_markup=cancel_keyboard(),
+        parse_mode="HTML",
+    )
+
+
+@router.message(F.text == "❓ راهنما")
+async def start_help(message: Message) -> None:
+    await message.answer(
         "❓ <b>راهنمای OPEX MONEY</b>\n\n"
         "در این بازی تو یه معامله‌گر اقتصادی هستی.\n"
         "به ملت‌ها بپیوند، ارز بخر و بفروش،\n"
@@ -240,22 +245,10 @@ async def start_help(call: CallbackQuery) -> None:
         "برای شروع، یه اسم معامله‌گر انتخاب کن\n"
         "و به ملتی بپیوند.\n\n"
         "اگه بعداً خواستی ملت خودت رو بسازی،\n"
-        "از پنل بازی می‌تونی اقدام کنی."
+        "از پنل بازی می‌تونی اقدام کنی.",
+        reply_markup=get_welcome_keyboard(),
+        parse_mode="HTML",
     )
-    await _safe_edit_caption(call, text, start_keyboard()) if getattr(call.message, "photo", None) else await _safe_edit_text(call, text, start_keyboard())
-    await call.answer()
-
-
-@router.callback_query(F.data == "start_player")
-async def start_player(call: CallbackQuery, state: FSMContext) -> None:
-    await state.clear()
-    await state.set_state(OnboardingStates.SET_USERNAME_PLAYER)
-    caption = USERNAME_CAPTION.format(bot_name="OPEX MONEY", user_mention=user_mention(call.from_user), current_date=current_date_fa())
-    if call.message and getattr(call.message, "photo", None):
-        await _safe_edit_caption(call, caption, cancel_keyboard())
-    else:
-        await _safe_edit_text(call, caption, cancel_keyboard())
-    await call.answer()
 
 
 @router.message(OnboardingStates.SET_USERNAME_PLAYER)
@@ -272,7 +265,7 @@ async def receive_username(message: Message, state: FSMContext) -> None:
         await state.set_state(OnboardingStates.SELECT_NATION)
         nations = await get_active_nations(session, limit=3)
     if not nations:
-        text = (f"✅ <b>«{html.escape(username)}»</b> ثبت شد.\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" "⏳ هنوز هیچ ملتی وجود نداره.\n\n" f"{user_mention(message.from_user)}، تو اولین نفری هستی\nکه وارد OPEX میشی.\n\n" "اولین ملت تاریخ رو بساز.\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        text = (f"✅ <b>«{html.escape(username)}»</b> ثبت شد.\n\n" "⏳ هنوز هیچ ملتی برای پیوستن وجود نداره.\n\n" "بعداً دوباره امتحان کن.")
         await message.answer(text, reply_markup=no_nation_keyboard(), parse_mode="HTML")
         return
     await message.answer(nation_list_text(message.from_user, username, nations), reply_markup=nation_keyboard(nations), parse_mode="HTML")
