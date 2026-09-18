@@ -17,6 +17,7 @@ from app.states.founder import FounderStates
 from app.states.governance import GovernanceStates
 from app.states.market import MarketStates
 from app.states.onboarding import OnboardingStates
+from app.utils.name_filter import is_valid_trader_name
 from app.utils.validators import validate_nation_name
 
 
@@ -60,7 +61,7 @@ STEP_REGISTRY: dict[str, StepDefinition] = {
     OnboardingStates.SET_USERNAME_PLAYER.state: StepDefinition(
         OnboardingStates.SET_USERNAME_PLAYER,
         "اسم معامله‌گرت را بفرست.",
-        _looks_like_form_input,
+        is_valid_trader_name,
         _noop,
     ),
     OnboardingStates.SELECT_NATION.state: StepDefinition(
@@ -78,7 +79,7 @@ STEP_REGISTRY: dict[str, StepDefinition] = {
     FounderStates.SET_NATION_NAME.state: StepDefinition(
         FounderStates.SET_NATION_NAME,
         "نام انگلیسی ملت را بفرست.",
-        _looks_like_form_input,
+        lambda value: validate_nation_name(value)[0],
         _noop,
     ),
     FounderStates.CONFIRM.state: StepDefinition(
@@ -90,7 +91,7 @@ STEP_REGISTRY: dict[str, StepDefinition] = {
     MarketStates.WAITING_BUY_AMOUNT.state: StepDefinition(
         MarketStates.WAITING_BUY_AMOUNT,
         "مقدار ΩXR برای خرید را به عدد بفرست.",
-        _looks_like_numeric_step,
+        _decimal_input,
         _noop,
     ),
     MarketStates.WAITING_SELL_AMOUNT.state: StepDefinition(
