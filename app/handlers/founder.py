@@ -99,9 +99,9 @@ async def _ensure_founder_schema(session) -> None:
 
 async def _known_groups() -> list[dict]:
     async with async_session() as session:
-        await _ensure_founder_schema(session)
-        await session.commit()
-        result = await session.execute(
+        async with session.begin():
+            await _ensure_founder_schema(session)
+            result = await session.execute(
             text(
                 """
                 SELECT group_id, title
@@ -110,8 +110,7 @@ async def _known_groups() -> list[dict]:
                 ORDER BY title ASC
                 """
             )
-        )
-        return [dict(row) for row in result.mappings().all()]
+            return [dict(row) for row in result.mappings().all()]
 
 
 async def _register_group(update: ChatMemberUpdated) -> None:
@@ -194,7 +193,8 @@ async def start_founder(call: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
 
     async with async_session() as session:
-        user = await get_user(session, call.from_user.id)
+        async with session.begin():
+            user = await get_user(session, call.from_user.id)
         if user is None:
             if call.message:
                 await call.message.answer("⚠️ اول باید ثبت‌نام کنی.")
@@ -220,8 +220,9 @@ async def start_founder(call: CallbackQuery, state: FSMContext) -> None:
     available: list[dict] = []
 
     async with async_session() as session:
-        await _ensure_founder_schema(session)
-        for group in groups:
+        async with session.begin():
+            await _ensure_founder_schema(session)
+            for group in groups:
             active = await session.scalar(
                 text(
                     """
@@ -233,8 +234,8 @@ async def start_founder(call: CallbackQuery, state: FSMContext) -> None:
                 ),
                 {"group_id": group["group_id"]},
             )
-            if active is None:
-                available.append(group)
+                if active is None:
+                    available.append(group)
 
     if not available:
         await state.clear()
@@ -284,7 +285,8 @@ async def select_group(call: CallbackQuery, state: FSMContext) -> None:
         return
 
     async with async_session() as session:
-        active = await session.scalar(
+        async with session.begin():
+            active = await session.scalar(
             text(
                 """
                 SELECT 1
@@ -345,7 +347,8 @@ async def set_currency_code(message: Message, state: FSMContext) -> None:
         return
 
     async with async_session() as session:
-        exists = await session.scalar(
+        async with session.begin():
+            exists = await session.scalar(
             text(
                 "SELECT 1 FROM nations WHERE currency_code = :code LIMIT 1"
             ),
