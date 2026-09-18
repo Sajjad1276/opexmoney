@@ -167,6 +167,39 @@ async def track_bot_groups(update: ChatMemberUpdated) -> None:
         logger.exception("Failed to update bot group registry")
 
 
+@founder_router.message(F.chat.type.in_({"group", "supergroup"}))
+async def track_active_group_message(message: Message) -> None:
+    # Telegram does not provide an API to list all groups shared with a user.
+    # A group is therefore registered when the bot receives any message there.
+    chat = message.chat
+    title = chat.title or "گروه بدون نام"
+    username = getattr(chat, "username", None)
+
+    async with async_session() as session:
+        async with session.begin():
+            await _ensure_founder_schema(session)
+            await session.execute(
+                text(
+                    """
+                    INSERT INTO bot_groups
+                        (group_id, title, username, is_active, created_at, updated_at)
+                    VALUES
+                        (:group_id, :title, :username, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    ON CONFLICT (group_id) DO UPDATE SET
+                        title = EXCLUDED.title,
+                        username = EXCLUDED.username,
+                        is_active = TRUE,
+                        updated_at = CURRENT_TIMESTAMP
+                    """
+                ),
+                {
+                    "group_id": chat.id,
+                    "title": title,
+                    "username": username,
+                },
+            )
+
+
 async def _shared_groups(bot, user_id: int) -> list[dict]:
     groups = await _known_groups()
     shared: list[dict] = []
@@ -215,7 +248,10 @@ async def start_founder(call: CallbackQuery, state: FSMContext) -> None:
     if not groups:
         await state.clear()
         if call.message:
-            await call.message.answer("⚠️ ربات در هیچ گروه مشترکی با تو نیست.")
+            await call.message.answer(
+                "⚠️ هنوز گروه مشترکی برای تأسیس پیدا نشد.\n"
+                "ربات رو داخل گروهت باز کن و یک پیام یا /start بفرست، بعد دوباره تلاش کن."
+            )
         await call.answer()
         return
 
