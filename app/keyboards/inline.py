@@ -6,10 +6,9 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 def start_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="💹 می‌خوام بازی کنم", callback_data="start_player", style=ButtonStyle.SUCCESS),
-        InlineKeyboardButton(text="🏛 می‌خوام ملت بسازم", callback_data="start_founder", style=ButtonStyle.PRIMARY),
+        InlineKeyboardButton(text="🎮 شروع بازی", callback_data="start_player", style=ButtonStyle.SUCCESS),
+        InlineKeyboardButton(text="❓ راهنما", callback_data="start_help"),
     ]])
-
 
 def cancel_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[
