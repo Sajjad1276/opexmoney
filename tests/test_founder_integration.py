@@ -1,7 +1,7 @@
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 
 from app.database.models import CurrencyHolding, Nation, User
 from app.database.session import async_session
@@ -52,7 +52,7 @@ async def test_create_nation_is_atomic_and_initializes_founder():
     async with async_session() as session:
         user = await session.get(User, 910002)
         holding = await session.scalar(
-            __import__("sqlalchemy").select(CurrencyHolding)
+            select(CurrencyHolding)
             .where(CurrencyHolding.user_id == 910002, CurrencyHolding.nation_id == nation.nation_id)
         )
         assert user.role == "founder"
