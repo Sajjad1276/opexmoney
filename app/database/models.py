@@ -197,6 +197,13 @@ class RuleOverride(Base):
     __table_args__ = (
         Index("ix_rule_overrides_rule_active", "rule_key", "is_active"),
         Index(
+            "uq_rule_override_active_global",
+            "rule_key",
+            unique=True,
+            postgresql_where=text("is_active = TRUE AND scope = 'global'"),
+            sqlite_where=text("is_active = 1 AND scope = 'global'"),
+        ),
+        Index(
             "uq_rule_override_active_target",
             "rule_key",
             "scope",
