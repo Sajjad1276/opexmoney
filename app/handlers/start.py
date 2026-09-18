@@ -19,7 +19,8 @@ from app.keyboards.inline import cancel_keyboard, first_trade_keyboard, nation_s
 from app.keyboards.reply import main_menu_keyboard
 from app.services.keyboard_state import KeyboardKind, keyboard_manager
 from app.services.nation_service import get_active_nations, get_nation_rank
-from app.services.onboarding_draft import clear_draft, get_draft, save_draft
+from app.services.onboarding_draft import clear_draft, get_draft
+from app.services.draft_recovery import resume_from_draft
 from app.services.user_service import get_registration_status, get_user, is_fully_registered
 from app.states.onboarding import OnboardingStates
 from app.utils.formatting import fmt_amount, fmt_pct, fmt_rate, get_rate_change, get_rate_emoji, to_fa
@@ -218,6 +219,11 @@ async def continue_registration(
     )
 
 
+async def get_draft_for_start(user_id: int):
+    async with async_session() as session:
+        return await get_draft(session, user_id)
+
+
 @router.message(CommandStart())
 async def start(message: Message, state: FSMContext) -> None:
     async with async_session() as session:
@@ -234,6 +240,11 @@ async def start(message: Message, state: FSMContext) -> None:
             else:
                 registered_user = None
             status = await get_registration_status(session, message.from_user.id)
+
+    draft = await get_draft_for_start(message.from_user.id)
+    if draft is not None:
+        if await resume_from_draft(message, state):
+            return
 
     if registered_user is not None:
         await state.clear()
