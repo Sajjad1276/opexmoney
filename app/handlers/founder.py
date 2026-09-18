@@ -13,9 +13,10 @@ from sqlalchemy import select
 
 from app.database.models import CurrencyHolding, Nation, User
 from app.database.session import async_session
-from app.keyboards.reply import main_menu
+from app.keyboards.inline import confirm_found_nation_keyboard
+from app.keyboards.reply import main_menu_keyboard
 from app.services.nation_service import create_nation
-from app.services.user_service import get_user
+from app.services.user_service import get_user, is_fully_registered
 from app.states.founder import FounderStates
 from app.states.onboarding import OnboardingStates
 from app.utils.validators import validate_currency_code, validate_nation_name
@@ -60,17 +61,13 @@ def _group_id_is_valid(value: str) -> bool:
 async def start_founder(call: CallbackQuery, state: FSMContext) -> None:
     async with async_session() as session:
         async with session.begin():
-            user = await get_user(session, call.from_user.id)
-            if user is None or not (user.username or "").strip():
-                await call.answer("⚠️ اول باید اسم معامله‌گرت رو ثبت کنی.", show_alert=True)
+            if not await is_fully_registered(session, call.from_user.id):
+                await call.answer("⚠️ اول باید وارد بازی بشی.", show_alert=True)
                 return
-
-    if user and user.role == "founder":
-        await call.answer(
-            "⚠️ تو قبلاً یه ملت داری. هر معامله‌گر فقط یه ملت می‌تونه بسازه.",
-            show_alert=True,
-        )
-        return
+            user = await get_user(session, call.from_user.id)
+            if user is not None and user.role == "founder":
+                await call.answer("⚠️ تو قبلاً یه ملت داری.", show_alert=True)
+                return
 
     await state.clear()
     await state.set_state(FounderStates.WAITING_GROUP_LINK)
@@ -184,7 +181,7 @@ async def receive_currency_code(message: Message, state: FSMContext) -> None:
         f"👑 بنیان‌گذار: {html.escape(message.from_user.first_name or 'معامله‌گر')}\n"
         f"💰 موجودی اولیه: ۱۰۰۰ {html.escape(code)}\n"
         "کد ارز بعد از تأسیس قابل تغییر نیست.",
-        reply_markup=founder_confirm_keyboard(),
+        reply_markup=confirm_found_nation_keyboard(),
         parse_mode="HTML",
     )
 
@@ -232,7 +229,7 @@ async def confirm_founder(call: CallbackQuery, state: FSMContext, bot: Bot) -> N
             f"💰 موجودی: ۱۰۰۰ {html.escape(nation.currency_code)}\n"
             "📈 نرخ اولیه: ۱.۰۰ ΩXR\n"
             "از پنل ملت‌ها می‌تونی مدیریت کنی.",
-            reply_markup=main_menu(),
+            reply_markup=main_menu_keyboard(),
             parse_mode="HTML",
         )
 
