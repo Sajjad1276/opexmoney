@@ -16,9 +16,9 @@ from sqlalchemy import func, select
 from app.database.models import CurrencyHolding, Nation, Transaction, User, UserActivity
 from app.database.session import async_session
 from app.keyboards.inline import cancel_keyboard, first_trade_keyboard, nation_selection_keyboard, trade_confirmation_keyboard, welcome_keyboard
-from app.keyboards.reply import main_menu
+from app.keyboards.reply import main_menu_keyboard
 from app.services.nation_service import get_active_nations, get_nation_rank
-from app.services.user_service import get_registration_status, get_user
+from app.services.user_service import get_registration_status, get_user, is_fully_registered
 from app.states.onboarding import OnboardingStates
 from app.utils.formatting import fmt_amount, fmt_pct, fmt_rate, get_rate_change, get_rate_emoji, to_fa
 
@@ -88,7 +88,7 @@ async def show_dashboard(message: Message, user: User) -> None:
         async with session.begin():
             nation = await session.get(Nation, user.home_nation_id) if user.home_nation_id else None
         if nation is None:
-            await message.answer("<b>OPEX MONEY</b>\nحسابت آماده است، اما هنوز ملت اصلی نداری.", reply_markup=main_menu(), parse_mode="HTML")
+            await message.answer("<b>OPEX MONEY</b>\nحسابت آماده است، اما هنوز ملت اصلی نداری.", reply_markup=main_menu_keyboard(), parse_mode="HTML")
             return
         async with session.begin():
             rank = nation.nation_rank or await get_nation_rank(session, nation.nation_id)
@@ -99,7 +99,7 @@ async def show_dashboard(message: Message, user: User) -> None:
         minutes = max(0, int((datetime.utcnow() - nation.last_rate_update).total_seconds() // 60)) if nation.last_rate_update else 0
         balance = holding.amount if holding else user.balance
         text = ("🌐 <b>OPEX MONEY</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" f"{user_mention(message.from_user)}\n\n" f"🏛 {html.escape(nation.name)} · {html.escape(user.username)}\n" f"💰 <code>{html.escape(nation.currency_code)}</code>: <b>{fmt_amount(balance)}</b> · <code>ΩXR</code>: <b>{fmt_amount(user.xr_balance)}</b>\n\n" f"{get_rate_emoji(change)} <code>{html.escape(nation.currency_code)}</code>: <b>{fmt_rate(nation.exchange_rate)} ΩXR</b> · <i>{fmt_pct(change)} امروز</i>\n" f"🏆 رتبه #{to_fa(rank)} از {to_fa(total_nations)} · 👥 {to_fa(active)} فعال\n" f"⏱ <i>{to_fa(minutes)} دقیقه پیش</i>\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-    await message.answer(text, reply_markup=main_menu(), parse_mode="HTML")
+    await message.answer(text, reply_markup=main_menu_keyboard(), parse_mode="HTML")
 
 
 async def continue_registration(
@@ -178,12 +178,27 @@ async def continue_registration(
 
 @router.message(CommandStart())
 async def start(message: Message, state: FSMContext) -> None:
-    await state.clear()
-
     async with async_session() as session:
         async with session.begin():
+            if await is_fully_registered(session, message.from_user.id):
+                user = await get_user(session, message.from_user.id)
+                if user and user.home_nation_id is not None:
+                    session.add(UserActivity(
+                        user_id=user.user_id,
+                        nation_id=user.home_nation_id,
+                        activity_type="login",
+                    ))
+                registered_user = user
+            else:
+                registered_user = None
             status = await get_registration_status(session, message.from_user.id)
-            if status["status"] == "complete":
+
+    if registered_user is not None:
+        await state.clear()
+        await show_dashboard(message, registered_user)
+        return
+
+    if status["status"] == "complete":
                 user = status["user"]
                 if user.home_nation_id is not None:
                     session.add(UserActivity(
@@ -219,11 +234,20 @@ async def start(message: Message, state: FSMContext) -> None:
 
 
 async def _begin_registration(message: Message, state: FSMContext) -> None:
-    await state.clear()
-
     async with async_session() as session:
         async with session.begin():
+            if await is_fully_registered(session, message.from_user.id):
+                user = await get_user(session, message.from_user.id)
+            else:
+                user = None
             status = await get_registration_status(session, message.from_user.id)
+
+    if user is not None:
+        await state.clear()
+        await show_dashboard(message, user)
+        return
+
+    await state.clear()
 
     if status["status"] == "complete":
         await show_dashboard(message, status["user"])
@@ -253,7 +277,7 @@ async def start_game_button(message: Message, state: FSMContext) -> None:
     await _begin_registration(message, state)
 
 
-@router.callback_query(F.data == "start_game", StateFilter(None))
+@router.callback_query(F.data == "start_game")
 async def start_game_callback(call: CallbackQuery, state: FSMContext) -> None:
     if call.message is None:
         await call.answer("⚠️ پیام شروع بازی پیدا نشد.", show_alert=True)
@@ -287,10 +311,10 @@ async def start_help_callback(call: CallbackQuery) -> None:
         await _show_help(call.message)
 
 
-@router.callback_query(F.data.startswith("join_"), StateFilter(OnboardingStates.SELECT_NATION))
+@router.callback_query(F.data.startswith("join_nation:"), StateFilter(OnboardingStates.SELECT_NATION))
 async def join_nation(call: CallbackQuery, state: FSMContext) -> None:
     try:
-        nation_id = int(call.data.rsplit("_", 1)[1])
+        nation_id = int(call.data.split(":", 1)[1])
     except (ValueError, AttributeError):
         await call.answer("⚠️ این ملت معتبر نیست.", show_alert=True)
         return
@@ -479,7 +503,7 @@ async def confirm_first_trade(call: CallbackQuery, state: FSMContext) -> None:
     if call.message:
         await call.message.answer(
             "🌐 <b>منوی اصلی آماده‌ست.</b>",
-            reply_markup=main_menu(),
+            reply_markup=main_menu_keyboard(),
             parse_mode="HTML",
         )
 
@@ -497,7 +521,7 @@ async def skip_first_trade(call: CallbackQuery, state: FSMContext) -> None:
     await _safe_edit_text(call, text)
     await call.answer()
     if call.message:
-        await call.message.answer("🌐 <b>منوی اصلی آماده‌ست.</b>", reply_markup=main_menu(), parse_mode="HTML")
+        await call.message.answer("🌐 <b>منوی اصلی آماده‌ست.</b>", reply_markup=main_menu_keyboard(), parse_mode="HTML")
 
 
 async def _get_holding_amount(user_id: int, nation_id: int) -> Decimal:
