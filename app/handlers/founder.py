@@ -33,23 +33,6 @@ def founder_cancel_keyboard() -> InlineKeyboardMarkup:
     )
 
 
-def founder_confirm_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="✅ تأسیس ملت",
-                    callback_data="confirm_founder",
-                ),
-                InlineKeyboardButton(
-                    text="❌ انصراف",
-                    callback_data="cancel_founder",
-                ),
-            ]
-        ]
-    )
-
-
 def _group_id_is_valid(value: str) -> bool:
     return bool(re.fullmatch(r"-100\d{9,10}", value.strip()))
 
@@ -75,11 +58,11 @@ async def start_founder(call: CallbackQuery, state: FSMContext) -> None:
 
     if call.message:
         await call.message.answer(
-            "🏛 <b>تأسیس ملت — مرحله ۱ از ۳</b>\n"
-            "پایتخت ملتت کجاست؟\n"
-            "آیدی عددی گروه تلگرامی رو بفرست.\n"
-            "(مثال: -1001234567890)\n"
-            "ربات باید از قبل در اون گروه باشه.",
+            "🏛 <b>تأسیس ملت · مرحله ۱ از ۴</b>\n"
+            "آیدی عددی گروه پایتخت رو بفرست.\n"
+            "مثال: -1001234567890\n"
+            "ربات باید از قبل داخل گروه باشه.\n"
+            "بعد از بررسی، نام ملت رو می‌گیریم.",
             reply_markup=founder_cancel_keyboard(),
             parse_mode="HTML",
         )
@@ -124,10 +107,10 @@ async def receive_group_id(message: Message, state: FSMContext) -> None:
     await state.update_data(group_id=group_id)
     await state.set_state(FounderStates.SET_NATION_NAME)
     await message.answer(
-        "🏛 <b>تأسیس ملت — مرحله ۲ از ۳</b>\n\n"
-        "اسم ملتت رو بنویس.\n\n"
-        "بین ۲ تا ۲۰ کاراکتر\n"
-        "فارسی یا انگلیسی مجازه.",
+        "🏛 <b>تأسیس ملت · مرحله ۲ از ۴</b>\n"
+        "اسم ملتت رو بنویس.\n"
+        "بین ۲ تا ۲۰ کاراکتر باشه.\n"
+        "حروف فارسی، انگلیسی، عدد و خط تیره مجازه.",
         reply_markup=founder_cancel_keyboard(),
         parse_mode="HTML",
     )
@@ -146,11 +129,11 @@ async def receive_nation_name(message: Message, state: FSMContext) -> None:
     await state.update_data(nation_name=(message.text or "").strip())
     await state.set_state(FounderStates.SET_CURRENCY_CODE)
     await message.answer(
-        "🏛 <b>تأسیس ملت — مرحله ۳ از ۳</b>\n\n"
-        "کد ارز ملتت رو انتخاب کن.\n\n"
-        "دقیقاً ۳ حرف لاتین بزرگ\n"
+        "🏛 <b>تأسیس ملت · مرحله ۳ از ۴</b>\n"
+        "کد ارز ملتت رو انتخاب کن.\n"
+        "دقیقاً ۳ حرف لاتین بزرگ.\n"
         "مثال: IRN یا PRS یا AZD\n"
-        "این کد دیگه قابل تغییر نیست.",
+        "این کد بعد از تأسیس قابل تغییر نیست.",
         reply_markup=founder_cancel_keyboard(),
         parse_mode="HTML",
     )
@@ -187,7 +170,7 @@ async def receive_currency_code(message: Message, state: FSMContext) -> None:
 
 
 @founder_router.callback_query(
-    F.data == "confirm_founder",
+    F.data.in_({"confirm_found", "confirm_founder"}),
     StateFilter(FounderStates.CONFIRM),
 )
 async def confirm_founder(call: CallbackQuery, state: FSMContext, bot: Bot) -> None:
@@ -223,12 +206,12 @@ async def confirm_founder(call: CallbackQuery, state: FSMContext, bot: Bot) -> N
 
     if call.message:
         await call.message.answer(
-            "🎉 <b>ملت تأسیس شد!</b>\n\n"
-            f"🏛 ملت {html.escape(nation.name)}\n"
+            "🎉 <b>ملت تأسیس شد!</b>\n"
+            f"🏛 {html.escape(nation.name)} · {html.escape(nation.currency_code)}\n"
             "👑 تو بنیان‌گذار این ملتی\n"
-            f"💰 موجودی: ۱۰۰۰ {html.escape(nation.currency_code)}\n"
+            "💰 موجودی اولیه: ۱۰۰۰ واحد\n"
             "📈 نرخ اولیه: ۱.۰۰ ΩXR\n"
-            "از پنل ملت‌ها می‌تونی مدیریت کنی.",
+            "منوی اصلی آماده‌ست.",
             reply_markup=main_menu_keyboard(),
             parse_mode="HTML",
         )
@@ -264,5 +247,5 @@ async def cancel_founder(call: CallbackQuery, state: FSMContext) -> None:
     if call.message:
         await call.message.answer(
             "❌ تأسیس ملت لغو شد.",
-            reply_markup=main_menu(),
+            reply_markup=main_menu_keyboard(),
         )
