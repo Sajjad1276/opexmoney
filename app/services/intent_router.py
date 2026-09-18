@@ -275,9 +275,11 @@ async def _resume_prompt(message: Message, state: FSMContext, draft: Any) -> Non
 
     if step == "founder.confirm":
         from app.keyboards.inline import confirm_found_nation_keyboard
-        await message.answer(
+        await keyboard_manager.send(
+            message,
             f"📋 تأسیس ذخیره‌شده آماده تأیید است.\n🏛 {payload.get('nation_name', 'ملت')}\n💱 {payload.get('currency_code', '---')}",
-            reply_markup=confirm_found_nation_keyboard(),
+            kind="inline:founder-confirm",
+            markup=confirm_found_nation_keyboard(),
         )
         return
 
