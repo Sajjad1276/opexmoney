@@ -19,6 +19,7 @@ from app.handlers.onboarding_fix import router as onboarding_fix_router
 from app.handlers.start import router as start_router
 from app.handlers.sections import router as sections_router
 from app.diagnostics.self_test import run_startup_smoke_test
+from app.diagnostics.flow_trace import FlowTraceMiddleware
 from app.services.economic_engine import reset_daily_metrics, update_nation_rates, update_nation_ranks
 from config import settings
 
@@ -75,6 +76,9 @@ def build_scheduler() -> AsyncIOScheduler:
 async def main() -> None:
     bot = Bot(token=settings.bot_token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     dp = Dispatcher(storage=build_storage())
+    flow_trace = FlowTraceMiddleware()
+    dp.message.middleware(flow_trace)
+    dp.callback_query.middleware(flow_trace)
 
     @dp.errors()
     async def errors_handler(event: ErrorEvent):
