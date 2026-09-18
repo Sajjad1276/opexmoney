@@ -15,7 +15,7 @@ from sqlalchemy import text
 from app.database.models import Base
 from app.database.session import async_session, engine
 from app.handlers.market import router as market_router
-from app.handlers.founder import founder_router
+from app.handlers.nation_flow import nation_router
 from app.handlers.onboarding_fix import router as onboarding_fix_router
 from app.handlers.start import router as start_router
 from app.services.economic_engine import reset_daily_metrics, update_nation_rates, update_nation_ranks
@@ -152,8 +152,8 @@ async def main() -> None:
     bot = Bot(token=settings.bot_token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     dp = Dispatcher(storage=build_storage())
     dp.include_router(onboarding_fix_router)
+    dp.include_router(nation_router)
     dp.include_router(start_router)
-    dp.include_router(founder_router)
     dp.include_router(market_router)
     scheduler = build_scheduler()
     scheduler.start()
