@@ -23,6 +23,7 @@ from app.keyboards.inline import (
     governance_vote_keyboard,
 )
 from app.services.keyboard_state import KeyboardKind, keyboard_manager
+from app.services.onboarding_draft import clear_draft, save_draft
 from app.services.governance_service import (
     cast_vote,
     create_proposal,
@@ -200,6 +201,14 @@ async def governance_select_rule(call: CallbackQuery, state: FSMContext):
 
     await state.set_state(GovernanceStates.WAITING_VALUE)
     await state.update_data(rule_key=key)
+    async with async_session() as session:
+        async with session.begin():
+            await save_draft(
+                session,
+                player_id=call.from_user.id,
+                step_key=GovernanceStates.WAITING_VALUE.state,
+                payload={"rule_key": key},
+            )
 
     range_text = (
         f"بین {html.escape(_format_value(rule, rule.min_value))} "
@@ -266,6 +275,20 @@ async def governance_receive_value(message: Message, state: FSMContext):
         current_value=str(current),
     )
     await state.set_state(GovernanceStates.CONFIRM_PROPOSAL)
+    async with async_session() as session:
+        async with session.begin():
+            await save_draft(
+                session,
+                player_id=message.from_user.id,
+                step_key=GovernanceStates.CONFIRM_PROPOSAL.state,
+                payload={
+                    "rule_key": key,
+                    "proposed_value": str(parsed),
+                    "target_scope": rule.target_scope,
+                    "target_id": target_id,
+                    "current_value": str(current),
+                },
+            )
 
     await keyboard_manager.send_message(
         message.bot,
@@ -308,6 +331,7 @@ async def governance_confirm(call: CallbackQuery, state: FSMContext):
                     target_scope=data["target_scope"],
                     target_id=data.get("target_id"),
                 )
+            await clear_draft(session, call.from_user.id)
             except ValueError as exc:
                 await call.answer(str(exc), show_alert=True)
                 return
@@ -333,6 +357,9 @@ async def governance_confirm(call: CallbackQuery, state: FSMContext):
 @governance_router.callback_query(F.data == "gov_cancel")
 async def governance_cancel(call: CallbackQuery, state: FSMContext):
     await state.clear()
+    async with async_session() as session:
+        async with session.begin():
+            await clear_draft(session, call.from_user.id)
     await call.answer("لغو شد")
     await _send_governance_home(call)
 
