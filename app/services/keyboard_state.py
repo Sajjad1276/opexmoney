@@ -170,6 +170,82 @@ class KeyboardStateManager:
         )
         return edited or message
 
+    async def edit_message_id(
+        self,
+        bot: Bot,
+        *,
+        chat_id: int,
+        message_id: int,
+        text: str,
+        kind: KeyboardKind = KeyboardKind.NONE,
+        name: str = "",
+        markup: Any = None,
+        parse_mode: str | None = None,
+        **kwargs: Any,
+    ) -> None:
+        previous = await self._read(chat_id)
+        if previous and previous.kind == KeyboardKind.REPLY.value and kind != KeyboardKind.REPLY:
+            await bot.send_message(
+                chat_id=chat_id,
+                text="↪️",
+                reply_markup=ReplyKeyboardRemove(),
+                disable_notification=True,
+            )
+        if previous and previous.kind == KeyboardKind.INLINE.value and kind != KeyboardKind.INLINE:
+            await self._remove_inline(bot, previous)
+        await bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=message_id,
+            text=text,
+            reply_markup=markup if kind == KeyboardKind.INLINE else None,
+            parse_mode=parse_mode,
+            **kwargs,
+        )
+        await self._write(
+            chat_id,
+            kind=kind,
+            name=name,
+            message_id=message_id,
+        )
+
+    async def edit_caption_id(
+        self,
+        bot: Bot,
+        *,
+        chat_id: int,
+        message_id: int,
+        caption: str,
+        kind: KeyboardKind = KeyboardKind.NONE,
+        name: str = "",
+        markup: Any = None,
+        parse_mode: str | None = None,
+        **kwargs: Any,
+    ) -> None:
+        previous = await self._read(chat_id)
+        if previous and previous.kind == KeyboardKind.REPLY.value and kind != KeyboardKind.REPLY:
+            await bot.send_message(
+                chat_id=chat_id,
+                text="↪️",
+                reply_markup=ReplyKeyboardRemove(),
+                disable_notification=True,
+            )
+        if previous and previous.kind == KeyboardKind.INLINE.value and kind != KeyboardKind.INLINE:
+            await self._remove_inline(bot, previous)
+        await bot.edit_message_caption(
+            chat_id=chat_id,
+            message_id=message_id,
+            caption=caption,
+            reply_markup=markup if kind == KeyboardKind.INLINE else None,
+            parse_mode=parse_mode,
+            **kwargs,
+        )
+        await self._write(
+            chat_id,
+            kind=kind,
+            name=name,
+            message_id=message_id,
+        )
+
     async def clear(self, bot: Bot, chat_id: int) -> None:
         previous = await self._read(chat_id)
         if previous and previous.kind == KeyboardKind.INLINE.value:
