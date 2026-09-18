@@ -52,3 +52,15 @@ async def username_exists(
         stmt = stmt.where(User.user_id != exclude_user_id)
     result = await session.execute(stmt.limit(1))
     return result.scalar_one_or_none() is not None
+
+
+async def is_user_registered(session: AsyncSession, telegram_id: int) -> bool:
+    user = await session.get(User, telegram_id)
+    if user is None:
+        return False
+    holding = await session.scalar(
+        select(CurrencyHolding.id)
+        .where(CurrencyHolding.user_id == telegram_id)
+        .limit(1)
+    )
+    return holding is not None
