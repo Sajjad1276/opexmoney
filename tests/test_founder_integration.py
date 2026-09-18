@@ -3,7 +3,7 @@ from decimal import Decimal
 import pytest
 from sqlalchemy import delete, select
 
-from app.database.models import CurrencyHolding, Nation, User
+from app.database.models import CurrencyHolding, Nation, User, UserActivity
 from app.database.session import async_session
 from app.services.nation_service import create_nation
 from app.services.user_service import is_user_registered
@@ -170,5 +170,6 @@ async def cleanup_test_rows():
     async with async_session() as session:
         async with session.begin():
             await session.execute(delete(CurrencyHolding).where(CurrencyHolding.user_id >= 910001, CurrencyHolding.user_id <= 910006))
+            await session.execute(delete(UserActivity).where(UserActivity.user_id >= 910001, UserActivity.user_id <= 910006))
             await session.execute(delete(User).where(User.user_id >= 910001, User.user_id <= 910006))
             await session.execute(delete(Nation).where(Nation.group_id >= -100910010, Nation.group_id <= -100910001))
