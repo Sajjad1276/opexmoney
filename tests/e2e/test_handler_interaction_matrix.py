@@ -155,9 +155,9 @@ async def test_every_registered_handler_executes_at_least_once():
         return Message(bot, USER_ID, text=text)
 
     await run("start.start", lambda: start.start(start_message(), state))
-    await run("start.start_game_button", lambda: start.start_game_button(await start_message("🎮 شروع بازی"), state))
+    await run("start.start_game_button", lambda: start.start_game_button(start_message("🎮 شروع بازی"), state))
     await run("start.start_game_callback", lambda: start.start_game_callback(Callback(bot, "start_game"), state))
-    await run("start.start_help", lambda: start.start_help(await start_message("❓ راهنما")))
+    await run("start.start_help", lambda: start.start_help(start_message("❓ راهنما")))
     await run("start.start_help_callback", lambda: start.start_help_callback(Callback(bot, "show_help")))
     await state.set_state(OnboardingStates.SELECT_NATION)
     await run("start.join_nation", lambda: start.join_nation(Callback(bot, "join_nation:999999"), state))
@@ -169,22 +169,22 @@ async def test_every_registered_handler_executes_at_least_once():
     await state.set_state(OnboardingStates.SET_USERNAME_PLAYER)
     await run(
         "onboarding.restart_onboarding_with_command",
-        lambda: onboarding_fix.restart_onboarding_with_command(await start_message(), state),
+        lambda: onboarding_fix.restart_onboarding_with_command(start_message(), state),
     )
     await state.set_state(OnboardingStates.SET_USERNAME_PLAYER)
     await run(
         "onboarding.reject_blocked_name",
-        lambda: onboarding_fix.reject_blocked_name(await start_message("admin"), state),
+        lambda: onboarding_fix.reject_blocked_name(start_message("admin"), state),
     )
     await state.set_state(OnboardingStates.SET_USERNAME_PLAYER)
     await run(
         "onboarding.reject_non_english_name",
-        lambda: onboarding_fix.reject_non_english_name(await start_message("سلام دنیا"), state),
+        lambda: onboarding_fix.reject_non_english_name(start_message("سلام دنیا"), state),
     )
     await state.set_state(OnboardingStates.SET_USERNAME_PLAYER)
     await run(
         "onboarding.accept_valid_name",
-        lambda: onboarding_fix.accept_valid_name(await start_message("MatrixValid1"), state),
+        lambda: onboarding_fix.accept_valid_name(start_message("MatrixValid1"), state),
     )
     await run("onboarding.cancel_start_fix", lambda: onboarding_fix.cancel_start_fix(Callback(bot, "cancel_start"), state))
 
@@ -209,24 +209,24 @@ async def test_every_registered_handler_executes_at_least_once():
     await run("founder.group_founder_start", lambda: founder.group_founder_start(group_message, bot, dispatcher))
     await state.set_state(FounderStates.SET_NATION_NAME)
     await state.update_data(group_id=MATRIX_GROUP_B, group_title="Matrix Capital B", group_username="matrix_capital_b", group_type="group")
-    await run("founder.receive_nation_name", lambda: founder.receive_nation_name(await start_message("Matrix Republic"), state))
+    await run("founder.receive_nation_name", lambda: founder.receive_nation_name(start_message("Matrix Republic"), state))
     await state.clear()
     await run("founder.confirm_founder", lambda: founder.confirm_founder(Callback(bot, "confirm_found"), state, bot))
     await run("founder.cancel_founder", lambda: founder.cancel_founder(Callback(bot, "cancel_founder"), state))
 
-    await run("nation.open_nations", lambda: nation.open_nations(await start_message("🌍 ملت‌ها")))
+    await run("nation.open_nations", lambda: nation.open_nations(start_message("🌍 ملت‌ها")))
     await run("nation.back_to_dashboard", lambda: nation.back_to_dashboard(Callback(bot, "back_to_dashboard")))
     await run("nation.my_nations", lambda: nation.my_nations(Callback(bot, "my_nations")))
     await run("nation.explore_nations", lambda: nation.explore_nations(Callback(bot, "explore_nations")))
     await run("nation.unavailable_nation_panel", lambda: nation.unavailable_nation_panel(Callback(bot, "founder_panel")))
     await run("nation.unavailable_trade_confirmation", lambda: nation.unavailable_trade_confirmation(Callback(bot, "confirm_trade")))
 
-    await run("sections.portfolio", lambda: sections.portfolio(await start_message("📊 پورتفولیو")))
-    await run("sections.missions", lambda: sections.missions(await start_message("⚡ مأموریت")))
-    await run("sections.ranking", lambda: sections.ranking(await start_message("🏆 رتبه‌بندی")))
-    await run("sections.settings", lambda: sections.settings(await start_message("⚙️ تنظیمات")))
+    await run("sections.portfolio", lambda: sections.portfolio(start_message("📊 پورتفولیو")))
+    await run("sections.missions", lambda: sections.missions(start_message("⚡ مأموریت")))
+    await run("sections.ranking", lambda: sections.ranking(start_message("🏆 رتبه‌بندی")))
+    await run("sections.settings", lambda: sections.settings(start_message("⚙️ تنظیمات")))
 
-    await run("market.market_button", lambda: market.market_button(await start_message("💹 بازار")))
+    await run("market.market_button", lambda: market.market_button(start_message("💹 بازار")))
     await run("market.market_main", lambda: market.market_main(Callback(bot, "market_main")))
     await run("market.market_refresh", lambda: market.market_refresh(Callback(bot, "market_refresh")))
     await run("market.market_buy", lambda: market.market_buy(Callback(bot, "market_buy"), state))
@@ -235,7 +235,7 @@ async def test_every_registered_handler_executes_at_least_once():
     await run("market.buy_currency", lambda: market.buy_currency(Callback(bot, "buy_999999"), state))
     await state.set_state(MarketStates.WAITING_BUY_AMOUNT)
     await state.update_data(nation_id=999999)
-    await run("market.buy_amount_message", lambda: market.buy_amount_message(await start_message("9"), state))
+    await run("market.buy_amount_message", lambda: market.buy_amount_message(start_message("9"), state))
     await run("market.confirm_buy", lambda: market.confirm_buy(Callback(bot, "cbuy_999999_10"), state))
     await run("market.buy_quick", lambda: market.buy_quick(Callback(bot, "buyq_10_999999"), state))
 
@@ -245,7 +245,7 @@ async def test_every_registered_handler_executes_at_least_once():
     await run("market.sell_currency", lambda: market.sell_currency(Callback(bot, "sell_NOPE"), state))
     await state.set_state(MarketStates.WAITING_SELL_AMOUNT)
     await state.update_data(nation_id=999999)
-    await run("market.sell_amount_message", lambda: market.sell_amount_message(await start_message("0"), state))
+    await run("market.sell_amount_message", lambda: market.sell_amount_message(start_message("0"), state))
     await run("market.confirm_sell", lambda: market.confirm_sell(Callback(bot, "csell_999999_10"), state))
     await run("market.sell_quick", lambda: market.sell_quick(Callback(bot, "sellq_10_NOPE"), state))
     await run("market.market_chart", lambda: market.market_chart(Callback(bot, "market_chart")))
@@ -256,7 +256,7 @@ async def test_every_registered_handler_executes_at_least_once():
     await run("governance.governance_new", lambda: governance.governance_new(Callback(bot, "gov_new"), state))
     await run("governance.governance_select_rule", lambda: governance.governance_select_rule(Callback(bot, "gov_rule:not_a_rule"), state))
     await state.clear()
-    await run("governance.governance_receive_value", lambda: governance.governance_receive_value(await start_message("5"), state))
+    await run("governance.governance_receive_value", lambda: governance.governance_receive_value(start_message("5"), state))
     await run("governance.governance_confirm", lambda: governance.governance_confirm(Callback(bot, "gov_confirm"), state))
     await run("governance.governance_cancel", lambda: governance.governance_cancel(Callback(bot, "gov_cancel"), state))
     await run("governance.governance_voting", lambda: governance.governance_voting(Callback(bot, "gov_voting")))
