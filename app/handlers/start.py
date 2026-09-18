@@ -112,11 +112,13 @@ async def continue_registration(
 ) -> None:
     if "username" in missing or not (user.username or "").strip():
         await state.set_state(OnboardingStates.SET_USERNAME_PLAYER)
-        await message.answer(
+        await keyboard_manager.send(
+            message,
             USERNAME_CAPTION.format(
                 user_mention=user_mention(message.from_user),
             ),
-            reply_markup=cancel_keyboard(),
+            kind="inline:onboarding",
+            markup=cancel_keyboard(),
             parse_mode="HTML",
         )
         return
@@ -171,9 +173,11 @@ async def continue_registration(
         )
         return
 
-    await message.answer(
+    await keyboard_manager.send(
+        message,
         nation_list_text(message.from_user, user.username, nations),
-        reply_markup=nation_selection_keyboard(nations),
+        kind="inline:nation-selection",
+        markup=nation_selection_keyboard(nations),
         parse_mode="HTML",
     )
 
@@ -214,9 +218,11 @@ async def start(message: Message, state: FSMContext) -> None:
         user_name=html.escape(message.from_user.first_name or "معامله‌گر"),
         current_date=current_date_fa(),
     )
-    await message.answer(
+    await keyboard_manager.send(
+        message,
         caption,
-        reply_markup=welcome_keyboard(),
+        kind="inline:welcome",
+        markup=welcome_keyboard(),
         parse_mode="HTML",
     )
 
@@ -251,11 +257,13 @@ async def _begin_registration(message: Message, state: FSMContext) -> None:
         return
 
     await state.set_state(OnboardingStates.SET_USERNAME_PLAYER)
-    await message.answer(
+    await keyboard_manager.send(
+        message,
         USERNAME_CAPTION.format(
             user_mention=user_mention(message.from_user),
         ),
-        reply_markup=cancel_keyboard(),
+        kind="inline:onboarding",
+        markup=cancel_keyboard(),
         parse_mode="HTML",
     )
 
