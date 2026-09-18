@@ -257,9 +257,11 @@ async def _resume_prompt(message: Message, state: FSMContext, draft: Any) -> Non
 
     if step == "founder.waiting_group_admin":
         from app.handlers.founder import founder_cancel_keyboard
-        await message.answer(
+        await keyboard_manager.send(
+            message,
             "🏛 ادامه تأسیس ملت\nگروه پایتخت هنوز متصل نشده. لینک قبلی را استفاده کن و بعد از ادمین شدن ربات ادامه بده.",
-            reply_markup=founder_cancel_keyboard(),
+            kind="inline:founder",
+            markup=founder_cancel_keyboard(),
         )
         return
 
