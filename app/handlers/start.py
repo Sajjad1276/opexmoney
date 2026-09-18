@@ -9,16 +9,17 @@ from decimal import Decimal
 from aiogram import F, Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import CommandStart
+from aiogram.filters.state import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message, ReplyKeyboardRemove
 from sqlalchemy import func, select
 
 from app.database.models import CurrencyHolding, Nation, Transaction, User, UserActivity
 from app.database.session import async_session
-from app.keyboards.inline import cancel_keyboard, first_trade_keyboard, nation_keyboard, trade_confirmation_keyboard
-from app.keyboards.reply import get_welcome_keyboard, main_menu
+from app.keyboards.inline import cancel_keyboard, first_trade_keyboard, nation_keyboard, trade_confirmation_keyboard, welcome_keyboard
+from app.keyboards.reply import main_menu
 from app.services.nation_service import get_active_nations, get_nation_rank
-from app.services.user_service import get_registration_status, get_user, username_exists
+from app.services.user_service import get_registration_status, get_user
 from app.states.onboarding import OnboardingStates
 from app.utils.formatting import fmt_amount, fmt_pct, fmt_rate, get_rate_change, get_rate_emoji, to_fa
 
@@ -209,14 +210,30 @@ async def start(message: Message, state: FSMContext) -> None:
     )
     await message.answer(
         caption,
-        reply_markup=get_welcome_keyboard(),
+        reply_markup=welcome_keyboard(),
         parse_mode="HTML",
     )
 
 
-@router.message(F.text == "🎮 شروع بازی")
-async def start_game_button(message: Message, state: FSMContext) -> None:
+async def _begin_registration(message: Message, state: FSMContext) -> None:
     await state.clear()
+
+    async with async_session() as session:
+        status = await get_registration_status(session, message.from_user.id)
+
+    if status["status"] == "complete":
+        await show_dashboard(message, status["user"])
+        return
+
+    if status["status"] == "partial":
+        await continue_registration(
+            message,
+            state,
+            status["user"],
+            status["missing"],
+        )
+        return
+
     await state.set_state(OnboardingStates.SET_USERNAME_PLAYER)
     await message.answer(
         USERNAME_CAPTION.format(
@@ -227,41 +244,46 @@ async def start_game_button(message: Message, state: FSMContext) -> None:
     )
 
 
-@router.message(F.text == "❓ راهنما")
-async def start_help(message: Message) -> None:
+@router.message(F.text == "🎮 شروع بازی")
+async def start_game_button(message: Message, state: FSMContext) -> None:
+    await _begin_registration(message, state)
+
+
+@router.callback_query(F.data == "start_game", StateFilter(None))
+async def start_game_callback(call: CallbackQuery, state: FSMContext) -> None:
+    if call.message is None:
+        await call.answer("⚠️ پیام شروع بازی پیدا نشد.", show_alert=True)
+        return
+
+    await call.answer()
+    await _begin_registration(call.message, state)
+
+
+async def _show_help(message: Message) -> None:
     await message.answer(
         "❓ <b>راهنمای OPEX MONEY</b>\n"
         "تو یه معامله‌گر اقتصادی هستی.\n"
-        "به ملت‌ها بپیوند، ارز بخر و بفروش،\n"
-        "و در اقتصاد زنده تلگرام رقابت کن.\n"
-        "برای شروع، اسم معامله‌گر انتخاب کن و به یه ملت بپیوند.\n"
-        "بعداً می‌تونی از پنل بازی برای تأسیس ملت اقدام کنی.",
-        reply_markup=get_welcome_keyboard(),
+        "به ملت‌ها بپیوند، ارز بخر و بفروش.\n"
+        "نرخ ارز با فعالیت بازار تغییر می‌کنه.\n"
+        "برای شروع، اسم معامله‌گرت رو انتخاب کن.",
+        reply_markup=welcome_keyboard(),
         parse_mode="HTML",
     )
 
 
-@router.message(OnboardingStates.SET_USERNAME_PLAYER)
-async def receive_username(message: Message, state: FSMContext) -> None:
-    username = (message.text or "").strip()
-    if len(username) < 3 or len(username) > 15 or not _valid_username(username):
-        await message.answer(LENGTH_ERROR.format(user_input=html.escape(username)), parse_mode="HTML")
-        return
-    async with async_session() as session:
-        if await username_exists(session, username):
-            await message.answer(DUPLICATE_NAME.format(user_input=html.escape(username)), parse_mode="HTML")
-            return
-        await state.update_data(username=username)
-        await state.set_state(OnboardingStates.SELECT_NATION)
-        nations = await get_active_nations(session, limit=3)
-    if not nations:
-        text = (f"✅ <b>«{html.escape(username)}»</b> ثبت شد.\n\n" "⏳ هنوز هیچ ملتی برای پیوستن وجود نداره.\n\n" "بعداً دوباره امتحان کن.")
-        await message.answer(text, reply_markup=no_nation_keyboard(), parse_mode="HTML")
-        return
-    await message.answer(nation_list_text(message.from_user, username, nations), reply_markup=nation_keyboard(nations), parse_mode="HTML")
+@router.message(F.text == "❓ راهنما")
+async def start_help(message: Message) -> None:
+    await _show_help(message)
 
 
-@router.callback_query(F.data.startswith("join_"))
+@router.callback_query(F.data == "show_help", StateFilter(None))
+async def start_help_callback(call: CallbackQuery) -> None:
+    await call.answer()
+    if call.message:
+        await _show_help(call.message)
+
+
+@router.callback_query(F.data.startswith("join_"), StateFilter(OnboardingStates.SELECT_NATION))
 async def join_nation(call: CallbackQuery, state: FSMContext) -> None:
     try:
         nation_id = int(call.data.rsplit("_", 1)[1])
