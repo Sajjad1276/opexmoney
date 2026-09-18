@@ -233,14 +233,12 @@ async def start_game_button(message: Message, state: FSMContext) -> None:
 @router.message(F.text == "❓ راهنما")
 async def start_help(message: Message) -> None:
     await message.answer(
-        "❓ <b>راهنمای OPEX MONEY</b>\n\n"
-        "در این بازی تو یه معامله‌گر اقتصادی هستی.\n"
+        "❓ <b>راهنمای OPEX MONEY</b>\n"
+        "تو یه معامله‌گر اقتصادی هستی.\n"
         "به ملت‌ها بپیوند، ارز بخر و بفروش،\n"
-        "و در اقتصاد زنده تلگرام رقابت کن.\n\n"
-        "برای شروع، یه اسم معامله‌گر انتخاب کن\n"
-        "و به ملتی بپیوند.\n\n"
-        "اگه بعداً خواستی ملت خودت رو بسازی،\n"
-        "از پنل بازی می‌تونی اقدام کنی.",
+        "و در اقتصاد زنده تلگرام رقابت کن.\n"
+        "برای شروع، اسم معامله‌گر انتخاب کن و به یه ملت بپیوند.\n"
+        "بعداً می‌تونی از پنل بازی برای تأسیس ملت اقدام کنی.",
         reply_markup=get_welcome_keyboard(),
         parse_mode="HTML",
     )
