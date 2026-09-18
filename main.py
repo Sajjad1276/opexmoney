@@ -35,7 +35,8 @@ def build_storage():
 async def run_rate_job() -> None:
     try:
         async with async_session() as session:
-            await update_nation_rates(session)
+            async with session.begin():
+                await update_nation_rates(session)
         logger.info("Nation rate engine completed")
     except Exception:
         logger.exception("Nation rate engine failed")
@@ -44,7 +45,8 @@ async def run_rate_job() -> None:
 async def run_rank_job() -> None:
     try:
         async with async_session() as session:
-            await update_nation_ranks(session)
+            async with session.begin():
+                await update_nation_ranks(session)
         logger.info("Nation rank update completed")
     except Exception:
         logger.exception("Nation rank update failed")
@@ -53,7 +55,8 @@ async def run_rank_job() -> None:
 async def run_daily_reset() -> None:
     try:
         async with async_session() as session:
-            await reset_daily_metrics(session)
+            async with session.begin():
+                await reset_daily_metrics(session)
         logger.info("Daily market reset completed")
     except Exception:
         logger.exception("Daily market reset failed")
