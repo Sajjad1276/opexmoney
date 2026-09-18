@@ -199,6 +199,20 @@ async def start(message: Message, state: FSMContext) -> None:
                 registered_user = None
             status = await get_registration_status(session, message.from_user.id)
 
+    draft = await get_draft(message.from_user.id)
+    if draft is not None:
+        await state.clear()
+        await keyboard_manager.send(
+            message,
+            "🔄 <b>ادامه از جایی که بودی</b>
+
+یک مرحله ناتمام از قبل ذخیره شده. می‌خوای همان‌جا ادامه بدی؟",
+            kind="inline:resume",
+            markup=resume_draft_keyboard(),
+            parse_mode="HTML",
+        )
+        return
+
     if registered_user is not None:
         await state.clear()
         await show_dashboard(message, registered_user)
@@ -405,8 +419,13 @@ async def join_nation(call: CallbackQuery, state: FSMContext) -> None:
         f"هر معامله‌ات روی نرخ <code>{html.escape(nation.currency_code)}</code> اثر میذاره."
     )
     await state.clear()
-    await state.update_data(first_trade_available=True)
-    await _safe_edit_text(call, text, first_trade_keyboard())
+    await clear_draft(call.from_user.id)
+    await keyboard_manager.edit_inline(
+        call.message,
+        text,
+        kind="inline:first-trade",
+        markup=first_trade_keyboard(),
+    )
     await call.answer()
 
 
@@ -432,11 +451,6 @@ async def first_trade_tutorial(call: CallbackQuery, state: FSMContext) -> None:
 
 @router.callback_query(F.data == "confirm_first_trade")
 async def confirm_first_trade(call: CallbackQuery, state: FSMContext) -> None:
-    data = await state.get_data()
-    if not data.get("first_trade_available"):
-        await call.answer()
-        return
-
     async with async_session() as session:
         async with session.begin():
             user = (
