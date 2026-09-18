@@ -59,9 +59,9 @@ NAME_ACCEPTED_TEXT = rtl_text("""🎉 <b>تبریک! «{username}» با موف�
 
 NO_NATION_TEXT = rtl_text("""🌍 <b>هنوز هیچ ملتی در OPEX وجود نداره.</b>
 
-تو اولین معامله‌گری هستی که وارد OPEX شدی، {user_mention}.
+ثبت‌نامت انجام شد، {user_mention}.
 
-برای شروع اقتصاد OPEX، اولین ملت تاریخ رو بساز.""")
+هر وقت اولین ملت ایجاد شد، می‌تونی به اون بپیوندی.""")
 
 
 def clean_nation_list_text(user, trader_name: str, nations) -> str:
