@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
 
-from app.config import settings
+from config import settings
 
 
 @dataclass(frozen=True)
