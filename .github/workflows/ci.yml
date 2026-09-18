@@ -36,5 +36,9 @@ jobs:
         run: python -m compileall -q .
       - name: Apply migrations
         run: alembic upgrade head
+      - name: Verify migration downgrade
+        run: |
+          alembic downgrade 0002_founder_constraints
+          alembic upgrade head
       - name: Run tests
         run: pytest -q
