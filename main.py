@@ -17,6 +17,8 @@ from app.handlers.founder import founder_router
 from app.handlers.nation import nation_router
 from app.handlers.onboarding_fix import router as onboarding_fix_router
 from app.handlers.start import router as start_router
+from app.handlers.sections import router as sections_router
+from app.diagnostics.self_test import run_startup_smoke_test
 from app.services.economic_engine import reset_daily_metrics, update_nation_rates, update_nation_ranks
 from config import settings
 
@@ -92,6 +94,10 @@ async def main() -> None:
     dp.include_router(market_router)
     dp.include_router(founder_router)
     dp.include_router(nation_router)
+    dp.include_router(sections_router)
+    smoke_ok = await run_startup_smoke_test(dp)
+    if not smoke_ok:
+        logger.error("Startup smoke test failed; bot will continue only for diagnosis")
     scheduler = build_scheduler()
     scheduler.start()
     logger.info("OPEX MONEY is online")
