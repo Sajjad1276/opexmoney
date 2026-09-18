@@ -204,9 +204,7 @@ async def start(message: Message, state: FSMContext) -> None:
         await state.clear()
         await keyboard_manager.send(
             message,
-            "🔄 <b>ادامه از جایی که بودی</b>
-
-یک مرحله ناتمام از قبل ذخیره شده. می‌خوای همان‌جا ادامه بدی؟",
+            "🔄 <b>ادامه از جایی که بودی</b>\n\nیک مرحله ناتمام از قبل ذخیره شده. می‌خوای همان‌جا ادامه بدی?",
             kind="inline:resume",
             markup=resume_draft_keyboard(),
             parse_mode="HTML",
@@ -431,10 +429,6 @@ async def join_nation(call: CallbackQuery, state: FSMContext) -> None:
 
 @router.callback_query(F.data == "first_trade_tutorial")
 async def first_trade_tutorial(call: CallbackQuery, state: FSMContext) -> None:
-    data = await state.get_data()
-    if not data.get("first_trade_available"):
-        await call.answer()
-        return
     async with async_session() as session:
         async with session.begin():
             user = await get_user(session, call.from_user.id)
@@ -445,7 +439,12 @@ async def first_trade_tutorial(call: CallbackQuery, state: FSMContext) -> None:
     receive_omx = Decimal("50") * nation.exchange_rate
     change = get_rate_change(nation)
     text = ("⚡ <b>اولین معامله</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" f"📤 می‌فروشی:   <b>۵۰ <code>{html.escape(nation.currency_code)}</code></b>\n" f"📥 دریافت می‌کنی: <b>{fmt_amount(receive_omx)} <code>ΩXR</code></b>\n\n─────────────────\n" f"💹 نرخ: <code>۱ {html.escape(nation.currency_code)} = {fmt_rate(nation.exchange_rate)} ΩXR</code>\n" f"{get_rate_emoji(change)} تغییر ۲۴h: <b>{fmt_pct(change)}</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-    await _safe_edit_text(call, text, trade_confirmation_keyboard())
+    await keyboard_manager.edit_inline(
+        call.message,
+        text,
+        kind="inline:first-trade",
+        markup=trade_confirmation_keyboard(),
+    )
     await call.answer()
 
 
@@ -508,14 +507,22 @@ async def confirm_first_trade(call: CallbackQuery, state: FSMContext) -> None:
         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     )
     await state.clear()
-    await _safe_edit_text(call, text)
-    await call.answer()
     if call.message:
-        await call.message.answer(
-            "🌐 <b>منوی اصلی آماده‌ست.</b>",
-            reply_markup=main_menu_keyboard(),
+        await keyboard_manager.edit_inline(
+            call.message,
+            text,
+            kind="none",
+            markup=None,
             parse_mode="HTML",
         )
+        await keyboard_manager.send(
+            call.message,
+            "🌐 <b>منوی اصلی آماده‌ست.</b>",
+            kind="reply:main",
+            markup=main_menu_keyboard(),
+            parse_mode="HTML",
+        )
+    await call.answer()
 
 
 @router.callback_query(F.data == "skip_first_trade")
@@ -528,10 +535,22 @@ async def skip_first_trade(call: CallbackQuery, state: FSMContext) -> None:
     currency_code = nation.currency_code if nation else "ارز"
     balance = fmt_amount(nation and (await _get_holding_amount(call.from_user.id, nation.nation_id)) or Decimal("500")) if nation else "۵۰۰"
     text = f"{html.escape(call.from_user.first_name or 'معامله‌گر')}، هر وقت آماده شدی\nاز 💹 بازار شروع کن.\n\n💰 موجودی: {balance} <code>{html.escape(currency_code)}</code>"
-    await _safe_edit_text(call, text)
-    await call.answer()
     if call.message:
-        await call.message.answer("🌐 <b>منوی اصلی آماده‌ست.</b>", reply_markup=main_menu_keyboard(), parse_mode="HTML")
+        await keyboard_manager.edit_inline(
+            call.message,
+            text,
+            kind="none",
+            markup=None,
+            parse_mode="HTML",
+        )
+        await keyboard_manager.send(
+            call.message,
+            "🌐 <b>منوی اصلی آماده‌ست.</b>",
+            kind="reply:main",
+            markup=main_menu_keyboard(),
+            parse_mode="HTML",
+        )
+    await call.answer()
 
 
 async def _get_holding_amount(user_id: int, nation_id: int) -> Decimal:
