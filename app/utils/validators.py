@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import Nation
+from app.utils.name_filter import is_blocked_trader_name
 
 
 _NATION_NAME_RE = re.compile(r"^[A-Za-z]+(?: [A-Za-z]+)*$")
@@ -30,8 +31,8 @@ def validate_nation_name(value: str) -> tuple[bool, str]:
         return False, "⚠️ اسم ملت باید بین ۲ تا ۲۰ کاراکتر باشه."
     if not _NATION_NAME_RE.fullmatch(value):
         return False, "⚠️ اسم ملت فقط باید انگلیسی و بدون عدد یا علامت باشه."
-    if value.upper() in _RESERVED_NATION_NAMES:
-        return False, "⚠️ این اسم برای سیستم رزرو شده. یه اسم دیگه انتخاب کن."
+    if value.upper() in _RESERVED_NATION_NAMES or is_blocked_trader_name(value):
+        return False, "⚠️ این اسم مجاز نیست. یه اسم دیگه انتخاب کن."
     return True, ""
 
 
