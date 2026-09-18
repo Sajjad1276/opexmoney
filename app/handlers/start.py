@@ -412,16 +412,28 @@ async def first_trade_tutorial(call: CallbackQuery, state: FSMContext) -> None:
 async def confirm_first_trade(call: CallbackQuery, state: FSMContext) -> None:
     data = await state.get_data()
     if not data.get("first_trade_available"):
-            await call.answer()
-            return
+        await call.answer()
+        return
+
     async with async_session() as session:
-            async with session.begin():
-                user = (await session.execute(select(User).where(User.user_id == call.from_user.id).with_for_update())).scalar_one_or_none()
+        async with session.begin():
+            user = (
+                await session.execute(
+                    select(User).where(
+                        User.user_id == call.from_user.id
+                    ).with_for_update()
+                )
+            ).scalar_one_or_none()
             if not user or not user.home_nation_id:
                 await call.answer("⚠️ حساب پیدا نشد. /start بزن.", show_alert=True)
                 return
             nation = await session.get(Nation, user.home_nation_id, with_for_update=True)
-            holding = await session.scalar(select(CurrencyHolding).where(CurrencyHolding.user_id == user.user_id, CurrencyHolding.nation_id == user.home_nation_id).with_for_update())
+            holding = await session.scalar(
+                select(CurrencyHolding).where(
+                    CurrencyHolding.user_id == user.user_id,
+                    CurrencyHolding.nation_id == user.home_nation_id,
+                ).with_for_update()
+            )
             if not nation or not holding:
                 await call.answer("⚠️ حساب پیدا نشد. /start بزن.", show_alert=True)
                 return
@@ -434,15 +446,40 @@ async def confirm_first_trade(call: CallbackQuery, state: FSMContext) -> None:
             user.balance = holding.amount
             user.xr_balance += receive_omx
             nation.trade_volume_24h += receive_omx
-            session.add(Transaction(user_id=user.user_id, nation_id=nation.nation_id, transaction_type="sell", spend_xr=receive_omx, amount=Decimal("50"), fee_xr=Decimal("0"), rate=rate))
-            session.add(UserActivity(user_id=user.user_id, nation_id=nation.nation_id, activity_type="trade"))
-            await session.commit()
-    text = ("✅ <b>معامله انجام شد.</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" f"📤 فروختی:   <s>۵۰ {html.escape(nation.currency_code)}</s>\n📥 دریافتی:  <b>{fmt_amount(receive_omx)} ΩXR</b>\n\n─────────────────\n" f"💰 موجودی:\n<code>{html.escape(nation.currency_code)}</code>: <b>{fmt_amount(holding.amount)}</b>\n<code>ΩXR</code>: <b>{fmt_amount(user.xr_balance)}</b>\n\n─────────────────\n" "✨ <b>«اولین قدم در بازارهای OPEX» باز شد.</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            session.add(Transaction(
+                user_id=user.user_id,
+                nation_id=nation.nation_id,
+                transaction_type="sell",
+                spend_xr=receive_omx,
+                amount=Decimal("50"),
+                fee_xr=Decimal("0"),
+                rate=rate,
+            ))
+            session.add(UserActivity(
+                user_id=user.user_id,
+                nation_id=nation.nation_id,
+                activity_type="trade",
+            ))
+
+    text = (
+        "✅ <b>معامله انجام شد.</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"📤 فروختی:   <s>۵۰ {html.escape(nation.currency_code)}</s>\n"
+        f"📥 دریافتی:  <b>{fmt_amount(receive_omx)} ΩXR</b>\n\n"
+        "─────────────────\n"
+        f"💰 موجودی:\n<code>{html.escape(nation.currency_code)}</code>: <b>{fmt_amount(holding.amount)}</b>\n"
+        f"<code>ΩXR</code>: <b>{fmt_amount(user.xr_balance)}</b>\n\n"
+        "─────────────────\n✨ <b>«اولین قدم در بازارهای OPEX» باز شد.</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    )
     await state.clear()
     await _safe_edit_text(call, text)
     await call.answer()
     if call.message:
-    await call.message.answer("🌐 <b>منوی اصلی آماده‌ست.</b>", reply_markup=main_menu(), parse_mode="HTML")
+        await call.message.answer(
+            "🌐 <b>منوی اصلی آماده‌ست.</b>",
+            reply_markup=main_menu(),
+            parse_mode="HTML",
+        )
 
 
 @router.callback_query(F.data == "skip_first_trade")
