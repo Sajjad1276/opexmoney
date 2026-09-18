@@ -52,7 +52,7 @@ async def update_nation_ranks(session: AsyncSession) -> None:
         else:
             existing.rank = index
             existing.calculated_at = now
-    await session.commit()
+    await session.flush()
 
 
 async def reset_daily_metrics(session: AsyncSession) -> None:
@@ -60,7 +60,7 @@ async def reset_daily_metrics(session: AsyncSession) -> None:
     for nation in nations:
         nation.rate_24h_open = nation.exchange_rate
         nation.trade_volume_24h = Decimal("0")
-    await session.commit()
+    await session.flush()
 
 
 async def get_active_members(session: AsyncSession, nation_id: int, hours: int = 24) -> int:
