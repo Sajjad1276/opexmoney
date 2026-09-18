@@ -154,6 +154,6 @@ async def test_keyboard_manager_transition_contract():
         row = await session.get(__import__("app.database.models", fromlist=["KeyboardState"]).KeyboardState, 930002)
         assert row.kind == KeyboardKind.REPLY.value
         assert row.name == "main_menu"
-        async with session.begin():
-            await session.delete(row)
+        await session.delete(row)
+        await session.commit()
     print("KEYBOARD|PASS|reply->inline->reply")
