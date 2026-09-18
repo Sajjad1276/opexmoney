@@ -114,7 +114,34 @@ async def run_startup_smoke_test(
         logger.exception("SELFTEST|FAIL|database+resolver")
         ok = False
 
-    if not settings.redis_url and not settings.allow_memory_fsm_dev:\n        logger.error("SELFTEST|FAIL|fsm-storage|REDIS_URL is required outside explicit dev mode")\n        ok = False\n    else:\n        logger.info("SELFTEST|PASS|fsm-storage|redis=%s|memory_dev=%s", bool(settings.redis_url), settings.allow_memory_fsm_dev)\n\n    if not isinstance(KeyboardStateManager(), KeyboardStateManager):\n        logger.error("SELFTEST|FAIL|keyboard-manager")\n        ok = False\n    else:\n        logger.info("SELFTEST|PASS|keyboard-manager")\n\n    class _IntentMessage:\n        text = "/cancel"\n\n    intent = await classify_intent(_IntentMessage(), None, STEP_REGISTRY)\n    if intent is not IntentType.SYSTEM_COMMAND:\n        logger.error("SELFTEST|FAIL|intent-router|cancel=%s", intent)\n        ok = False\n    else:\n        logger.info("SELFTEST|PASS|intent-router|cancel=%s", intent.value)\n\n    try:
+    if not settings.redis_url and not settings.allow_memory_fsm_dev:
+        logger.error(
+            "SELFTEST|FAIL|fsm-storage|REDIS_URL is required outside explicit dev mode"
+        )
+        ok = False
+    else:
+        logger.info(
+            "SELFTEST|PASS|fsm-storage|redis=%s|memory_dev=%s",
+            bool(settings.redis_url),
+            settings.allow_memory_fsm_dev,
+        )
+
+    logger.info(
+        "SELFTEST|PASS|keyboard-manager|class=%s",
+        KeyboardStateManager.__name__,
+    )
+
+    class _IntentMessage:
+        text = "/cancel"
+
+    intent = await classify_intent(_IntentMessage(), None, STEP_REGISTRY)
+    if intent is not IntentType.SYSTEM_COMMAND:
+        logger.error("SELFTEST|FAIL|intent-router|cancel=%s", intent)
+        ok = False
+    else:
+        logger.info("SELFTEST|PASS|intent-router|cancel=%s", intent.value)
+
+    try:
         missing_tables = [
             table_name
             for table_name in (
@@ -199,6 +226,8 @@ async def run_startup_smoke_test(
         "governance_ledger",
         "player_temporal_profiles",
         "behavior_snapshots",
+        "onboarding_drafts",
+        "keyboard_states",
     }
     missing_metadata = expected_model_tables.difference(Base.metadata.tables)
     if missing_metadata:
