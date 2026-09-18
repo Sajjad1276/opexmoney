@@ -124,7 +124,7 @@ async def resume_from_draft(
 
         if step == FounderStates.CONFIRM.state:
             await state.set_state(FounderStates.CONFIRM)
-            await state.update_data(founder_user_id=message.from_user.id, **payload)
+            await state.update_data(**{**payload, "founder_user_id": message.from_user.id})
             await keyboard_manager.send_message(
                 message.bot,
                 chat_id=message.chat.id,
