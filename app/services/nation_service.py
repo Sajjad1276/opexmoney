@@ -11,14 +11,13 @@ from app.database.models import ActivityType, CurrencyHolding, Nation, User, Use
 
 
 async def get_active_nations(session: AsyncSession, limit: int = 3) -> list[Nation]:
-    async with session.begin():
-        result = await session.execute(
-            select(Nation)
-            .where(Nation.is_active.is_(True))
-            .order_by(desc(Nation.member_count), Nation.nation_id.asc())
-            .limit(limit)
-        )
-        return list(result.scalars().all())
+    result = await session.execute(
+        select(Nation)
+        .where(Nation.is_active.is_(True))
+        .order_by(desc(Nation.member_count), Nation.nation_id.asc())
+        .limit(limit)
+    )
+    return list(result.scalars().all())
 
 
 async def get_nation_rank(session: AsyncSession, nation_id: int) -> int:
