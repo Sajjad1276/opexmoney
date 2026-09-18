@@ -324,13 +324,19 @@ async def start_game_callback(call: CallbackQuery, state: FSMContext) -> None:
 
 
 async def _show_help(message: Message) -> None:
-    await message.answer(
-        "❓ <b>راهنمای OPEX MONEY</b>\n"
-        "تو یه معامله‌گر اقتصادی هستی.\n"
-        "به ملت‌ها بپیوند، ارز بخر و بفروش.\n"
-        "نرخ ارز با فعالیت بازار تغییر می‌کنه.\n"
-        "برای شروع، اسم معامله‌گرت رو انتخاب کن.",
-        reply_markup=welcome_keyboard(),
+    await keyboard_manager.send_message(
+        message.bot,
+        chat_id=message.chat.id,
+        text=(
+            "❓ <b>راهنمای OPEX MONEY</b>\n"
+            "تو یه معامله‌گر اقتصادی هستی.\n"
+            "به ملت‌ها بپیوند، ارز بخر و بفروش.\n"
+            "نرخ ارز با فعالیت بازار تغییر می‌کنه.\n"
+            "برای شروع، اسم معامله‌گرت رو انتخاب کن."
+        ),
+        kind=KeyboardKind.INLINE,
+        name="welcome",
+        markup=welcome_keyboard(),
         parse_mode="HTML",
     )
 
