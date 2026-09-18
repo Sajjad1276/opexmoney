@@ -11,9 +11,6 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.storage.redis import RedisStorage
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
-from sqlalchemy import text
-
-from app.database.models import Base
 from app.database.session import async_session, engine
 from app.handlers.market import router as market_router
 from app.handlers.founder import founder_router
@@ -33,85 +30,6 @@ def build_storage():
         return RedisStorage.from_url(settings.redis_url)
     logger.warning("REDIS_URL is not configured; using in-memory FSM storage")
     return MemoryStorage()
-
-
-async def prepare_database() -> None:
-    async with engine.begin() as connection:
-        await connection.run_sync(Base.metadata.create_all)
-
-        statements = [
-            "ALTER TABLE users ADD COLUMN IF NOT EXISTS xr_balance NUMERIC(14,2) NOT NULL DEFAULT 0",
-            "ALTER TABLE nations ADD COLUMN IF NOT EXISTS rate_prev NUMERIC(10,4) NOT NULL DEFAULT 1.0000",
-            "ALTER TABLE nations ADD COLUMN IF NOT EXISTS rate_24h_open NUMERIC(10,4) NOT NULL DEFAULT 1.0000",
-            "ALTER TABLE nations ADD COLUMN IF NOT EXISTS trade_volume_24h NUMERIC(18,4) NOT NULL DEFAULT 0",
-            "ALTER TABLE nations ADD COLUMN IF NOT EXISTS active_members_24h INTEGER NOT NULL DEFAULT 0",
-            "ALTER TABLE nations ADD COLUMN IF NOT EXISTS nation_rank INTEGER",
-            "ALTER TABLE nations ADD COLUMN IF NOT EXISTS last_rate_update TIMESTAMP",
-            "ALTER TABLE nations ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE",
-            "ALTER TABLE nations ALTER COLUMN exchange_rate TYPE NUMERIC(12,4)",
-            """
-            DO $$
-            BEGIN
-                IF EXISTS (
-                    SELECT 1
-                    FROM information_schema.columns
-                    WHERE table_schema = current_schema()
-                      AND table_name = 'users'
-                      AND column_name = 'user_id'
-                      AND data_type = 'integer'
-                ) THEN
-                    ALTER TABLE currency_holdings DROP CONSTRAINT IF EXISTS currency_holdings_user_id_fkey;
-                    ALTER TABLE transactions DROP CONSTRAINT IF EXISTS transactions_user_id_fkey;
-                    ALTER TABLE user_activities DROP CONSTRAINT IF EXISTS user_activities_user_id_fkey;
-                    ALTER TABLE trade_previews DROP CONSTRAINT IF EXISTS trade_previews_user_id_fkey;
-
-                    ALTER TABLE users ALTER COLUMN user_id TYPE BIGINT USING user_id::BIGINT;
-                    ALTER TABLE currency_holdings ALTER COLUMN user_id TYPE BIGINT USING user_id::BIGINT;
-                    ALTER TABLE transactions ALTER COLUMN user_id TYPE BIGINT USING user_id::BIGINT;
-                    ALTER TABLE user_activities ALTER COLUMN user_id TYPE BIGINT USING user_id::BIGINT;
-                    ALTER TABLE trade_previews ALTER COLUMN user_id TYPE BIGINT USING user_id::BIGINT;
-
-                    ALTER TABLE currency_holdings
-                        ADD CONSTRAINT currency_holdings_user_id_fkey
-                        FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE;
-                    ALTER TABLE transactions
-                        ADD CONSTRAINT transactions_user_id_fkey
-                        FOREIGN KEY (user_id) REFERENCES users(user_id);
-                    ALTER TABLE user_activities
-                        ADD CONSTRAINT user_activities_user_id_fkey
-                        FOREIGN KEY (user_id) REFERENCES users(user_id);
-                    ALTER TABLE trade_previews
-                        ADD CONSTRAINT trade_previews_user_id_fkey
-                        FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE;
-                END IF;
-
-                IF EXISTS (
-                    SELECT 1
-                    FROM information_schema.columns
-                    WHERE table_schema = current_schema()
-                      AND table_name = 'nations'
-                      AND column_name = 'group_id'
-                      AND data_type = 'integer'
-                ) THEN
-                    ALTER TABLE nations ALTER COLUMN group_id TYPE BIGINT USING group_id::BIGINT;
-                END IF;
-
-                IF EXISTS (
-                    SELECT 1
-                    FROM information_schema.columns
-                    WHERE table_schema = current_schema()
-                      AND table_name = 'nations'
-                      AND column_name = 'founder_user_id'
-                      AND data_type = 'integer'
-                ) THEN
-                    ALTER TABLE nations ALTER COLUMN founder_user_id TYPE BIGINT USING founder_user_id::BIGINT;
-                END IF;
-            END $$;
-            """,
-            "INSERT INTO currency_holdings (user_id,nation_id,amount) SELECT user_id,home_nation_id,balance FROM users WHERE home_nation_id IS NOT NULL ON CONFLICT (user_id,nation_id) DO NOTHING",
-        ]
-        for statement in statements:
-            await connection.execute(text(statement))
 
 
 async def run_rate_job() -> None:
@@ -150,7 +68,6 @@ def build_scheduler() -> AsyncIOScheduler:
 
 
 async def main() -> None:
-    await prepare_database()
     bot = Bot(token=settings.bot_token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     dp = Dispatcher(storage=build_storage())
 
