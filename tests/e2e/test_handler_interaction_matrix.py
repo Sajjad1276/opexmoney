@@ -115,6 +115,20 @@ async def test_every_registered_handler_executes_at_least_once():
 
     async with async_session() as session:
         async with session.begin():
+            await session.execute(delete(TradePreview).where(TradePreview.user_id == USER_ID))
+            await session.execute(delete(Transaction).where(Transaction.user_id == USER_ID))
+            await session.execute(delete(UserActivity).where(UserActivity.user_id == USER_ID))
+            await session.execute(delete(CurrencyHolding).where(CurrencyHolding.user_id == USER_ID))
+            await session.execute(delete(OnboardingDraft).where(OnboardingDraft.player_id == USER_ID))
+            await session.execute(delete(KeyboardState).where(KeyboardState.chat_id == USER_ID))
+            await session.execute(delete(BotGroup).where(BotGroup.group_id.in_([MATRIX_GROUP_A, MATRIX_GROUP_B])))
+            old_user = await session.get(User, USER_ID)
+            if old_user is not None:
+                await session.delete(old_user)
+            await session.execute(delete(Nation).where(Nation.group_id.in_([NATION_GROUP, MATRIX_GROUP_A, MATRIX_GROUP_B])))
+
+    async with async_session() as session:
+        async with session.begin():
             nation_row = Nation(
                 group_id=NATION_GROUP,
                 name="Matrixland",
@@ -135,6 +149,7 @@ async def test_every_registered_handler_executes_at_least_once():
                 xr_balance=Decimal("500.00"),
                 role="founder",
             ))
+            await session.flush()
             session.add(CurrencyHolding(
                 user_id=USER_ID,
                 nation_id=nation_row.nation_id,
