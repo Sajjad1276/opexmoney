@@ -151,10 +151,10 @@ async def test_every_registered_handler_executes_at_least_once():
             failures.append((name, repr(exc)))
             print(f"HANDLER|FAIL|{name}|{exc!r}")
 
-    async def start_message(text="/start"):
+    def start_message(text="/start"):
         return Message(bot, USER_ID, text=text)
 
-    await run("start.start", lambda: start.start(await start_message(), state))
+    await run("start.start", lambda: start.start(start_message(), state))
     await run("start.start_game_button", lambda: start.start_game_button(await start_message("🎮 شروع بازی"), state))
     await run("start.start_game_callback", lambda: start.start_game_callback(Callback(bot, "start_game"), state))
     await run("start.start_help", lambda: start.start_help(await start_message("❓ راهنما")))
