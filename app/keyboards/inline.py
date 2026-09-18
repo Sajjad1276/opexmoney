@@ -10,11 +10,6 @@ def cancel_keyboard() -> InlineKeyboardMarkup:
     ]])
 
 
-def nation_keyboard(nations) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text=f"🏛 پیوستن به {nation.name}", callback_data=f"join_{nation.nation_id}", style=ButtonStyle.SUCCESS),
-    ] for nation in nations])
-
 
 def first_trade_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[
