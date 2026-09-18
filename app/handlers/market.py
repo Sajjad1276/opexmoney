@@ -58,7 +58,8 @@ async def market_refresh(call:CallbackQuery):
 @router.callback_query(F.data=='market_buy')
 async def market_buy(call:CallbackQuery,state:FSMContext):
     async with async_session() as session:
-        user=await session.get(User,call.from_user.id); nations=(await session.execute(select(Nation).where(Nation.is_active.is_(True)).order_by(Nation.exchange_rate.desc()).limit(3))).scalars().all()
+        async with session.begin():
+            user=await session.get(User,call.from_user.id); nations=(await session.execute(select(Nation).where(Nation.is_active.is_(True)).order_by(Nation.exchange_rate.desc()).limit(3))).scalars().all()
         if not user: await call.answer('🔴 حساب پیدا نشد. /start بزن.',show_alert=True); return
         text='📈 <b>خرید ارز</b>\n━━━━━━━━━━━━━━━━━━━━\n💰 ΩXR موجود: <b>'+fmt_amount(user.xr_balance)+'</b>\n\n<b>کدوم ارز می‌خوای بخری؟</b>'
         for n in nations: text+=f'\n🏛 <code>{html.escape(n.currency_code)}</code> · {html.escape(n.name)} · <b>{fmt_rate(n.exchange_rate)} ΩXR</b>'
@@ -89,14 +90,17 @@ async def make_buy_preview(message,state,nation_id,raw):
 async def buy_currency(call,state):
     nation_id=int(call.data.rsplit('_',1)[1])
     async with async_session() as session:
-        nation=await session.get(Nation,nation_id); user=await session.get(User,call.from_user.id)
+        async with session.begin():
+            nation=await session.get(Nation,nation_id); user=await session.get(User,call.from_user.id)
         if not nation or not user: await call.answer('⚠️ ارز پیدا نشد.',show_alert=True); return
         text=f'📈 <b>خرید <code>{html.escape(nation.currency_code)}</code></b>\n━━━━━━━━━━━━━━━━━━━━\n💹 نرخ: <code>۱ {html.escape(nation.currency_code)} = {fmt_rate(nation.exchange_rate)} ΩXR</code>\n💰 موجودی: <b>{fmt_amount(user.xr_balance)} ΩXR</b>\n\n<b>چقدر ΩXR خرج می‌کنی؟</b>\n<i>حداقل ۱۰ ΩXR</i>'
     await state.set_state(MarketStates.WAITING_BUY_AMOUNT); await state.update_data(nation_id=nation_id); await safe_edit(call,text,buy_amount_keyboard(nation_id)); await call.answer()
 @router.callback_query(F.data.startswith('buyq_'))
 async def buy_quick(call,state):
     _,amount,nation_id=call.data.split('_',2)
-    async with async_session() as session: user=await session.get(User,call.from_user.id)
+    async with async_session() as session:
+        async with session.begin():
+            user=await session.get(User,call.from_user.id)
     spend=user.xr_balance if amount=='all' and user else Decimal(amount); await make_buy_preview(call.message,state,int(nation_id),str(spend)); await call.answer()
 @router.message(MarketStates.WAITING_BUY_AMOUNT)
 async def buy_amount_message(message,state): data=await state.get_data(); await make_buy_preview(message,state,int(data['nation_id']),message.text or '')
@@ -162,7 +166,9 @@ async def market_sell(call,state):
 @router.callback_query(F.data.startswith('sell_'))
 async def sell_currency(call,state):
     code=call.data.removeprefix('sell_')
-    async with async_session() as session: nation=await session.scalar(select(Nation).where(Nation.currency_code==code,Nation.is_active.is_(True))); holding=await session.scalar(select(CurrencyHolding).where(CurrencyHolding.user_id==call.from_user.id,CurrencyHolding.nation_id==nation.nation_id)) if nation else None
+    async with async_session() as session:
+        async with session.begin():
+            nation=await session.scalar(select(Nation).where(Nation.currency_code==code,Nation.is_active.is_(True))); holding=await session.scalar(select(CurrencyHolding).where(CurrencyHolding.user_id==call.from_user.id,CurrencyHolding.nation_id==nation.nation_id)) if nation else None
     if not nation or not holding or holding.amount<=0: await call.answer('🔴 موجودی این ارز صفر است.',show_alert=True); return
     await state.set_state(MarketStates.WAITING_SELL_AMOUNT); await state.update_data(nation_id=nation.nation_id); text=f'📉 <b>فروش <code>{html.escape(nation.currency_code)}</code></b>\n━━━━━━━━━━━━━━━━━━━━\n💹 نرخ: <code>۱ {html.escape(nation.currency_code)} = {fmt_rate(nation.exchange_rate)} ΩXR</code>\n💰 موجودی: <b>{fmt_amount(holding.amount)} {html.escape(nation.currency_code)}</b>\n\n<b>چقدر می‌فروشی؟</b>'; await safe_edit(call,text,sell_amount_keyboard(nation.currency_code)); await call.answer()
 async def make_sell_preview(message,state,nation_id,raw):
@@ -247,7 +253,9 @@ async def confirm_sell(call,state=None):
 async def market_chart(call): await safe_edit(call,'📊 <b>نمودار نرخ</b>\n━━━━━━━━━━━━━━━━━━━━\nاین قابلیت هنوز فعال نیست.',market_keyboard()); await call.answer()
 @router.callback_query(F.data=='market_history')
 async def market_history(call):
-    async with async_session() as session: rows=(await session.execute(select(Transaction,Nation.currency_code).join(Nation,Nation.nation_id==Transaction.nation_id).where(Transaction.user_id==call.from_user.id).order_by(Transaction.created_at.desc()).limit(5))).all()
+    async with async_session() as session:
+        async with session.begin():
+            rows=(await session.execute(select(Transaction,Nation.currency_code).join(Nation,Nation.nation_id==Transaction.nation_id).where(Transaction.user_id==call.from_user.id).order_by(Transaction.created_at.desc()).limit(5))).all()
     lines=['📜 <b>تاریخچه</b>','━━━━━━━━━━━━━━━━━━━━']
     if not rows: lines.append('هنوز معامله‌ای انجام ندادی.')
     for tx,code in rows: lines.append(f"{'📈' if tx.transaction_type=='buy' else '📉'} <code>{html.escape(code)}</code> · {fmt_amount(tx.amount)} · {fmt_rate(tx.rate)} ΩXR")
