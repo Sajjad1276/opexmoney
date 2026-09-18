@@ -215,9 +215,11 @@ def governance_vote_keyboard(proposal_id: int) -> InlineKeyboardMarkup:
 
 
 def governance_proposal_list_keyboard(proposals) -> InlineKeyboardMarkup:
+    from app.services.rules.registry import RULE_REGISTRY
+
     rows = [
         [InlineKeyboardButton(
-            text=f"🗳 {proposal.rule_key} · #{proposal.id}",
+            text=f"🗳 {RULE_REGISTRY.get(proposal.rule_key).title_fa if proposal.rule_key in RULE_REGISTRY else proposal.rule_key} · #{proposal.id}",
             callback_data=f"gov_proposal:{proposal.id}",
         )]
         for proposal in proposals
