@@ -27,6 +27,8 @@ from app.keyboards.inline import (
     trade_preview_keyboard,
 )
 from app.services.economic_engine import get_active_members
+from app.services.keyboard_state import KeyboardKind, keyboard_manager
+from app.services.onboarding_draft import clear_draft, save_draft
 from app.services.rules.resolver import resolve
 from app.services.temporal_service import get_peak_multiplier
 from app.states.market import MarketStates
@@ -45,11 +47,14 @@ router = Router(name="market")
 
 async def safe_edit(call, text, markup=None):
     try:
-        if call.message is None or not hasattr(call.message, "edit_text"):
+        if call.message is None:
             return False
-        await call.message.edit_text(
-            text,
-            reply_markup=markup,
+        await keyboard_manager.edit_message(
+            call.message,
+            text=text,
+            kind=KeyboardKind.INLINE if markup is not None else KeyboardKind.NONE,
+            name="market" if markup is not None else "none",
+            markup=markup,
             parse_mode="HTML",
         )
         return True
@@ -146,9 +151,13 @@ async def render_market(message: Message, edit_call=None):
     if edit_call:
         await safe_edit(edit_call, text, market_keyboard())
     else:
-        await message.answer(
-            text,
-            reply_markup=market_keyboard(),
+        await keyboard_manager.send_message(
+            message.bot,
+            chat_id=message.chat.id,
+            text=text,
+            kind=KeyboardKind.INLINE,
+            name="market",
+            markup=market_keyboard(),
             parse_mode="HTML",
         )
 
@@ -196,9 +205,12 @@ async def market_refresh(call: CallbackQuery):
                 text = market_text(user, nation, others, active)
 
         try:
-            await call.message.edit_text(
-                text,
-                reply_markup=market_keyboard(),
+            await keyboard_manager.edit_message(
+                call.message,
+                text=text,
+                kind=KeyboardKind.INLINE,
+                name="market",
+                markup=market_keyboard(),
                 parse_mode="HTML",
             )
             await call.answer()
@@ -323,6 +335,7 @@ async def make_buy_preview(
                     preview_rate=nation.exchange_rate,
                 )
             )
+            await clear_draft(session, message.from_user.id)
 
             peak_signal = (
                 "\n📈 <i>بازار الان با تو راه میاد.</i>\n"
@@ -350,9 +363,13 @@ async def make_buy_preview(
             )
 
     await state.clear()
-    await message.answer(
-        text,
-        reply_markup=trade_preview_keyboard(nation_id, spend, "buy"),
+    await keyboard_manager.send_message(
+        message.bot,
+        chat_id=message.chat.id,
+        text=text,
+        kind=KeyboardKind.INLINE,
+        name="trade_preview_buy",
+        markup=trade_preview_keyboard(nation_id, spend, "buy"),
         parse_mode="HTML",
     )
 
@@ -381,6 +398,14 @@ async def buy_currency(call, state):
 
     await state.set_state(MarketStates.WAITING_BUY_AMOUNT)
     await state.update_data(nation_id=nation_id)
+    async with async_session() as session:
+        async with session.begin():
+            await save_draft(
+                session,
+                player_id=call.from_user.id,
+                step_key=MarketStates.WAITING_BUY_AMOUNT.state,
+                payload={"nation_id": nation_id},
+            )
     await safe_edit(call, text, buy_amount_keyboard(nation_id))
     await call.answer()
 
@@ -515,6 +540,7 @@ async def confirm_buy(call, state=None):
                 )
             )
             await session.delete(preview)
+            await clear_draft(session, call.from_user.id)
 
             peak_signal = (
                 "\n📈 بازار الان با تو راه میاد."
@@ -620,6 +646,14 @@ async def sell_currency(call, state):
 
     await state.set_state(MarketStates.WAITING_SELL_AMOUNT)
     await state.update_data(nation_id=nation.nation_id)
+    async with async_session() as session:
+        async with session.begin():
+            await save_draft(
+                session,
+                player_id=call.from_user.id,
+                step_key=MarketStates.WAITING_SELL_AMOUNT.state,
+                payload={"nation_id": nation.nation_id},
+            )
     text = (
         f"📉 <b>فروش <code>{html.escape(nation.currency_code)}</code></b>\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
@@ -700,6 +734,7 @@ async def make_sell_preview(message, state, nation_id: int, raw: str):
                     preview_rate=nation.exchange_rate,
                 )
             )
+            await clear_draft(session, message.from_user.id)
             xr_after = user.xr_balance + calc["receive"]
             currency_after = holding.amount - amount
             peak_signal = (
@@ -728,9 +763,13 @@ async def make_sell_preview(message, state, nation_id: int, raw: str):
             )
 
     await state.clear()
-    await message.answer(
-        text,
-        reply_markup=trade_preview_keyboard(nation_id, amount, "sell"),
+    await keyboard_manager.send_message(
+        message.bot,
+        chat_id=message.chat.id,
+        text=text,
+        kind=KeyboardKind.INLINE,
+        name="trade_preview_sell",
+        markup=trade_preview_keyboard(nation_id, amount, "sell"),
         parse_mode="HTML",
     )
 
@@ -887,6 +926,7 @@ async def confirm_sell(call, state=None):
                 )
             )
             await session.delete(preview)
+            await clear_draft(session, call.from_user.id)
 
             peak_signal = (
                 "\n📈 بازار الان با تو راه میاد."

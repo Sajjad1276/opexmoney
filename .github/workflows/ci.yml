@@ -41,4 +41,4 @@ jobs:
           alembic downgrade 0002_founder_constraints
           alembic upgrade head
       - name: Run tests
-        run: pytest -q
+        run: pytest -q -s

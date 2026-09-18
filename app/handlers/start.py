@@ -17,7 +17,10 @@ from app.database.models import CurrencyHolding, Nation, Transaction, User, User
 from app.database.session import async_session
 from app.keyboards.inline import cancel_keyboard, first_trade_keyboard, nation_selection_keyboard, trade_confirmation_keyboard, welcome_keyboard
 from app.keyboards.reply import main_menu_keyboard
+from app.services.keyboard_state import KeyboardKind, keyboard_manager
 from app.services.nation_service import get_active_nations, get_nation_rank
+from app.services.onboarding_draft import clear_draft, get_draft
+from app.services.draft_recovery import resume_from_draft
 from app.services.user_service import get_registration_status, get_user, is_fully_registered
 from app.states.onboarding import OnboardingStates
 from app.utils.formatting import fmt_amount, fmt_pct, fmt_rate, get_rate_change, get_rate_emoji, to_fa
@@ -36,22 +39,40 @@ def current_date_fa() -> str:
 
 
 
-async def _safe_edit_text(call: CallbackQuery, text: str, reply_markup=None) -> bool:
+async def _safe_edit_text(call: CallbackQuery, text: str, markup=None) -> bool:
     try:
-        if call.message is None or not hasattr(call.message, "edit_text"):
+        if call.message is None:
             return False
-        await call.message.edit_text(text, reply_markup=reply_markup, parse_mode="HTML")
+        kind = KeyboardKind.INLINE if markup is not None else KeyboardKind.NONE
+        await keyboard_manager.edit_message(
+            call.message,
+            text=text,
+            kind=kind,
+            name="inline" if kind == KeyboardKind.INLINE else "none",
+            markup=markup,
+            parse_mode="HTML",
+        )
         return True
     except TelegramBadRequest as exc:
         logger.info("Message edit failed: %s", exc)
         return False
 
 
-async def _safe_edit_caption(call: CallbackQuery, caption: str, reply_markup=None) -> bool:
+async def _safe_edit_caption(call: CallbackQuery, caption: str, markup=None) -> bool:
     try:
-        if call.message is None or not hasattr(call.message, "edit_caption"):
+        if call.message is None:
             return False
-        await call.message.edit_caption(caption=caption, reply_markup=reply_markup, parse_mode="HTML")
+        kind = KeyboardKind.INLINE if markup is not None else KeyboardKind.NONE
+        await keyboard_manager.edit_caption_id(
+            call.bot,
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            caption=caption,
+            kind=kind,
+            name="inline" if kind == KeyboardKind.INLINE else "none",
+            markup=markup,
+            parse_mode="HTML",
+        )
         return True
     except TelegramBadRequest as exc:
         logger.info("Caption edit failed: %s", exc)
@@ -88,7 +109,15 @@ async def show_dashboard(message: Message, user: User) -> None:
         async with session.begin():
             nation = await session.get(Nation, user.home_nation_id) if user.home_nation_id else None
         if nation is None:
-            await message.answer("<b>OPEX MONEY</b>\nحسابت آماده است، اما هنوز ملت اصلی نداری.", reply_markup=main_menu_keyboard(), parse_mode="HTML")
+            await keyboard_manager.send_message(
+                message.bot,
+                chat_id=message.chat.id,
+                text="<b>OPEX MONEY</b>\nحسابت آماده است، اما هنوز ملت اصلی نداری.",
+                kind=KeyboardKind.REPLY,
+                name="main_menu",
+                markup=main_menu_keyboard(),
+                parse_mode="HTML",
+            )
             return
         async with session.begin():
             rank = nation.nation_rank or await get_nation_rank(session, nation.nation_id)
@@ -99,7 +128,7 @@ async def show_dashboard(message: Message, user: User) -> None:
         minutes = max(0, int((datetime.utcnow() - nation.last_rate_update).total_seconds() // 60)) if nation.last_rate_update else 0
         balance = holding.amount if holding else user.balance
         text = ("🌐 <b>OPEX MONEY</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" f"{user_mention(message.from_user)}\n\n" f"🏛 {html.escape(nation.name)} · {html.escape(user.username)}\n" f"💰 <code>{html.escape(nation.currency_code)}</code>: <b>{fmt_amount(balance)}</b> · <code>ΩXR</code>: <b>{fmt_amount(user.xr_balance)}</b>\n\n" f"{get_rate_emoji(change)} <code>{html.escape(nation.currency_code)}</code>: <b>{fmt_rate(nation.exchange_rate)} ΩXR</b> · <i>{fmt_pct(change)} امروز</i>\n" f"🏆 رتبه #{to_fa(rank)} از {to_fa(total_nations)} · 👥 {to_fa(active)} فعال\n" f"⏱ <i>{to_fa(minutes)} دقیقه پیش</i>\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-    await message.answer(text, reply_markup=main_menu_keyboard(), parse_mode="HTML")
+    await keyboard_manager.send_message(message.bot, chat_id=message.chat.id, text=text, kind=KeyboardKind.REPLY, name="main_menu", markup=main_menu_keyboard(), parse_mode="HTML")
 
 
 async def continue_registration(
@@ -110,11 +139,15 @@ async def continue_registration(
 ) -> None:
     if "username" in missing or not (user.username or "").strip():
         await state.set_state(OnboardingStates.SET_USERNAME_PLAYER)
-        await message.answer(
-            USERNAME_CAPTION.format(
+        await keyboard_manager.send_message(
+            message.bot,
+            chat_id=message.chat.id,
+            text=USERNAME_CAPTION.format(
                 user_mention=user_mention(message.from_user),
             ),
-            reply_markup=cancel_keyboard(),
+            kind=KeyboardKind.INLINE,
+            name="onboarding_username",
+            markup=cancel_keyboard(),
             parse_mode="HTML",
         )
         return
@@ -160,20 +193,35 @@ async def continue_registration(
     await state.set_state(OnboardingStates.SELECT_NATION)
 
     if not nations:
-        await message.answer(
-            "🌍 <b>هنوز هیچ ملتی تأسیس نشده!</b>\n\n"
-            "تو می‌تونی اولین بنیان‌گذار تاریخ باشی\n"
-            "و اولین ملت OPEX MONEY رو بسازی.",
-            reply_markup=nation_selection_keyboard([]),
+        await keyboard_manager.send_message(
+            message.bot,
+            chat_id=message.chat.id,
+            text=(
+                "🌍 <b>هنوز هیچ ملتی تأسیس نشده!</b>\n\n"
+                "تو می‌تونی اولین بنیان‌گذار تاریخ باشی\n"
+                "و اولین ملت OPEX MONEY رو بسازی."
+            ),
+            kind=KeyboardKind.INLINE,
+            name="nation_selection",
+            markup=nation_selection_keyboard([]),
             parse_mode="HTML",
         )
         return
 
-    await message.answer(
-        nation_list_text(message.from_user, user.username, nations),
-        reply_markup=nation_selection_keyboard(nations),
+    await keyboard_manager.send_message(
+        message.bot,
+        chat_id=message.chat.id,
+        text=nation_list_text(message.from_user, user.username, nations),
+        kind=KeyboardKind.INLINE,
+        name="nation_selection",
+        markup=nation_selection_keyboard(nations),
         parse_mode="HTML",
     )
+
+
+async def get_draft_for_start(user_id: int):
+    async with async_session() as session:
+        return await get_draft(session, user_id)
 
 
 @router.message(CommandStart())
@@ -192,6 +240,11 @@ async def start(message: Message, state: FSMContext) -> None:
             else:
                 registered_user = None
             status = await get_registration_status(session, message.from_user.id)
+
+    draft = await get_draft_for_start(message.from_user.id)
+    if draft is not None:
+        if await resume_from_draft(message, state):
+            return
 
     if registered_user is not None:
         await state.clear()
@@ -212,9 +265,13 @@ async def start(message: Message, state: FSMContext) -> None:
         user_name=html.escape(message.from_user.first_name or "معامله‌گر"),
         current_date=current_date_fa(),
     )
-    await message.answer(
-        caption,
-        reply_markup=welcome_keyboard(),
+    await keyboard_manager.send_message(
+        message.bot,
+        chat_id=message.chat.id,
+        text=caption,
+        kind=KeyboardKind.INLINE,
+        name="welcome",
+        markup=welcome_keyboard(),
         parse_mode="HTML",
     )
 
@@ -249,11 +306,15 @@ async def _begin_registration(message: Message, state: FSMContext) -> None:
         return
 
     await state.set_state(OnboardingStates.SET_USERNAME_PLAYER)
-    await message.answer(
-        USERNAME_CAPTION.format(
+    await keyboard_manager.send_message(
+        message.bot,
+        chat_id=message.chat.id,
+        text=USERNAME_CAPTION.format(
             user_mention=user_mention(message.from_user),
         ),
-        reply_markup=cancel_keyboard(),
+        kind=KeyboardKind.INLINE,
+        name="onboarding_username",
+        markup=cancel_keyboard(),
         parse_mode="HTML",
     )
 
@@ -274,13 +335,19 @@ async def start_game_callback(call: CallbackQuery, state: FSMContext) -> None:
 
 
 async def _show_help(message: Message) -> None:
-    await message.answer(
-        "❓ <b>راهنمای OPEX MONEY</b>\n"
-        "تو یه معامله‌گر اقتصادی هستی.\n"
-        "به ملت‌ها بپیوند، ارز بخر و بفروش.\n"
-        "نرخ ارز با فعالیت بازار تغییر می‌کنه.\n"
-        "برای شروع، اسم معامله‌گرت رو انتخاب کن.",
-        reply_markup=welcome_keyboard(),
+    await keyboard_manager.send_message(
+        message.bot,
+        chat_id=message.chat.id,
+        text=(
+            "❓ <b>راهنمای OPEX MONEY</b>\n"
+            "تو یه معامله‌گر اقتصادی هستی.\n"
+            "به ملت‌ها بپیوند، ارز بخر و بفروش.\n"
+            "نرخ ارز با فعالیت بازار تغییر می‌کنه.\n"
+            "برای شروع، اسم معامله‌گرت رو انتخاب کن."
+        ),
+        kind=KeyboardKind.INLINE,
+        name="welcome",
+        markup=welcome_keyboard(),
         parse_mode="HTML",
     )
 
@@ -360,6 +427,7 @@ async def join_nation(call: CallbackQuery, state: FSMContext) -> None:
                 xr_balance=Decimal("0.00"),
                 role="player",
             )
+            await clear_draft(session, call.from_user.id)
             holding = CurrencyHolding(
                 user_id=user.user_id,
                 nation_id=nation.nation_id,
@@ -487,9 +555,13 @@ async def confirm_first_trade(call: CallbackQuery, state: FSMContext) -> None:
     await _safe_edit_text(call, text)
     await call.answer()
     if call.message:
-        await call.message.answer(
-            "🌐 <b>منوی اصلی آماده‌ست.</b>",
-            reply_markup=main_menu_keyboard(),
+        await keyboard_manager.send_message(
+            call.bot,
+            chat_id=call.message.chat.id,
+            text="🌐 <b>منوی اصلی آماده‌ست.</b>",
+            kind=KeyboardKind.REPLY,
+            name="main_menu",
+            markup=main_menu_keyboard(),
             parse_mode="HTML",
         )
 
@@ -507,7 +579,15 @@ async def skip_first_trade(call: CallbackQuery, state: FSMContext) -> None:
     await _safe_edit_text(call, text)
     await call.answer()
     if call.message:
-        await call.message.answer("🌐 <b>منوی اصلی آماده‌ست.</b>", reply_markup=main_menu_keyboard(), parse_mode="HTML")
+        await keyboard_manager.send_message(
+            call.bot,
+            chat_id=call.message.chat.id,
+            text="🌐 <b>منوی اصلی آماده‌ست.</b>",
+            kind=KeyboardKind.REPLY,
+            name="main_menu",
+            markup=main_menu_keyboard(),
+            parse_mode="HTML",
+        )
 
 
 async def _get_holding_amount(user_id: int, nation_id: int) -> Decimal:
@@ -520,6 +600,9 @@ async def _get_holding_amount(user_id: int, nation_id: int) -> Decimal:
 @router.callback_query(F.data == "cancel_start")
 async def cancel_start(call: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
+    async with async_session() as session:
+        async with session.begin():
+            await clear_draft(session, call.from_user.id)
     text = f"{html.escape(call.from_user.first_name or 'معامله‌گر')}، ثبت‌نام لغو شد.\n\nهر وقت خواستی، /start بزن."
     if call.message and getattr(call.message, "photo", None):
         await _safe_edit_caption(call, text)

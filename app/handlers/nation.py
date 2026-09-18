@@ -1,22 +1,17 @@
 from __future__ import annotations
 
 from aiogram import F, Router
-from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
+from aiogram.types import CallbackQuery, InlineKeyboardButton, Message
 from sqlalchemy import select
 
 from app.database.models import Nation, User
 from app.database.session import async_session
 from app.handlers.start import show_dashboard
-from app.keyboards.inline import nation_panel_keyboard
+from app.keyboards.inline import back_only_keyboard, first_nation_keyboard, nation_explore_keyboard, nation_panel_keyboard
+from app.services.keyboard_state import KeyboardKind, keyboard_manager
 from app.services.user_service import is_fully_registered
 
 nation_router = Router(name="nation")
-
-
-def _soon_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="↩️ بازگشت", callback_data="back_to_dashboard")]
-    ])
 
 
 @nation_router.message(F.text == "🌍 ملت‌ها")
@@ -34,11 +29,17 @@ async def open_nations(message: Message) -> None:
         )
         return
 
-    await message.answer(
-        "🌍 <b>ملت‌ها</b>\n"
-        "اینجا می‌تونی ملت‌ها رو بررسی کنی.\n"
-        "از گزینه‌ها برای ادامه استفاده کن.",
-        reply_markup=nation_panel_keyboard(is_founder),
+    await keyboard_manager.send_message(
+        message.bot,
+        chat_id=message.chat.id,
+        text=(
+            "🌍 <b>ملت‌ها</b>\n"
+            "اینجا می‌تونی ملت‌ها رو بررسی کنی.\n"
+            "از گزینه‌ها برای ادامه استفاده کن."
+        ),
+        kind=KeyboardKind.INLINE,
+        name="nation_panel",
+        markup=nation_panel_keyboard(is_founder),
         parse_mode="HTML",
     )
 
@@ -80,11 +81,15 @@ async def my_nations(call: CallbackQuery) -> None:
             f"👥 {nation.member_count} نفر\n"
             "برای جزئیات بیشتر، این بخش در حال توسعه است."
         )
-    await call.message.edit_text(
-        text,
-        reply_markup=_soon_keyboard(),
-        parse_mode="HTML",
-    ) if call.message else None
+    if call.message:
+        await keyboard_manager.edit_message(
+            call.message,
+            text=text,
+            kind=KeyboardKind.INLINE,
+            name="nation_back",
+            markup=back_only_keyboard(),
+            parse_mode="HTML",
+        )
     await call.answer()
 
 
@@ -105,14 +110,16 @@ async def explore_nations(call: CallbackQuery) -> None:
             ).scalars().all()
 
     if not nations:
-        await call.message.edit_text(
-            "🌍 <b>هنوز ملتی وجود نداره.</b>\n"
-            "تو می‌تونی اولین ملت رو تأسیس کنی.",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="🏛 تأسیس اولین ملت", callback_data="found_nation")]
-            ]),
-            parse_mode="HTML",
-        ) if call.message else None
+        if call.message:
+            await keyboard_manager.edit_message(
+                call.message,
+                text="🌍 <b>هنوز ملتی وجود نداره.</b>\n"
+                     "تو می‌تونی اولین ملت رو تأسیس کنی.",
+                kind=KeyboardKind.INLINE,
+                name="first_nation",
+                markup=first_nation_keyboard(),
+                parse_mode="HTML",
+            )
         await call.answer()
         return
 
@@ -125,10 +132,15 @@ async def explore_nations(call: CallbackQuery) -> None:
     ]
     rows.append([InlineKeyboardButton(text="↩️ بازگشت", callback_data="back_to_dashboard")])
     if call.message:
-        await call.message.edit_text(
-            "🔍 <b>کاوش ملت‌ها</b>\n"
-            "ملت فعال موردنظرت رو انتخاب کن.",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=rows),
+        await keyboard_manager.edit_message(
+            call.message,
+            text=(
+                "🔍 <b>کاوش ملت‌ها</b>\n"
+                "ملت فعال موردنظرت رو انتخاب کن."
+            ),
+            kind=KeyboardKind.INLINE,
+            name="nation_explore",
+            markup=nation_explore_keyboard(nations),
             parse_mode="HTML",
         )
     await call.answer()

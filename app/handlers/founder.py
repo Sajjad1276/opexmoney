@@ -16,9 +16,12 @@ from app.database.session import async_session
 from app.keyboards.inline import (
     add_to_group_keyboard,
     confirm_found_nation_keyboard,
+    founder_cancel_keyboard,
 )
 from app.keyboards.reply import main_menu_keyboard
+from app.services.keyboard_state import KeyboardKind, keyboard_manager
 from app.services.nation_service import create_nation
+from app.services.onboarding_draft import clear_draft, save_draft
 from app.services.user_service import get_user
 from app.states.founder import FounderStates
 from app.states.onboarding import OnboardingStates
@@ -31,19 +34,6 @@ logger = logging.getLogger(__name__)
 founder_router = Router(name="founder")
 
 _ADMIN_LINK_RIGHTS = "delete_messages+restrict_members+invite_users+pin_messages+manage_topics"
-
-
-def founder_cancel_keyboard():
-    from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-
-    return InlineKeyboardMarkup(
-        inline_keyboard=[[
-            InlineKeyboardButton(
-                text="❌ انصراف",
-                callback_data="cancel_founder",
-            )
-        ]]
-    )
 
 
 @founder_router.callback_query(
@@ -64,6 +54,12 @@ async def start_founder(
             if user.role == "founder":
                 await call.answer("⚠️ تو قبلاً یه ملت داری.", show_alert=True)
                 return
+            await save_draft(
+                session,
+                player_id=call.from_user.id,
+                step_key=FounderStates.WAITING_GROUP_ADMIN.state,
+                payload={"founder_user_id": call.from_user.id},
+            )
 
     me = await bot.get_me()
     group_link = (
@@ -78,13 +74,19 @@ async def start_founder(
 
     await call.answer()
     if call.message:
-        await call.message.answer(
-            "🏛 <b>تأسیس ملت · مرحله ۱</b>\n"
-            "اول ربات رو به گروهی که می‌خوای پایتخت ملتت باشه اضافه کن.\n"
-            "در فرم تلگرام، ربات رو به‌عنوان ادمین اضافه کن.\n"
-            "دسترسی‌های لازم از قبل پیشنهاد می‌شن.\n"
-            "بعد از ادمین شدن، ربات خودش گروه رو تشخیص می‌ده.",
-            reply_markup=add_to_group_keyboard(group_link),
+        await keyboard_manager.send_message(
+            call.bot,
+            chat_id=call.message.chat.id,
+            text=(
+                "🏛 <b>تأسیس ملت · مرحله ۱</b>\n"
+                "اول ربات رو به گروهی که می‌خوای پایتخت ملتت باشه اضافه کن.\n"
+                "در فرم تلگرام، ربات رو به‌عنوان ادمین اضافه کن.\n"
+                "دسترسی‌های لازم از قبل پیشنهاد می‌شن.\n"
+                "بعد از ادمین شدن، ربات خودش گروه رو تشخیص می‌ده."
+            ),
+            kind=KeyboardKind.INLINE,
+            name="founder_group",
+            markup=add_to_group_keyboard(group_link),
             parse_mode="HTML",
         )
 
@@ -168,6 +170,19 @@ async def _continue_group_onboarding(
                 bot_group.username = group_username
                 bot_group.is_active = True
 
+            await save_draft(
+                session,
+                player_id=founder_user_id,
+                step_key=FounderStates.SET_NATION_NAME.state,
+                payload={
+                    "group_id": group_id,
+                    "group_title": group_title,
+                    "group_username": group_username,
+                    "group_type": group_type,
+                    "founder_user_id": founder_user_id,
+                },
+            )
+
     await founder_state.update_data(
         group_id=group_id,
         group_title=group_title,
@@ -176,15 +191,20 @@ async def _continue_group_onboarding(
     )
     await founder_state.set_state(FounderStates.SET_NATION_NAME)
 
-    await bot.send_message(
-        founder_user_id,
-        "🎉 <b>گروه با موفقیت متصل شد!</b>\n"
-        f"🏛 پایتخت: <b>{html.escape(group_title)}</b>\n"
-        "🤖 ربات با دسترسی ادمین فعال شد.\n"
-        "حالا اسم انگلیسی ملتت رو بفرست.\n"
-        "فقط حروف انگلیسی و فاصله، بدون عدد و علامت.",
+    await keyboard_manager.send_message(
+        bot,
+        chat_id=founder_user_id,
+        text=(
+            "🎉 <b>گروه با موفقیت متصل شد!</b>\n"
+            f"🏛 پایتخت: <b>{html.escape(group_title)}</b>\n"
+            "🤖 ربات با دسترسی ادمین فعال شد.\n"
+            "حالا اسم انگلیسی ملتت رو بفرست.\n"
+            "فقط حروف انگلیسی و فاصله، بدون عدد و علامت."
+        ),
+        kind=KeyboardKind.INLINE,
+        name="founder_cancel",
+        markup=founder_cancel_keyboard(),
         parse_mode="HTML",
-        reply_markup=founder_cancel_keyboard(),
     )
 
     try:
@@ -264,27 +284,55 @@ async def group_founder_start(
 async def receive_nation_name(message: Message, state: FSMContext) -> None:
     valid, error = validate_nation_name(message.text or "")
     if not valid:
-        await message.answer(error, reply_markup=founder_cancel_keyboard())
+        await keyboard_manager.send_message(
+            message.bot,
+            chat_id=message.chat.id,
+            text=error,
+            kind=KeyboardKind.INLINE,
+            name="founder_cancel",
+            markup=founder_cancel_keyboard(),
+        )
         return
+
+    data = await state.get_data()
+    normalized_name = " ".join((message.text or "").strip().split())
 
     async with async_session() as session:
         async with session.begin():
-            code = await generate_unique_currency_code(message.text or "", session)
-
-    data = await state.get_data()
+            code = await generate_unique_currency_code(normalized_name, session)
+            await save_draft(
+                session,
+                player_id=message.from_user.id,
+                step_key=FounderStates.CONFIRM.state,
+                payload={
+                    "group_id": data.get("group_id"),
+                    "group_title": data.get("group_title"),
+                    "group_username": data.get("group_username"),
+                    "group_type": data.get("group_type"),
+                    "founder_user_id": message.from_user.id,
+                    "nation_name": normalized_name,
+                    "currency_code": code,
+                },
+            )
     await state.update_data(
-        nation_name=" ".join((message.text or "").strip().split()),
+        nation_name=normalized_name,
         currency_code=code,
     )
     await state.set_state(FounderStates.CONFIRM)
 
-    await message.answer(
-        "📋 <b>آماده تأسیس ملت</b>\n"
-        f"🏛 نام ملت: <b>{html.escape(data.get('nation_name', message.text.strip()))}</b>\n"
-        f"💱 کد خودکار ارز: <b>{html.escape(code)}</b>\n"
-        f"🗺 پایتخت: <b>{html.escape(data.get('group_title', 'گروه'))}</b>\n"
-        "کد ارز بر اساس نام ملت ساخته شده و باید یکتا باشه.",
-        reply_markup=confirm_found_nation_keyboard(),
+    await keyboard_manager.send_message(
+        message.bot,
+        chat_id=message.chat.id,
+        text=(
+            "📋 <b>آماده تأسیس ملت</b>\n"
+            f"🏛 نام ملت: <b>{html.escape(data.get('nation_name', message.text.strip()))}</b>\n"
+            f"💱 کد خودکار ارز: <b>{html.escape(code)}</b>\n"
+            f"🗺 پایتخت: <b>{html.escape(data.get('group_title', 'گروه'))}</b>\n"
+            "کد ارز بر اساس نام ملت ساخته شده و باید یکتا باشه."
+        ),
+        kind=KeyboardKind.INLINE,
+        name="founder_confirm",
+        markup=confirm_found_nation_keyboard(),
         parse_mode="HTML",
     )
 
@@ -340,19 +388,27 @@ async def confirm_founder(
             logger.exception("Nation creation failed")
             await call.answer("⚠️ تأسیس ملت انجام نشد. دوباره امتحان کن.", show_alert=True)
             return
+        async with session.begin():
+            await clear_draft(session, call.from_user.id)
 
     await state.clear()
     await call.answer()
 
     if call.message:
-        await call.message.answer(
-            "🎉 <b>ملت تأسیس شد!</b>\n"
-            f"🏛 {html.escape(nation.name)}\n"
-            f"💱 ارز رسمی: <b>{html.escape(nation.currency_code)}</b>\n"
-            "👑 تو بنیان‌گذار این ملتی.\n"
-            "💰 موجودی اولیه: ۱۰۰۰ واحد\n"
-            "🌐 منوی اصلی آماده‌ست.",
-            reply_markup=main_menu_keyboard(),
+        await keyboard_manager.send_message(
+            call.bot,
+            chat_id=call.message.chat.id,
+            text=(
+                "🎉 <b>ملت تأسیس شد!</b>\n"
+                f"🏛 {html.escape(nation.name)}\n"
+                f"💱 ارز رسمی: <b>{html.escape(nation.currency_code)}</b>\n"
+                "👑 تو بنیان‌گذار این ملتی.\n"
+                "💰 موجودی اولیه: ۱۰۰۰ واحد\n"
+                "🌐 منوی اصلی آماده‌ست."
+            ),
+            kind=KeyboardKind.REPLY,
+            name="main_menu",
+            markup=main_menu_keyboard(),
             parse_mode="HTML",
         )
 
@@ -380,9 +436,16 @@ async def confirm_founder(
 )
 async def cancel_founder(call: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
+    async with async_session() as session:
+        async with session.begin():
+            await clear_draft(session, call.from_user.id)
     await call.answer()
     if call.message:
-        await call.message.answer(
-            "❌ تأسیس ملت لغو شد.",
-            reply_markup=main_menu_keyboard(),
+        await keyboard_manager.send_message(
+            call.bot,
+            chat_id=call.message.chat.id,
+            text="❌ تأسیس ملت لغو شد.",
+            kind=KeyboardKind.REPLY,
+            name="main_menu",
+            markup=main_menu_keyboard(),
         )
