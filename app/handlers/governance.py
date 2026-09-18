@@ -331,7 +331,7 @@ async def governance_confirm(call: CallbackQuery, state: FSMContext):
                     target_scope=data["target_scope"],
                     target_id=data.get("target_id"),
                 )
-            await clear_draft(session, call.from_user.id)
+                await clear_draft(session, call.from_user.id)
             except ValueError as exc:
                 await call.answer(str(exc), show_alert=True)
                 return
