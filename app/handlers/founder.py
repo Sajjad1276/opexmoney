@@ -10,7 +10,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, ChatMemberUpdated, Message
 from sqlalchemy import select
 
-from app.database.models import Nation
+from app.database.models import BotGroup, Nation
 from app.database.session import async_session
 from app.keyboards.inline import (
     add_to_group_keyboard,
@@ -136,6 +136,9 @@ async def bot_group_status_changed(
         )
         return
 
+    group_title = event.chat.title or "گروه بدون نام"
+    group_username = getattr(event.chat, "username", None)
+
     async with async_session() as session:
         async with session.begin():
             existing = await session.execute(
@@ -154,8 +157,20 @@ async def bot_group_status_changed(
                 )
                 return
 
-    group_title = event.chat.title or "گروه بدون نام"
-    group_username = getattr(event.chat, "username", None)
+            bot_group = await session.get(BotGroup, event.chat.id)
+            if bot_group is None:
+                session.add(
+                    BotGroup(
+                        group_id=event.chat.id,
+                        title=group_title,
+                        username=group_username,
+                        is_active=True,
+                    )
+                )
+            else:
+                bot_group.title = group_title
+                bot_group.username = group_username
+                bot_group.is_active = True
 
     await actor_state.update_data(
         group_id=event.chat.id,
