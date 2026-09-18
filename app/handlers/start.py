@@ -198,20 +198,6 @@ async def start(message: Message, state: FSMContext) -> None:
         await show_dashboard(message, registered_user)
         return
 
-    if status["status"] == "complete":
-                user = status["user"]
-                if user.home_nation_id is not None:
-                    session.add(UserActivity(
-                        user_id=user.user_id,
-                        nation_id=user.home_nation_id,
-                        activity_type="login",
-                    ))
-
-    if status["status"] == "complete":
-        user = status["user"]
-        await show_dashboard(message, user)
-        return
-
     if status["status"] == "partial":
         await continue_registration(
             message,
