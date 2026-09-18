@@ -20,6 +20,15 @@ class ActivityType(StrEnum):
 
 class Nation(Base):
     __tablename__ = "nations"
+    __table_args__ = (
+        Index("uq_nations_currency_code", "currency_code", unique=True),
+        Index(
+            "uq_nations_active_group",
+            "group_id",
+            unique=True,
+            postgresql_where=text("is_active = TRUE"),
+        ),
+    )
     nation_id: Mapped[int] = mapped_column(Integer, primary_key=True)
     # Telegram chat/user identifiers can exceed PostgreSQL INTEGER (int4).
     group_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
@@ -40,8 +49,9 @@ class Nation(Base):
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (UniqueConstraint("username", name="uq_users_username"),)
     user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    username: Mapped[str] = mapped_column(String(15), unique=True, nullable=False)
+    username: Mapped[str] = mapped_column(String(15), nullable=False)
     home_nation_id: Mapped[int | None] = mapped_column(ForeignKey("nations.nation_id"))
     balance: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("500.00"), nullable=False)
     xr_balance: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0.00"), nullable=False)
