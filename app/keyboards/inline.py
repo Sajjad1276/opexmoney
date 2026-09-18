@@ -42,13 +42,6 @@ def market_keyboard() -> InlineKeyboardMarkup:
     ])
 
 
-def confirm_trade_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="✅ تأیید", callback_data="confirm_trade", style=ButtonStyle.SUCCESS),
-        InlineKeyboardButton(text="❌ انصراف", callback_data="cancel_trade", style=ButtonStyle.DANGER),
-    ]])
-
-
 def nation_panel_keyboard(is_founder: bool = False) -> InlineKeyboardMarkup:
     buttons = [
         [InlineKeyboardButton(text="🌍 ملت‌های من", callback_data="my_nations")],
@@ -56,10 +49,6 @@ def nation_panel_keyboard(is_founder: bool = False) -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="🏛 تأسیس ملت", callback_data="found_nation")],
         [InlineKeyboardButton(text="📜 قانون اساسی", callback_data="governance_main")],
     ]
-    if is_founder:
-        buttons.insert(0, [
-            InlineKeyboardButton(text="👑 پنل مدیریت", callback_data="founder_panel")
-        ])
     buttons.append([
         InlineKeyboardButton(text="↩️ بازگشت", callback_data="back_to_dashboard")
     ])
