@@ -358,7 +358,7 @@ async def governance_proposal(call: CallbackQuery):
         "━━━━━━━━━━━━━━━━━━━━\n"
         f"قانون: <b>{html.escape(rule.title_fa)}</b>\n"
         f"مقدار پیشنهادی: <b>{html.escape(_format_value(rule, proposal.proposed_value))}</b>\n"
-        f"وضعیت: <b>{html.escape(proposal.status)}</b>\n"
+        f"وضعیت: <b>{html.escape({"draft": "پیش‌نویس", "voting": "در حال رأی‌گیری", "passed": "تصویب‌شده", "rejected": "ردشده", "expired": "منقضی‌شده", "active": "فعال", "revoked": "لغوشده"}.get(proposal.status, "نامشخص"))}</b>\n"
         f"⏳ پایان رأی‌گیری: <b>{html.escape(_remaining(proposal.voting_closes_at))}</b>\n\n"
         f"✅ موافق: <b>{to_fa(weights['for'])}</b>\n"
         f"❌ مخالف: <b>{to_fa(weights['against'])}</b>\n"
