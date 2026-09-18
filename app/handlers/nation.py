@@ -9,6 +9,7 @@ from aiogram.enums import ButtonStyle
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 from app.states.nation import NationStates
+from app.states.onboarding import OnboardingStates
 
 logger = logging.getLogger(__name__)
 nation_router = Router(name="nation")
@@ -42,7 +43,7 @@ async def open_nations(message: Message) -> None:
     )
 @nation_router.callback_query(
     F.data == "create_nation",
-    StateFilter(NationStates.IDLE, None),
+    StateFilter(None, OnboardingStates.SELECT_NATION),
 )
 async def start_nation_creation(
     call: CallbackQuery,
