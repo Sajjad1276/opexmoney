@@ -16,6 +16,7 @@ from sqlalchemy import text
 from app.database.models import Base
 from app.database.session import async_session, engine
 from app.handlers.market import router as market_router
+from app.handlers.founder import founder_router
 from app.handlers.nation import nation_router
 from app.handlers.onboarding_fix import router as onboarding_fix_router
 from app.handlers.start import router as start_router
@@ -169,6 +170,7 @@ async def main() -> None:
     dp.include_router(onboarding_fix_router)
     dp.include_router(start_router)
     dp.include_router(market_router)
+    dp.include_router(founder_router)
     dp.include_router(nation_router)
     scheduler = build_scheduler()
     scheduler.start()
