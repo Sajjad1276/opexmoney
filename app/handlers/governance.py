@@ -159,12 +159,17 @@ async def governance_new(call: CallbackQuery, state: FSMContext):
         return
 
     await state.clear()
-    await call.message.edit_text(
-        "📝 <b>ثبت طرح جدید</b>\n"
-        "━━━━━━━━━━━━━━━━━━━━\n"
-        "یک قانون از فهرست مجاز انتخاب کن.\n"
-        "هیچ قانون خارج از این فهرست قابل ثبت نیست.",
-        reply_markup=governance_rule_keyboard(
+    await keyboard_manager.edit_message(
+        call.message,
+        text=(
+            "📝 <b>ثبت طرح جدید</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "یک قانون از فهرست مجاز انتخاب کن.\n"
+            "هیچ قانون خارج از این فهرست قابل ثبت نیست."
+        ),
+        kind=KeyboardKind.INLINE,
+        name="governance_rules",
+        markup=governance_rule_keyboard(
             [(key, definition.title_fa) for key, definition in RULE_REGISTRY.items()]
         ),
         parse_mode="HTML",
@@ -406,7 +411,14 @@ async def governance_proposal(call: CallbackQuery):
         f"❌ مخالف: <b>{to_fa(weights['against'])}</b>\n"
         f"⚪ ممتنع: <b>{to_fa(weights['abstain'])}</b>"
     )
-    await call.message.edit_text(text, reply_markup=markup, parse_mode="HTML")
+    await keyboard_manager.edit_message(
+        call.message,
+        text=text,
+        kind=KeyboardKind.INLINE,
+        name="governance",
+        markup=markup,
+        parse_mode="HTML",
+    )
     await call.answer()
 
 
