@@ -9,7 +9,7 @@ from aiogram import BaseMiddleware, F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
-from app.keyboards.inline import restart_confirmation_keyboard, resume_draft_keyboard
+from app.keyboards.inline import add_to_group_keyboard, restart_confirmation_keyboard
 from app.keyboards.reply import main_menu_keyboard
 from app.services.draft_service import clear_draft, get_draft
 from app.services.keyboard_state import keyboard_manager
@@ -202,7 +202,7 @@ async def handle_system_command(message: Message, state: FSMContext) -> None:
         await cancel_current_flow(message, state)
     elif command == "/help":
         from app.handlers.start import _show_help
-        await _show_help(message)
+        await _show_help(message, preserve_keyboard=await state.get_state() is not None)
     elif command == "/start":
         await _request_restart(message, state)
 
@@ -311,12 +311,19 @@ async def _resume_prompt(message: Message, state: FSMContext, draft: Any) -> Non
         )
         return
 
-    await message.answer(_state_description(target.state))
+    await keyboard_manager.send(
+        message,
+        _state_description(target.state),
+        kind="inline:resume",
+        markup=None,
+    )
 
 
 class IntentRoutingMiddleware(BaseMiddleware):
     async def __call__(self, handler, event, data):
         if not isinstance(event, Message):
+            return await handler(event, data)
+        if getattr(getattr(event, "chat", None), "type", None) != "private":
             return await handler(event, data)
         state: FSMContext | None = data.get("state")
         current_state = await state.get_state() if state is not None else None
