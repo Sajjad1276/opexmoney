@@ -39,8 +39,7 @@ async def create_nation(
     founder_user_id: int,
     group_id: int,
     nation_name: str,
-    currency_code: str,
-    founder_username: str | None = None,
+    currency_code: str
 ) -> Nation:
     async with session.begin():
         user_result = await session.execute(
