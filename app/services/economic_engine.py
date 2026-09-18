@@ -38,7 +38,7 @@ async def update_nation_rates(session: AsyncSession, now: datetime | None = None
         nation.last_rate_update = now
         session.add(RateHistory(nation_id=nation.nation_id, rate=new_rate, volume=nation.trade_volume_24h, active_members=int(active), calculated_at=now))
         session.add(NationMemberHistory(nation_id=nation.nation_id, member_count=nation.member_count, recorded_at=now))
-    await session.commit()
+    await session.flush()
 
 
 async def update_nation_ranks(session: AsyncSession) -> None:
