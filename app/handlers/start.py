@@ -280,6 +280,19 @@ async def join_nation(call: CallbackQuery, state: FSMContext) -> None:
         await call.answer("⏱ فرآیند ثبت‌نام منقضی شد. /start بزن.", show_alert=True)
         return
     async with async_session() as session:
+        result = await session.execute(
+            select(Nation)
+            .where(
+                Nation.nation_id == nation_id,
+                Nation.is_active.is_(True),
+            )
+            .with_for_update()
+        )
+        nation = result.scalar_one_or_none()
+        if nation is None:
+            await call.answer("⚠️ این ملت دیگه در دسترس نیست.", show_alert=True)
+            return
+
         existing = await get_user(session, call.from_user.id)
         if existing is not None:
             # A partial DB registration can safely finish here after restart/deploy.
@@ -313,11 +326,6 @@ async def join_nation(call: CallbackQuery, state: FSMContext) -> None:
             await call.answer()
             if call.message:
                 await show_dashboard(call.message, existing)
-            return
-        result = await session.execute(select(Nation).where(Nation.nation_id == nation_id, Nation.is_active.is_(True)).with_for_update())
-        nation = result.scalar_one_or_none()
-        if nation is None:
-            await call.answer("⚠️ این ملت دیگه در دسترس نیست.", show_alert=True)
             return
         user = User(user_id=call.from_user.id, username=trader_name, home_nation_id=nation.nation_id, balance=Decimal("500.00"), xr_balance=Decimal("0.00"), role="player")
         holding = CurrencyHolding(user_id=user.user_id, nation_id=nation.nation_id, amount=Decimal("500.00"))
