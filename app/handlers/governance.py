@@ -22,6 +22,9 @@ from app.keyboards.inline import (
     governance_rule_keyboard,
     governance_vote_keyboard,
 )
+from app.services.draft_service import clear_draft, save_draft
+from app.services.keyboard_state import keyboard_manager
+from app.services.intent_router import cancel_current_flow
 from app.services.governance_service import (
     cast_vote,
     create_proposal,
@@ -80,10 +83,22 @@ async def _send_governance_home(call: CallbackQuery | None, message: Message | N
     markup = governance_main_keyboard(user.role == "founder")
     if call:
         if call.message:
-            await call.message.edit_text(text, reply_markup=markup, parse_mode="HTML")
+            await keyboard_manager.edit_inline(
+                call.message,
+                text,
+                kind="inline:governance",
+                markup=markup,
+                parse_mode="HTML",
+            )
         await call.answer()
     else:
-        await message.answer(text, reply_markup=markup, parse_mode="HTML")
+        await keyboard_manager.send(
+            message,
+            text,
+            kind="inline:governance",
+            markup=markup,
+            parse_mode="HTML",
+        )
 
 
 @governance_router.callback_query(F.data == "governance_main")
@@ -291,9 +306,9 @@ async def governance_confirm(call: CallbackQuery, state: FSMContext):
 
 @governance_router.callback_query(F.data == "gov_cancel")
 async def governance_cancel(call: CallbackQuery, state: FSMContext):
-    await state.clear()
+    if call.message:
+        await cancel_current_flow(call.message, state)
     await call.answer("لغو شد")
-    await _send_governance_home(call)
 
 
 @governance_router.callback_query(F.data == "gov_voting")
@@ -320,7 +335,13 @@ async def governance_voting(call: CallbackQuery):
         )
         markup = governance_proposal_list_keyboard(proposals)
 
-    await call.message.edit_text(text, reply_markup=markup, parse_mode="HTML")
+    await keyboard_manager.edit_inline(
+        call.message,
+        text,
+        kind="inline:governance",
+        markup=markup,
+        parse_mode="HTML",
+    )
     await call.answer()
 
 
@@ -419,9 +440,11 @@ async def governance_history(call: CallbackQuery):
             f"{html.escape(ledger.new_value or '—')}"
         )
 
-    await call.message.edit_text(
+    await keyboard_manager.edit_inline(
+        call.message,
         "\n".join(lines),
-        reply_markup=governance_history_keyboard(
+        kind="inline:governance",
+        markup=governance_history_keyboard(
             offset,
             has_next=len(rows) == 9,
         ),
