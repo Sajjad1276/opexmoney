@@ -27,6 +27,9 @@ async def get_registration_status(
         if user is None:
             return {"status": "new", "user": None, "missing": ["user"]}
 
+        if not (user.username or "").strip():
+            return {"status": "partial", "user": user, "missing": ["username", "holding"]}
+
         holding = await session.execute(
             select(CurrencyHolding.id)
             .where(CurrencyHolding.user_id == telegram_id)
