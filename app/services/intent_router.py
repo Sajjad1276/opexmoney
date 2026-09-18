@@ -125,6 +125,8 @@ async def classify_intent(message, current_state, registry=None) -> IntentType:
     text = (message.text or "").strip()
     if text.startswith("/"):
         command = text[1:].split("@", 1)[0].split(None, 1)[0].casefold()
+        if command == "start" and "founder_" in text:
+            return IntentType.AMBIGUOUS
         if command in SYSTEM_COMMANDS:
             return IntentType.SYSTEM_COMMAND
 
