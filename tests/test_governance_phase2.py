@@ -47,13 +47,47 @@ async def cleanup_phase2_rows():
     yield
     async with async_session() as session:
         async with session.begin():
-            await session.execute(delete(Vote))
-            await session.execute(delete(RuleOverride))
-            await session.execute(delete(GovernanceLedger))
-            await session.execute(delete(Proposal))
-            await session.execute(delete(BehaviorSnapshot))
-            await session.execute(delete(RateHistory))
-            await session.execute(delete(NationMemberHistory))
+            nation_ids = select(Nation.nation_id).where(
+                Nation.group_id.between(TEST_GROUP_MIN, TEST_GROUP_MAX)
+            )
+            proposal_ids = select(Proposal.id).where(
+                Proposal.proposer_player_id.between(TEST_USER_MIN, TEST_USER_MAX)
+            )
+            behavior_ids = select(BehaviorSnapshot.id).where(
+                BehaviorSnapshot.active_players_count == 920006
+            )
+
+            await session.execute(delete(Vote).where(
+                Vote.player_id.between(TEST_USER_MIN, TEST_USER_MAX)
+            ))
+            await session.execute(delete(RuleOverride).where(
+                RuleOverride.source_proposal_id.in_(proposal_ids)
+                | (
+                    (RuleOverride.rule_key == "market.tx_fee")
+                    & (RuleOverride.scope == "global")
+                    & (RuleOverride.active_until.is_not(None))
+                )
+            ))
+            await session.execute(delete(GovernanceLedger).where(
+                GovernanceLedger.actor_player_id.between(TEST_USER_MIN, TEST_USER_MAX)
+                | (
+                    (GovernanceLedger.action == "circuit_breaker")
+                    & (GovernanceLedger.old_value == "920100")
+                    & (GovernanceLedger.new_value == "920200")
+                )
+            ))
+            await session.execute(delete(Proposal).where(
+                Proposal.id.in_(proposal_ids)
+            ))
+            await session.execute(delete(BehaviorSnapshot).where(
+                BehaviorSnapshot.id.in_(behavior_ids)
+            ))
+            await session.execute(delete(RateHistory).where(
+                RateHistory.nation_id.in_(nation_ids)
+            ))
+            await session.execute(delete(NationMemberHistory).where(
+                NationMemberHistory.nation_id.in_(nation_ids)
+            ))
             await session.execute(
                 delete(PlayerTemporalProfile).where(
                     PlayerTemporalProfile.player_id.between(TEST_USER_MIN, TEST_USER_MAX)
@@ -480,8 +514,8 @@ async def test_circuit_breaker_suspends_active_overrides():
                     sell_tx_count=1,
                     export_tx_count=0,
                     import_tx_count=0,
-                    total_volume=Decimal("100"),
-                    avg_net_worth=Decimal("100"),
+                    total_volume=Decimal("920006"),
+                    avg_net_worth=Decimal("920100"),
                     median_net_worth=Decimal("100"),
                     gini_coefficient=Decimal("0.1"),
                     top10_wealth_share=Decimal("0.2"),
@@ -493,8 +527,8 @@ async def test_circuit_breaker_suspends_active_overrides():
                     sell_tx_count=1,
                     export_tx_count=0,
                     import_tx_count=0,
-                    total_volume=Decimal("100"),
-                    avg_net_worth=Decimal("150"),
+                    total_volume=Decimal("920006"),
+                    avg_net_worth=Decimal("920200"),
                     median_net_worth=Decimal("100"),
                     gini_coefficient=Decimal("0.1"),
                     top10_wealth_share=Decimal("0.2"),
