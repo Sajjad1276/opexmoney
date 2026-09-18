@@ -164,7 +164,7 @@ class Proposal(Base):
         Index("ix_proposals_status_closing", "status", "voting_closes_at"),
         Index("ix_proposals_proposer_created", "proposer_player_id", "created_at"),
     )
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     proposer_player_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
     rule_key: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -184,8 +184,8 @@ class Vote(Base):
         UniqueConstraint("proposal_id", "player_id", name="uq_vote_proposal_player"),
         Index("ix_votes_proposal", "proposal_id"),
     )
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    proposal_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("proposals.id", ondelete="CASCADE"), nullable=False)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    proposal_id: Mapped[int] = mapped_column(Integer, ForeignKey("proposals.id", ondelete="CASCADE"), nullable=False)
     player_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
     choice: Mapped[str] = mapped_column(String(10), nullable=False)
     weight: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
@@ -206,12 +206,12 @@ class RuleOverride(Base):
             sqlite_where=text("is_active = 1"),
         ),
     )
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
     rule_key: Mapped[str] = mapped_column(String(100), nullable=False)
     value: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
     scope: Mapped[str] = mapped_column(String(20), nullable=False)
     target_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
-    source_proposal_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("proposals.id", ondelete="SET NULL"), nullable=True)
+    source_proposal_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("proposals.id", ondelete="SET NULL"), nullable=True)
     active_from: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     active_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     suspended_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
@@ -221,7 +221,7 @@ class RuleOverride(Base):
 class GovernanceLedger(Base):
     __tablename__ = "governance_ledger"
     __table_args__ = (Index("ix_governance_ledger_at", "at"),)
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
     at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     actor_player_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
     action: Mapped[str] = mapped_column(String(40), nullable=False)
@@ -245,7 +245,7 @@ class PlayerTemporalProfile(Base):
 class BehaviorSnapshot(Base):
     __tablename__ = "behavior_snapshots"
     __table_args__ = (Index("ix_behavior_snapshots_at", "at"),)
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
     at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     active_players_count: Mapped[int] = mapped_column(Integer, nullable=False)
     buy_tx_count: Mapped[int] = mapped_column(Integer, nullable=False)
