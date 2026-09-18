@@ -55,6 +55,19 @@ CONTRACTS = {
         "🏆 رتبه‌بندی",
         "⚙️ تنظیمات",
     ],
+    "onboarding_fix": [
+        "restart_onboarding_with_command",
+        "reject_blocked_name",
+        "reject_non_english_name",
+        "accept_valid_name",
+        "cancel_start_fix",
+    ],
+    "interaction": [
+        "confirm_restart",
+        "keep_wizard",
+        "system_cancel",
+        "system_help",
+    ],
     "governance": [
         "governance_main",
         "gov_active",
@@ -200,6 +213,8 @@ async def run_startup_smoke_test(
         "governance_ledger",
         "player_temporal_profiles",
         "behavior_snapshots",
+        "onboarding_drafts",
+        "keyboard_states",
     }
     missing_metadata = expected_model_tables.difference(Base.metadata.tables)
     if missing_metadata:
