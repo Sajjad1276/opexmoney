@@ -192,11 +192,17 @@ async def continue_registration(
     await state.set_state(OnboardingStates.SELECT_NATION)
 
     if not nations:
-        await message.answer(
-            "🌍 <b>هنوز هیچ ملتی تأسیس نشده!</b>\n\n"
-            "تو می‌تونی اولین بنیان‌گذار تاریخ باشی\n"
-            "و اولین ملت OPEX MONEY رو بسازی.",
-            reply_markup=nation_selection_keyboard([]),
+        await keyboard_manager.send_message(
+            message.bot,
+            chat_id=message.chat.id,
+            text=(
+                "🌍 <b>هنوز هیچ ملتی تأسیس نشده!</b>\n\n"
+                "تو می‌تونی اولین بنیان‌گذار تاریخ باشی\n"
+                "و اولین ملت OPEX MONEY رو بسازی."
+            ),
+            kind=KeyboardKind.INLINE,
+            name="nation_selection",
+            markup=nation_selection_keyboard([]),
             parse_mode="HTML",
         )
         return
