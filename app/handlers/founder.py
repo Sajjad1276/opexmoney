@@ -21,6 +21,7 @@ from app.keyboards.inline import (
 from app.keyboards.reply import main_menu_keyboard
 from app.services.keyboard_state import KeyboardKind, keyboard_manager
 from app.services.nation_service import create_nation
+from app.services.onboarding_draft import clear_draft, save_draft
 from app.services.user_service import get_user
 from app.states.founder import FounderStates
 from app.states.onboarding import OnboardingStates
@@ -53,6 +54,12 @@ async def start_founder(
             if user.role == "founder":
                 await call.answer("⚠️ تو قبلاً یه ملت داری.", show_alert=True)
                 return
+            await save_draft(
+                session,
+                player_id=call.from_user.id,
+                step_key=FounderStates.WAITING_GROUP_ADMIN.state,
+                payload={"founder_user_id": call.from_user.id},
+            )
 
     me = await bot.get_me()
     group_link = (
@@ -162,6 +169,19 @@ async def _continue_group_onboarding(
                 bot_group.title = group_title
                 bot_group.username = group_username
                 bot_group.is_active = True
+
+            await save_draft(
+                session,
+                player_id=founder_user_id,
+                step_key=FounderStates.SET_NATION_NAME.state,
+                payload={
+                    "group_id": group_id,
+                    "group_title": group_title,
+                    "group_username": group_username,
+                    "group_type": group_type,
+                    "founder_user_id": founder_user_id,
+                },
+            )
 
     await founder_state.update_data(
         group_id=group_id,
@@ -274,13 +294,28 @@ async def receive_nation_name(message: Message, state: FSMContext) -> None:
         )
         return
 
+    data = await state.get_data()
+    normalized_name = " ".join((message.text or "").strip().split())
+
     async with async_session() as session:
         async with session.begin():
-            code = await generate_unique_currency_code(message.text or "", session)
-
-    data = await state.get_data()
+            code = await generate_unique_currency_code(normalized_name, session)
+            await save_draft(
+                session,
+                player_id=message.from_user.id,
+                step_key=FounderStates.CONFIRM.state,
+                payload={
+                    "group_id": data.get("group_id"),
+                    "group_title": data.get("group_title"),
+                    "group_username": data.get("group_username"),
+                    "group_type": data.get("group_type"),
+                    "founder_user_id": message.from_user.id,
+                    "nation_name": normalized_name,
+                    "currency_code": code,
+                },
+            )
     await state.update_data(
-        nation_name=" ".join((message.text or "").strip().split()),
+        nation_name=normalized_name,
         currency_code=code,
     )
     await state.set_state(FounderStates.CONFIRM)
@@ -399,6 +434,9 @@ async def confirm_founder(
 )
 async def cancel_founder(call: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
+    async with async_session() as session:
+        async with session.begin():
+            await clear_draft(session, call.from_user.id)
     await call.answer()
     if call.message:
         await keyboard_manager.send_message(
