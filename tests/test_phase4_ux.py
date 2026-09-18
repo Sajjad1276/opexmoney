@@ -69,7 +69,7 @@ async def test_draft_survives_new_memory_storage():
         async with session.begin():
             session.add(User(
                 user_id=user_id,
-                username="PersistentiaPlayer",
+                username="Persist930001",
                 role="player",
                 balance=0,
                 xr_balance=0,
