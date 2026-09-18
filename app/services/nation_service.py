@@ -52,13 +52,8 @@ async def create_nation(
         if user is None:
             raise ValueError("اول باید وارد بازی بشی.")
 
-        holding_result = await session.execute(
-            select(CurrencyHolding.id)
-            .where(CurrencyHolding.user_id == founder_user_id)
-            .limit(1)
-        )
-        if holding_result.scalar_one_or_none() is None:
-            raise ValueError("اول باید وارد بازی بشی.")
+        if not (user.username or "").strip():
+            raise ValueError("اول باید اسم معامله‌گرت رو ثبت کنی.")
 
         if user.role == "founder":
             raise ValueError("هر معامله‌گر فقط یه ملت می‌تونه بسازه.")
