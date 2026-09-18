@@ -63,8 +63,17 @@ def test_all_fsm_states_have_step_definitions():
 @pytest.mark.asyncio
 async def test_draft_survives_new_memory_storage():
     user_id = 930001
+    from app.database.models import User
+
     async with __import__("app.database.session", fromlist=["async_session"]).async_session() as session:
         async with session.begin():
+            session.add(User(
+                user_id=user_id,
+                username="PersistentiaPlayer",
+                role="player",
+                balance=0,
+                xr_balance=0,
+            ))
             await save_draft(
                 session,
                 player_id=user_id,
@@ -137,7 +146,7 @@ async def test_keyboard_manager_transition_contract():
         name="wizard",
         markup=object(),
     )
-    assert bot.removed == 0
+    assert bot.removed == 1
     assert len(bot.sent) == 2
 
     await manager.send_message(
@@ -149,6 +158,7 @@ async def test_keyboard_manager_transition_contract():
         markup=object(),
     )
     assert len(bot.sent) == 3
+    assert bot.removed == 2
 
     async with __import__("app.database.session", fromlist=["async_session"]).async_session() as session:
         row = await session.get(__import__("app.database.models", fromlist=["KeyboardState"]).KeyboardState, 930002)
