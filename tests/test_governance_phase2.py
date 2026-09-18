@@ -5,7 +5,7 @@ from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 import pytest
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 
 from app.database.models import (
     BehaviorSnapshot,
@@ -107,6 +107,11 @@ async def cleanup_phase2_rows():
                 delete(CurrencyHolding).where(
                     CurrencyHolding.user_id.between(TEST_USER_MIN, TEST_USER_MAX)
                 )
+            )
+            await session.execute(
+                update(User)
+                .where(User.user_id.between(TEST_USER_MIN, TEST_USER_MAX))
+                .values(home_nation_id=None)
             )
             await session.execute(
                 delete(Nation).where(
