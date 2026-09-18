@@ -4,6 +4,8 @@ import asyncio
 import logging
 
 from aiogram import Bot, Dispatcher
+from aiogram.types import Update
+from aiogram.types.error_event import ErrorEvent
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
@@ -15,7 +17,7 @@ from sqlalchemy import text
 from app.database.models import Base
 from app.database.session import async_session, engine
 from app.handlers.market import router as market_router
-from app.handlers.nation_flow import nation_router
+from app.handlers.nation import nation_router
 from app.handlers.onboarding_fix import router as onboarding_fix_router
 from app.handlers.start import router as start_router
 from app.services.economic_engine import reset_daily_metrics, update_nation_rates, update_nation_ranks
@@ -151,10 +153,24 @@ async def main() -> None:
     await prepare_database()
     bot = Bot(token=settings.bot_token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     dp = Dispatcher(storage=build_storage())
+
+    @dp.errors()
+    async def errors_handler(event: ErrorEvent):
+        update = event.update
+        exception = event.exception
+        logger.error("Update %s caused error %s", update, exception, exc_info=True)
+        try:
+            if update.message:
+                await update.message.answer("⚠️ یه مشکل موقت پیش اومد. لطفاً دوباره امتحان کن.")
+            elif update.callback_query:
+                await update.callback_query.answer("⚠️ خطا، دوباره امتحان کن", show_alert=True)
+        except Exception:
+            logger.exception("Failed to send user-facing error message")
+        return True
     dp.include_router(onboarding_fix_router)
-    dp.include_router(nation_router)
     dp.include_router(start_router)
     dp.include_router(market_router)
+    dp.include_router(nation_router)
     scheduler = build_scheduler()
     scheduler.start()
     logger.info("OPEX MONEY is online")
