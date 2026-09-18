@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import html
 import logging
+import re
 
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
@@ -236,7 +237,7 @@ async def group_founder_start(
     bot: Bot,
     dispatcher: Dispatcher,
 ) -> None:
-    match = message.text and __import__("re").match(
+    match = message.text and re.match(
         r"^/start(?:@[^ ]+)?\s+founder_(\d+)$",
         message.text,
     )
