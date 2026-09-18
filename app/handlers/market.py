@@ -72,7 +72,8 @@ async def make_buy_preview(message,state,nation_id,raw):
         if not user or not nation: await message.answer('⚠️ اطلاعات معامله پیدا نشد.',parse_mode='HTML'); return
         if spend>user.xr_balance: await message.answer(f'🔴 موجودی کافی نیست.\nموجودی: {fmt_amount(user.xr_balance)} ΩXR\nمبلغ وارد شده: {fmt_amount(spend)} ΩXR\n\nمبلغ کمتری وارد کن.',parse_mode='HTML'); return
         calc=calc_trade(spend,nation.exchange_rate,True); holding=await session.scalar(select(CurrencyHolding).where(CurrencyHolding.user_id==user.user_id,CurrencyHolding.nation_id==nation_id)); current=holding.amount if holding else Decimal('0')
-        session.add(TradePreview(user_id=user.user_id,nation_id=nation_id,side='buy',spend=spend,preview_rate=nation.exchange_rate)); await session.commit()
+        async with session.begin():
+            session.add(TradePreview(user_id=user.user_id,nation_id=nation_id,side='buy',spend=spend,preview_rate=nation.exchange_rate))
         text=f'📈 <b>تأیید خرید</b>\n━━━━━━━━━━━━━━━━━━━━\n📤 پرداخت:   <b>{fmt_amount(spend)} ΩXR</b>\n📥 دریافت:   <b>{fmt_amount(calc["receive"])} {html.escape(nation.currency_code)}</b>\n\n─────────────────\n💹 نرخ: <code>۱ {html.escape(nation.currency_code)} = {fmt_rate(nation.exchange_rate)} ΩXR</code>\n📋 کارمزد: <b>{fmt_amount(calc["fee"])} ΩXR</b> (۰٫۵٪)\n\n─────────────────\n<b>موجودی بعد از معامله:</b>\nΩXR: <b>{fmt_amount(user.xr_balance-spend)}</b>\n{html.escape(nation.currency_code)}: <b>{fmt_amount(current+calc["receive"])}</b>\n━━━━━━━━━━━━━━━━━━━━'
     await state.clear(); await message.answer(text,reply_markup=trade_preview_keyboard(nation_id,spend,'buy'),parse_mode='HTML')
 @router.callback_query(F.data.startswith('buy_'))
@@ -91,17 +92,56 @@ async def buy_quick(call,state):
 @router.message(MarketStates.WAITING_BUY_AMOUNT)
 async def buy_amount_message(message,state): data=await state.get_data(); await make_buy_preview(message,state,int(data['nation_id']),message.text or '')
 @router.callback_query(F.data.startswith('cbuy_'))
-async def confirm_buy(call):
-    _,nation_id_raw,spend_raw=call.data.split('_',2); nation_id=int(nation_id_raw); spend=Decimal(spend_raw)
+async def confirm_buy(call,state=None):
+    _,nation_id_raw,spend_raw=call.data.split('_',2)
+    nation_id=int(nation_id_raw)
+    spend=Decimal(spend_raw)
+    text=None
     async with async_session() as session:
-        user=(await session.execute(select(User).where(User.user_id==call.from_user.id).with_for_update())).scalar_one_or_none(); nation=await session.get(Nation,nation_id,with_for_update=True); preview=await session.scalar(select(TradePreview).where(TradePreview.user_id==call.from_user.id,TradePreview.nation_id==nation_id,TradePreview.side=='buy',TradePreview.spend==spend).order_by(TradePreview.created_at.desc()).limit(1)) if user else None
-        if not user or not nation or not preview: await call.answer('⏱ پیش‌نمایش منقضی شد. دوباره مقدار رو وارد کن.',show_alert=True); return
-        if abs(nation.exchange_rate-preview.preview_rate)/preview.preview_rate>Decimal('0.01'): await call.answer('⚠️ نرخ تغییر کرد. پیش‌نمایش جدید رو تأیید کن.',show_alert=True); return
-        if user.xr_balance<spend: await call.answer('🔴 موجودی کافی نیست.',show_alert=True); return
-        calc=calc_trade(spend,nation.exchange_rate,True); holding=await session.scalar(select(CurrencyHolding).where(CurrencyHolding.user_id==user.user_id,CurrencyHolding.nation_id==nation_id).with_for_update())
-        if holding is None: holding=CurrencyHolding(user_id=user.user_id,nation_id=nation_id,amount=Decimal('0')); session.add(holding); await session.flush()
-        user.xr_balance-=spend; holding.amount+=calc['receive']; nation.trade_volume_24h+=spend; session.add(Transaction(user_id=user.user_id,nation_id=nation_id,transaction_type='buy',spend_xr=spend,amount=calc['receive'],fee_xr=calc['fee'],rate=nation.exchange_rate)); session.add(UserActivity(user_id=user.user_id,nation_id=nation_id,activity_type='trade')); await session.delete(preview); await session.commit(); text=f'✅ <b>خرید انجام شد.</b>\n━━━━━━━━━━━━━━━━━━━━\n📤 پرداختی: <s>{fmt_amount(spend)} ΩXR</s>\n📥 دریافتی: <b>{fmt_amount(calc["receive"])} {html.escape(nation.currency_code)}</b>\n\n─────────────────\n💰 موجودی:\nΩXR: <b>{fmt_amount(user.xr_balance)}</b>\n{html.escape(nation.currency_code)}: <b>{fmt_amount(holding.amount)}</b>'
-    await safe_edit(call,text,market_keyboard()); await call.answer('✅ خرید انجام شد')
+        async with session.begin():
+            user=(await session.execute(
+                select(User).where(User.user_id==call.from_user.id).with_for_update()
+            )).scalar_one_or_none()
+            nation=await session.get(Nation,nation_id,with_for_update=True)
+            preview=await session.scalar(
+                select(TradePreview)
+                .where(
+                    TradePreview.user_id==call.from_user.id,
+                    TradePreview.nation_id==nation_id,
+                    TradePreview.side=='buy',
+                    TradePreview.spend==spend,
+                )
+                .order_by(TradePreview.created_at.desc())
+                .limit(1)
+            ) if user else None
+            if not user or not nation or not preview:
+                await call.answer('⏱ پیش‌نمایش منقضی شد. دوباره مقدار رو وارد کن.',show_alert=True)
+                return
+            if abs(nation.exchange_rate-preview.preview_rate)/preview.preview_rate>Decimal('0.01'):
+                await call.answer('⚠️ نرخ تغییر کرد. پیش‌نمایش جدید رو تأیید کن.',show_alert=True)
+                return
+            if user.xr_balance<spend:
+                await call.answer('🔴 موجودی کافی نیست.',show_alert=True)
+                return
+            calc=calc_trade(spend,nation.exchange_rate,True)
+            holding=await session.scalar(
+                select(CurrencyHolding)
+                .where(CurrencyHolding.user_id==user.user_id,CurrencyHolding.nation_id==nation_id)
+                .with_for_update()
+            )
+            if holding is None:
+                holding=CurrencyHolding(user_id=user.user_id,nation_id=nation_id,amount=Decimal('0'))
+                session.add(holding)
+                await session.flush()
+            user.xr_balance-=spend
+            holding.amount+=calc['receive']
+            nation.trade_volume_24h+=spend
+            session.add(Transaction(user_id=user.user_id,nation_id=nation_id,transaction_type='buy',spend_xr=spend,amount=calc['receive'],fee_xr=calc['fee'],rate=nation.exchange_rate))
+            session.add(UserActivity(user_id=user.user_id,nation_id=nation_id,activity_type='trade'))
+            await session.delete(preview)
+            text=f'✅ <b>خرید انجام شد.</b>\n━━━━━━━━━━━━━━━━━━━━\n📤 پرداختی: <s>{fmt_amount(spend)} ΩXR</s>\n📥 دریافتی: <b>{fmt_amount(calc["receive"])} {html.escape(nation.currency_code)}</b>\n\n─────────────────\n💰 موجودی:\nΩXR: <b>{fmt_amount(user.xr_balance)}</b>\n{html.escape(nation.currency_code)}: <b>{fmt_amount(holding.amount)}</b>'
+    await safe_edit(call,text,market_keyboard())
+    await call.answer('✅ خرید انجام شد')
 @router.callback_query(F.data=='market_sell')
 async def market_sell(call,state):
     async with async_session() as session:
@@ -124,7 +164,9 @@ async def make_sell_preview(message,state,nation_id,raw):
         nation=await session.get(Nation,nation_id); user=await session.get(User,message.from_user.id); holding=await session.scalar(select(CurrencyHolding).where(CurrencyHolding.user_id==message.from_user.id,CurrencyHolding.nation_id==nation_id))
         if not nation or not user or not holding: await message.answer('⚠️ موجودی این ارز پیدا نشد.',parse_mode='HTML'); return
         if holding.amount<amount: await message.answer(f'🔴 موجودی کافی نیست.\nموجودی: {fmt_amount(holding.amount)} {html.escape(nation.currency_code)}\nمبلغ وارد شده: {fmt_amount(amount)} {html.escape(nation.currency_code)}',parse_mode='HTML'); return
-        calc=calc_trade(amount,nation.exchange_rate,False); session.add(TradePreview(user_id=user.user_id,nation_id=nation_id,side='sell',spend=amount,preview_rate=nation.exchange_rate)); await session.commit(); xr_after=user.xr_balance+calc['receive']; currency_after=holding.amount-amount; text=f'📉 <b>تأیید فروش</b>\n━━━━━━━━━━━━━━━━━━━━\n📤 فروش:     <b>{fmt_amount(amount)} {html.escape(nation.currency_code)}</b>\n📥 دریافت:   <b>{fmt_amount(calc["receive"])} ΩXR</b>\n\n─────────────────\n💹 نرخ: <code>۱ {html.escape(nation.currency_code)} = {fmt_rate(nation.exchange_rate)} ΩXR</code>\n📋 کارمزد: <b>{fmt_amount(calc["fee"])} ΩXR</b> (۰٫۵٪)\n\n─────────────────\n<b>موجودی بعد از معامله:</b>\nΩXR: <b>{fmt_amount(xr_after)}</b>\n{html.escape(nation.currency_code)}: <b>{fmt_amount(currency_after)}</b>\n━━━━━━━━━━━━━━━━━━━━'
+        calc=calc_trade(amount,nation.exchange_rate,False)
+        async with session.begin():
+            session.add(TradePreview(user_id=user.user_id,nation_id=nation_id,side='sell',spend=amount,preview_rate=nation.exchange_rate)) xr_after=user.xr_balance+calc['receive']; currency_after=holding.amount-amount; text=f'📉 <b>تأیید فروش</b>\n━━━━━━━━━━━━━━━━━━━━\n📤 فروش:     <b>{fmt_amount(amount)} {html.escape(nation.currency_code)}</b>\n📥 دریافت:   <b>{fmt_amount(calc["receive"])} ΩXR</b>\n\n─────────────────\n💹 نرخ: <code>۱ {html.escape(nation.currency_code)} = {fmt_rate(nation.exchange_rate)} ΩXR</code>\n📋 کارمزد: <b>{fmt_amount(calc["fee"])} ΩXR</b> (۰٫۵٪)\n\n─────────────────\n<b>موجودی بعد از معامله:</b>\nΩXR: <b>{fmt_amount(xr_after)}</b>\n{html.escape(nation.currency_code)}: <b>{fmt_amount(currency_after)}</b>\n━━━━━━━━━━━━━━━━━━━━'
     await state.clear(); await message.answer(text,reply_markup=trade_preview_keyboard(nation_id,amount,'sell'),parse_mode='HTML')
 @router.callback_query(F.data.startswith('sellq_'))
 async def sell_quick(call,state):
@@ -135,15 +177,52 @@ async def sell_quick(call,state):
 @router.message(MarketStates.WAITING_SELL_AMOUNT)
 async def sell_amount_message(message,state): data=await state.get_data(); await make_sell_preview(message,state,int(data['nation_id']),message.text or '')
 @router.callback_query(F.data.startswith('csell_'))
-async def confirm_sell(call):
-    _,nation_id_raw,amount_raw=call.data.split('_',2); nation_id=int(nation_id_raw); amount=Decimal(amount_raw)
+async def confirm_sell(call,state=None):
+    _,nation_id_raw,amount_raw=call.data.split('_',2)
+    nation_id=int(nation_id_raw)
+    amount=Decimal(amount_raw)
+    text=None
     async with async_session() as session:
-        user=(await session.execute(select(User).where(User.user_id==call.from_user.id).with_for_update())).scalar_one_or_none(); nation=await session.get(Nation,nation_id,with_for_update=True); preview=await session.scalar(select(TradePreview).where(TradePreview.user_id==call.from_user.id,TradePreview.nation_id==nation_id,TradePreview.side=='sell',TradePreview.spend==amount).order_by(TradePreview.created_at.desc()).limit(1)) if user else None; holding=await session.scalar(select(CurrencyHolding).where(CurrencyHolding.user_id==call.from_user.id,CurrencyHolding.nation_id==nation_id).with_for_update()) if user else None
-        if not user or not nation or not preview or not holding: await call.answer('⏱ پیش‌نمایش منقضی شد. دوباره مقدار رو وارد کن.',show_alert=True); return
-        if abs(nation.exchange_rate-preview.preview_rate)/preview.preview_rate>Decimal('0.01'): await call.answer('⚠️ نرخ تغییر کرد. پیش‌نمایش جدید رو تأیید کن.',show_alert=True); return
-        if holding.amount<amount: await call.answer('🔴 موجودی کافی نیست.',show_alert=True); return
-        calc=calc_trade(amount,nation.exchange_rate,False); holding.amount-=amount; user.xr_balance+=calc['receive']; nation.trade_volume_24h+=amount*nation.exchange_rate; session.add(Transaction(user_id=user.user_id,nation_id=nation_id,transaction_type='sell',spend_xr=amount*nation.exchange_rate,amount=amount,fee_xr=calc['fee'],rate=nation.exchange_rate)); session.add(UserActivity(user_id=user.user_id,nation_id=nation_id,activity_type='trade')); await session.delete(preview); await session.commit(); text=f'✅ <b>فروش انجام شد.</b>\n━━━━━━━━━━━━━━━━━━━━\n📤 فروختی:  <b>{fmt_amount(amount)} {html.escape(nation.currency_code)}</b>\n📥 دریافتی: <b>{fmt_amount(calc["receive"])} ΩXR</b>\n\n─────────────────\n💰 موجودی:\nΩXR: <b>{fmt_amount(user.xr_balance)}</b>\n{html.escape(nation.currency_code)}: <b>{fmt_amount(holding.amount)}</b>'
-    await safe_edit(call,text,market_keyboard()); await call.answer('✅ فروش انجام شد')
+        async with session.begin():
+            user=(await session.execute(
+                select(User).where(User.user_id==call.from_user.id).with_for_update()
+            )).scalar_one_or_none()
+            nation=await session.get(Nation,nation_id,with_for_update=True)
+            preview=await session.scalar(
+                select(TradePreview)
+                .where(
+                    TradePreview.user_id==call.from_user.id,
+                    TradePreview.nation_id==nation_id,
+                    TradePreview.side=='sell',
+                    TradePreview.spend==amount,
+                )
+                .order_by(TradePreview.created_at.desc())
+                .limit(1)
+            ) if user else None
+            holding=await session.scalar(
+                select(CurrencyHolding)
+                .where(CurrencyHolding.user_id==call.from_user.id,CurrencyHolding.nation_id==nation_id)
+                .with_for_update()
+            ) if user else None
+            if not user or not nation or not preview or not holding:
+                await call.answer('⏱ پیش‌نمایش منقضی شد. دوباره مقدار رو وارد کن.',show_alert=True)
+                return
+            if abs(nation.exchange_rate-preview.preview_rate)/preview.preview_rate>Decimal('0.01'):
+                await call.answer('⚠️ نرخ تغییر کرد. پیش‌نمایش جدید رو تأیید کن.',show_alert=True)
+                return
+            if holding.amount<amount:
+                await call.answer('🔴 موجودی کافی نیست.',show_alert=True)
+                return
+            calc=calc_trade(amount,nation.exchange_rate,False)
+            holding.amount-=amount
+            user.xr_balance+=calc['receive']
+            nation.trade_volume_24h+=amount*nation.exchange_rate
+            session.add(Transaction(user_id=user.user_id,nation_id=nation_id,transaction_type='sell',spend_xr=amount*nation.exchange_rate,amount=amount,fee_xr=calc['fee'],rate=nation.exchange_rate))
+            session.add(UserActivity(user_id=user.user_id,nation_id=nation_id,activity_type='trade'))
+            await session.delete(preview)
+            text=f'✅ <b>فروش انجام شد.</b>\n━━━━━━━━━━━━━━━━━━━━\n📤 فروختی:  <b>{fmt_amount(amount)} {html.escape(nation.currency_code)}</b>\n📥 دریافتی: <b>{fmt_amount(calc["receive"])} ΩXR</b>\n\n─────────────────\n💰 موجودی:\nΩXR: <b>{fmt_amount(user.xr_balance)}</b>\n{html.escape(nation.currency_code)}: <b>{fmt_amount(holding.amount)}</b>'
+    await safe_edit(call,text,market_keyboard())
+    await call.answer('✅ فروش انجام شد')
 @router.callback_query(F.data=='market_chart')
 async def market_chart(call): await safe_edit(call,'📊 <b>نمودار نرخ</b>\n━━━━━━━━━━━━━━━━━━━━\nاین قابلیت هنوز فعال نیست.',market_keyboard()); await call.answer()
 @router.callback_query(F.data=='market_history')
