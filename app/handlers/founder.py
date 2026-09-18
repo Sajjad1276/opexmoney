@@ -77,8 +77,8 @@ async def start_founder(call: CallbackQuery, state: FSMContext) -> None:
 
     if call.message:
         await call.message.answer(
-            "🏛 <b>تأسیس ملت — مرحله ۱ از ۳</b>\n\n"
-            "پایتخت ملتت کجاست؟\n\n"
+            "🏛 <b>تأسیس ملت — مرحله ۱ از ۳</b>\n"
+            "پایتخت ملتت کجاست؟\n"
             "آیدی عددی گروه تلگرامی رو بفرست.\n"
             "(مثال: -1001234567890)\n"
             "ربات باید از قبل در اون گروه باشه.",
@@ -177,12 +177,11 @@ async def receive_currency_code(message: Message, state: FSMContext) -> None:
 
     await message.answer(
         "📋 <b>اطلاعات ملت تو:</b>\n"
-        f"🏛 نام: {html.escape(data['nation_name'])}\n"
-        f"💱 ارز: {html.escape(code)}\n"
+        f"🏛 {html.escape(data['nation_name'])} · 💱 {html.escape(code)}\n"
         f"🗺 پایتخت: گروه {data['group_id']}\n"
         f"👑 بنیان‌گذار: {html.escape(message.from_user.first_name or 'معامله‌گر')}\n"
         f"💰 موجودی اولیه: ۱۰۰۰ {html.escape(code)}\n"
-        "بعد از تأسیس، کد ارز قابل تغییر نیست.",
+        "کد ارز بعد از تأسیس قابل تغییر نیست.",
         reply_markup=founder_confirm_keyboard(),
         parse_mode="HTML",
     )
