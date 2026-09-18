@@ -255,3 +255,26 @@ def founder_cancel_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(text="❌ انصراف", callback_data="cancel_founder"),
     ]])
+
+def back_only_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="↩️ بازگشت", callback_data="back_to_dashboard")]
+    ])
+
+
+def nation_explore_keyboard(nations) -> InlineKeyboardMarkup:
+    rows = [
+        [InlineKeyboardButton(
+            text=f"🏴 {nation.name} · {nation.currency_code} · {nation.member_count} نفر",
+            callback_data=f"join_nation:{nation.nation_id}",
+        )]
+        for nation in nations
+    ]
+    rows.append([InlineKeyboardButton(text="↩️ بازگشت", callback_data="back_to_dashboard")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def first_nation_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🏛 تأسیس اولین ملت", callback_data="found_nation")]
+    ])
