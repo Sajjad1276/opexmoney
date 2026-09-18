@@ -39,6 +39,7 @@ async def create_nation(
     group_id: int,
     nation_name: str,
     currency_code: str,
+    founder_username: str | None = None,
 ) -> Nation:
     async with session.begin():
         user_result = await session.execute(
@@ -49,7 +50,19 @@ async def create_nation(
         user = user_result.scalar_one_or_none()
 
         if user is None:
-            raise ValueError("حساب پیدا نشد.")
+            if not founder_username:
+                raise ValueError("حساب پیدا نشد.")
+            user = User(
+                user_id=founder_user_id,
+                username=founder_username,
+                home_nation_id=None,
+                balance=Decimal("0.00"),
+                xr_balance=Decimal("0.00"),
+                role="player",
+            )
+            session.add(user)
+            await session.flush()
+
         if user.role == "founder":
             raise ValueError("هر معامله‌گر فقط می‌تونه یک ملت بسازه.")
 
