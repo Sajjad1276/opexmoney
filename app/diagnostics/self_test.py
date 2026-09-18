@@ -8,9 +8,12 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy import inspect, text
 
 from app.database.models import Base
+from config import settings
 from app.database.session import async_session, engine
 from app.services.rules.registry import RULE_REGISTRY, validate_registry
 from app.services.rules.resolver import resolve
+from app.services.intent_router import IntentType, classify_intent, STEP_REGISTRY
+from app.services.keyboard_state import KeyboardStateManager
 
 logger = logging.getLogger("opexmoney.selftest")
 
@@ -111,7 +114,7 @@ async def run_startup_smoke_test(
         logger.exception("SELFTEST|FAIL|database+resolver")
         ok = False
 
-    try:
+    if not settings.redis_url and not settings.allow_memory_fsm_dev:\n        logger.error("SELFTEST|FAIL|fsm-storage|REDIS_URL is required outside explicit dev mode")\n        ok = False\n    else:\n        logger.info("SELFTEST|PASS|fsm-storage|redis=%s|memory_dev=%s", bool(settings.redis_url), settings.allow_memory_fsm_dev)\n\n    if not isinstance(KeyboardStateManager(), KeyboardStateManager):\n        logger.error("SELFTEST|FAIL|keyboard-manager")\n        ok = False\n    else:\n        logger.info("SELFTEST|PASS|keyboard-manager")\n\n    class _IntentMessage:\n        text = "/cancel"\n\n    intent = await classify_intent(_IntentMessage(), None, STEP_REGISTRY)\n    if intent is not IntentType.SYSTEM_COMMAND:\n        logger.error("SELFTEST|FAIL|intent-router|cancel=%s", intent)\n        ok = False\n    else:\n        logger.info("SELFTEST|PASS|intent-router|cancel=%s", intent.value)\n\n    try:
         missing_tables = [
             table_name
             for table_name in (
@@ -121,6 +124,8 @@ async def run_startup_smoke_test(
                 "governance_ledger",
                 "player_temporal_profiles",
                 "behavior_snapshots",
+            "onboarding_drafts",
+            "keyboard_states",
             )
             if not await _table_exists(table_name)
         ]
