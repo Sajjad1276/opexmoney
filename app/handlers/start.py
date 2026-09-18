@@ -18,6 +18,8 @@ from app.database.session import async_session
 from app.keyboards.inline import cancel_keyboard, first_trade_keyboard, nation_selection_keyboard, trade_confirmation_keyboard, welcome_keyboard
 from app.keyboards.reply import main_menu_keyboard
 from app.services.nation_service import get_active_nations, get_nation_rank
+from app.services.draft_service import clear_draft, get_draft
+from app.services.keyboard_state import keyboard_manager
 from app.services.user_service import get_registration_status, get_user, is_fully_registered
 from app.states.onboarding import OnboardingStates
 from app.utils.formatting import fmt_amount, fmt_pct, fmt_rate, get_rate_change, get_rate_emoji, to_fa
