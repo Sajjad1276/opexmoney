@@ -249,3 +249,4 @@ def governance_revoke_keyboard(overrides) -> InlineKeyboardMarkup:
     ]
     rows.append([InlineKeyboardButton(text="↩️ قوانین", callback_data="governance_main")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
+\n\ndef restart_confirmation_keyboard() -> InlineKeyboardMarkup:\n    return InlineKeyboardMarkup(inline_keyboard=[\n        [InlineKeyboardButton(text="✅ شروع دوباره", callback_data="confirm_restart", style=ButtonStyle.DANGER)],\n        [InlineKeyboardButton(text="↩️ ادامه مرحله فعلی", callback_data="keep_wizard")],\n    ])\n
