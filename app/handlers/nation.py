@@ -8,14 +8,10 @@ from aiogram.fsm.context import FSMContext
 from aiogram.enums import ButtonStyle
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
-from app.states.nation import NationStates
 from app.states.onboarding import OnboardingStates
 
 logger = logging.getLogger(__name__)
 nation_router = Router(name="nation")
-
-
-
 
 
 def nations_keyboard() -> InlineKeyboardMarkup:
