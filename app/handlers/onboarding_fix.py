@@ -9,7 +9,7 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
-from app.database.models import User
+from app.database.models import Nation, User
 from app.database.session import async_session
 from app.handlers.start import _safe_edit_caption, _safe_edit_text, start as restart_flow, user_mention
 from app.keyboards.inline import cancel_keyboard, nation_selection_keyboard
@@ -106,6 +106,43 @@ NO_NATION_TEXT = rtl_text("""🌍 <b>هنوز هیچ ملتی تأسیس نشد�
 
 تو می‌تونی اولین بنیان‌گذار تاریخ باشی
 و اولین ملت OPEX MONEY رو بسازی.""")
+
+
+async def show_nation_selection(
+    message: Message,
+    session,
+    state: FSMContext,
+) -> None:
+    result = await session.execute(
+        select(Nation)
+        .where(Nation.is_active.is_(True))
+        .order_by(Nation.member_count.desc(), Nation.nation_id.asc())
+        .limit(10)
+    )
+    nations = result.scalars().all()
+
+    await state.set_state(OnboardingStates.SELECT_NATION)
+
+    if not nations:
+        await message.answer(
+            "🌍 هنوز هیچ ملتی تأسیس نشده!\n"
+            "تو می‌تونی اولین بنیان‌گذار باشی.\n"
+            "اولین ملت رو از همین‌جا بساز.",
+            reply_markup=nation_selection_keyboard([]),
+        )
+        return
+
+    lines = ["🌍 <b>ملت خودت رو انتخاب کن:</b>", "هر ملت یه اقتصاد مستقله."]
+    lines.extend(
+        f"🏴 {html.escape(nation.name)} ({html.escape(nation.currency_code)}) · {to_fa(nation.member_count)} نفر"
+        for nation in nations[:4]
+    )
+    lines.append("ملت جدید هم می‌تونی تأسیس کنی.")
+    await message.answer(
+        "\n".join(lines),
+        reply_markup=nation_selection_keyboard(nations[:4]),
+        parse_mode="HTML",
+    )
 
 
 def clean_nation_list_text(user, trader_name: str, nations) -> str:
