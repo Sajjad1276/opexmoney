@@ -85,16 +85,18 @@ def nation_list_text(user, trader_name: str, nations: list[Nation]) -> str:
 
 async def show_dashboard(message: Message, user: User) -> None:
     async with async_session() as session:
-        nation = await session.get(Nation, user.home_nation_id) if user.home_nation_id else None
+        async with session.begin():
+            nation = await session.get(Nation, user.home_nation_id) if user.home_nation_id else None
         if nation is None:
             await message.answer("<b>OPEX MONEY</b>\nحسابت آماده است، اما هنوز ملت اصلی نداری.", reply_markup=main_menu(), parse_mode="HTML")
             return
-        rank = nation.nation_rank or await get_nation_rank(session, nation.nation_id)
-        total_nations = await session.scalar(select(func.count(Nation.nation_id)).where(Nation.is_active.is_(True))) or 0
+        async with session.begin():
+            rank = nation.nation_rank or await get_nation_rank(session, nation.nation_id)
+            total_nations = await session.scalar(select(func.count(Nation.nation_id)).where(Nation.is_active.is_(True))) or 0
+            holding = await session.scalar(select(CurrencyHolding).where(CurrencyHolding.user_id == user.user_id, CurrencyHolding.nation_id == nation.nation_id))
         active = nation.active_members_24h
         change = get_rate_change(nation)
         minutes = max(0, int((datetime.utcnow() - nation.last_rate_update).total_seconds() // 60)) if nation.last_rate_update else 0
-        holding = await session.scalar(select(CurrencyHolding).where(CurrencyHolding.user_id == user.user_id, CurrencyHolding.nation_id == nation.nation_id))
         balance = holding.amount if holding else user.balance
         text = ("🌐 <b>OPEX MONEY</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" f"{user_mention(message.from_user)}\n\n" f"🏛 {html.escape(nation.name)} · {html.escape(user.username)}\n" f"💰 <code>{html.escape(nation.currency_code)}</code>: <b>{fmt_amount(balance)}</b> · <code>ΩXR</code>: <b>{fmt_amount(user.xr_balance)}</b>\n\n" f"{get_rate_emoji(change)} <code>{html.escape(nation.currency_code)}</code>: <b>{fmt_rate(nation.exchange_rate)} ΩXR</b> · <i>{fmt_pct(change)} امروز</i>\n" f"🏆 رتبه #{to_fa(rank)} از {to_fa(total_nations)} · 👥 {to_fa(active)} فعال\n" f"⏱ <i>{to_fa(minutes)} دقیقه پیش</i>\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     await message.answer(text, reply_markup=main_menu(), parse_mode="HTML")
@@ -219,7 +221,8 @@ async def _begin_registration(message: Message, state: FSMContext) -> None:
     await state.clear()
 
     async with async_session() as session:
-        status = await get_registration_status(session, message.from_user.id)
+        async with session.begin():
+            status = await get_registration_status(session, message.from_user.id)
 
     if status["status"] == "complete":
         await show_dashboard(message, status["user"])
@@ -393,8 +396,9 @@ async def first_trade_tutorial(call: CallbackQuery, state: FSMContext) -> None:
         await call.answer()
         return
     async with async_session() as session:
-        user = await get_user(session, call.from_user.id)
-        nation = await session.get(Nation, user.home_nation_id) if user and user.home_nation_id else None
+        async with session.begin():
+            user = await get_user(session, call.from_user.id)
+            nation = await session.get(Nation, user.home_nation_id) if user and user.home_nation_id else None
     if not user or not nation:
         await call.answer("⚠️ اطلاعات معامله پیدا نشد.", show_alert=True)
         return
@@ -496,7 +500,8 @@ async def skip_first_trade(call: CallbackQuery, state: FSMContext) -> None:
 
 async def _get_holding_amount(user_id: int, nation_id: int) -> Decimal:
     async with async_session() as session:
-        holding = await session.scalar(select(CurrencyHolding).where(CurrencyHolding.user_id == user_id, CurrencyHolding.nation_id == nation_id))
+        async with session.begin():
+            holding = await session.scalar(select(CurrencyHolding).where(CurrencyHolding.user_id == user_id, CurrencyHolding.nation_id == nation_id))
         return holding.amount if holding else Decimal("500")
 
 
