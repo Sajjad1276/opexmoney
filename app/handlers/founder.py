@@ -59,10 +59,11 @@ def _group_id_is_valid(value: str) -> bool:
 )
 async def start_founder(call: CallbackQuery, state: FSMContext) -> None:
     async with async_session() as session:
-        if not await is_user_registered(session, call.from_user.id):
-            await call.answer("⚠️ اول باید وارد بازی بشی.", show_alert=True)
-            return
-        user = await get_user(session, call.from_user.id)
+        async with session.begin():
+            if not await is_user_registered(session, call.from_user.id):
+                await call.answer("⚠️ اول باید وارد بازی بشی.", show_alert=True)
+                return
+            user = await get_user(session, call.from_user.id)
 
     if user and user.role == "founder":
         await call.answer(
@@ -164,7 +165,8 @@ async def receive_nation_name(message: Message, state: FSMContext) -> None:
 )
 async def receive_currency_code(message: Message, state: FSMContext) -> None:
     async with async_session() as session:
-        valid, error = await validate_currency_code(message.text or "", session)
+        async with session.begin():
+            valid, error = await validate_currency_code(message.text or "", session)
 
     if not valid:
         await message.answer(error, reply_markup=founder_cancel_keyboard())
