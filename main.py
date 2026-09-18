@@ -9,9 +9,11 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.storage.redis import RedisStorage
+from sqlalchemy import select
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
+from app.database.models import User
 from app.database.session import async_session, engine
 from app.diagnostics.flow_trace import FlowTraceMiddleware
 from app.diagnostics.self_test import run_startup_smoke_test
@@ -87,11 +89,7 @@ async def run_governance_job(bot: Bot) -> None:
                 founder_ids = list(
                     (
                         await session.execute(
-                            __import__("sqlalchemy").select(
-                                __import__("app.database.models", fromlist=["User"]).User.user_id
-                            ).where(
-                                __import__("app.database.models", fromlist=["User"]).User.role == "founder"
-                            )
+                            select(User.user_id).where(User.role == "founder")
                         )
                     ).scalars().all()
                 )
