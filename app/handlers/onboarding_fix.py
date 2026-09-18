@@ -16,6 +16,7 @@ from app.database.session import async_session
 from app.handlers.start import _safe_edit_caption, _safe_edit_text, start as restart_flow, user_mention
 from app.keyboards.inline import cancel_keyboard, nation_selection_keyboard
 from app.services.keyboard_state import KeyboardKind, keyboard_manager
+from app.services.onboarding_draft import clear_draft, save_draft
 from app.services.nation_service import get_active_nations
 from app.services.temporal_service import ensure_temporal_profile
 from app.services.user_service import get_user, is_fully_registered, username_exists
@@ -250,6 +251,12 @@ async def accept_valid_name(message: Message, state: FSMContext) -> None:
                     session,
                     message.from_user.id,
                 )
+                await save_draft(
+                    session,
+                    player_id=message.from_user.id,
+                    step_key=OnboardingStates.SELECT_NATION.state,
+                    payload={"username": username},
+                )
 
     if duplicate:
         duplicate_text = rtl_text(
@@ -271,6 +278,9 @@ async def accept_valid_name(message: Message, state: FSMContext) -> None:
 @router.callback_query(F.data == "cancel_start", StateFilter(OnboardingStates.SET_USERNAME_PLAYER))
 async def cancel_start_fix(call: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
+    async with async_session() as session:
+        async with session.begin():
+            await clear_draft(session, call.from_user.id)
     user_name = html.escape(call.from_user.first_name or "معامله‌گر")
     text = CANCEL_TEXT.format(user_name=user_name)
     try:
