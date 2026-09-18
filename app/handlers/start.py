@@ -285,50 +285,6 @@ async def _get_holding_amount(user_id: int, nation_id: int) -> Decimal:
         return holding.amount if holding else Decimal("500")
 
 
-@router.callback_query(F.data == "start_founder")
-async def founder(call: CallbackQuery, state: FSMContext) -> None:
-    # Do not clear onboarding state here. The trader name has already been
-    # accepted, so closing this unavailable feature must not cancel registration.
-    await _safe_edit_text(
-        call,
-        "🏛 <b>ساخت ملت</b>\n─────────────────\nاین قابلیت هنوز فعال نیست.\n\nبرای اطلاع از زمان راه‌اندازی، کانال OPEX رو دنبال کن.",
-        founder_cancel_keyboard(),
-    )
-    await call.answer()
-
-
-@router.callback_query(F.data == "cancel_founder")
-async def cancel_founder(call: CallbackQuery, state: FSMContext) -> None:
-    # Return to the nation-selection stage and preserve the accepted trader name.
-    data = await state.get_data()
-    trader_name = data.get("username")
-    if not trader_name:
-        await call.answer("⏱ فرآیند ثبت‌نام منقضی شد. /start بزن.", show_alert=True)
-        return
-
-    await state.set_state(OnboardingStates.SELECT_NATION)
-    async with async_session() as session:
-        nations = await get_active_nations(session, limit=3)
-
-    if nations:
-        text = nation_list_text(call.from_user, trader_name, nations)
-        markup = nation_keyboard(nations)
-    else:
-        text = (
-            f"✅ <b>«{html.escape(trader_name)}»</b> ثبت شد.\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            "⏳ هنوز هیچ ملتی وجود نداره.\n\n"
-            f"{user_mention(call.from_user)}، تو اولین نفری هستی\n"
-            "که وارد OPEX میشی.\n\n"
-            "اولین ملت تاریخ رو بساز.\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        )
-        markup = no_nation_keyboard()
-
-    await _safe_edit_text(call, text, markup)
-    await call.answer("ساخت ملت بسته شد.")
-
-
 @router.callback_query(F.data == "cancel_start")
 async def cancel_start(call: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
