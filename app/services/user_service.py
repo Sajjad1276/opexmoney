@@ -21,24 +21,23 @@ async def get_registration_status(
       - partial: user exists but is missing a required registration field
       - new: no user row exists
     """
-    async with session.begin():
-        user = await session.get(User, telegram_id)
+    user = await session.get(User, telegram_id)
 
-        if user is None:
-            return {"status": "new", "user": None, "missing": ["user"]}
+    if user is None:
+        return {"status": "new", "user": None, "missing": ["user"]}
 
-        if not (user.username or "").strip():
-            return {"status": "partial", "user": user, "missing": ["username", "holding"]}
+    if not (user.username or "").strip():
+        return {"status": "partial", "user": user, "missing": ["username", "holding"]}
 
-        holding = await session.execute(
-            select(CurrencyHolding.id)
-            .where(CurrencyHolding.user_id == telegram_id)
-            .limit(1)
-        )
-        if holding.scalar_one_or_none() is None:
-            return {"status": "partial", "user": user, "missing": ["holding"]}
+    holding = await session.execute(
+        select(CurrencyHolding.id)
+        .where(CurrencyHolding.user_id == telegram_id)
+        .limit(1)
+    )
+    if holding.scalar_one_or_none() is None:
+        return {"status": "partial", "user": user, "missing": ["holding"]}
 
-        return {"status": "complete", "user": user, "missing": []}
+    return {"status": "complete", "user": user, "missing": []}
 
 
 async def username_exists(
