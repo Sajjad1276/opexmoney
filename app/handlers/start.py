@@ -108,7 +108,15 @@ async def show_dashboard(message: Message, user: User) -> None:
         async with session.begin():
             nation = await session.get(Nation, user.home_nation_id) if user.home_nation_id else None
         if nation is None:
-            await message.answer("<b>OPEX MONEY</b>\nحسابت آماده است، اما هنوز ملت اصلی نداری.", reply_markup=main_menu_keyboard(), parse_mode="HTML")
+            await keyboard_manager.send_message(
+                message.bot,
+                chat_id=message.chat.id,
+                text="<b>OPEX MONEY</b>\nحسابت آماده است، اما هنوز ملت اصلی نداری.",
+                kind=KeyboardKind.REPLY,
+                name="main_menu",
+                markup=main_menu_keyboard(),
+                parse_mode="HTML",
+            )
             return
         async with session.begin():
             rank = nation.nation_rank or await get_nation_rank(session, nation.nation_id)
