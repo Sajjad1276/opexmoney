@@ -226,7 +226,7 @@ Production behavior is different: `REDIS_URL` is required unless the explicit de
 
 ## Final CI result
 
-**Workflow run:** 284  
+**Workflow run:** 286  
 **Result:** `success`  
 **Steps:** compile, migration upgrade, migration downgrade/upgrade, full pytest.
 
@@ -237,6 +237,14 @@ Final pytest result from CI:
 ```
 
 The warnings are existing `datetime.utcnow()` deprecation warnings in temporal/economic code. No Phase 4 test failed.
+
+## Storage guard output
+
+```
+STORAGE|PASS|production_requires_redis|explicit_dev_allows_memory
+```
+
+This is the direct runtime check for Part B.1.
 
 ## E2E output
 
