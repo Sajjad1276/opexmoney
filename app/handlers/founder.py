@@ -196,14 +196,15 @@ async def start_founder(call: CallbackQuery, state: FSMContext) -> None:
     async with async_session() as session:
         user = await get_user(session, call.from_user.id)
         if user is None:
-            await call.answer("⚠️ اول باید ثبت‌نام کنی.", show_alert=True)
+            if call.message:
+                await call.message.answer("⚠️ اول باید ثبت‌نام کنی.")
+            await call.answer()
             return
 
         if user.role == "founder":
-            await call.answer(
-                "⚠️ هر معامله‌گر فقط می‌تونه یک ملت بسازه.",
-                show_alert=True,
-            )
+            if call.message:
+                await call.message.answer("⚠️ هر معامله‌گر فقط می‌تونه یک ملت بسازه.")
+            await call.answer()
             return
 
         trader_name = user.username
@@ -211,10 +212,9 @@ async def start_founder(call: CallbackQuery, state: FSMContext) -> None:
     groups = await _shared_groups(call.bot, call.from_user.id)
     if not groups:
         await state.clear()
-        await call.answer(
-            "⚠️ ربات در هیچ گروه مشترکی با تو نیست.",
-            show_alert=True,
-        )
+        if call.message:
+            await call.message.answer("⚠️ ربات در هیچ گروه مشترکی با تو نیست.")
+        await call.answer()
         return
 
     available: list[dict] = []
@@ -238,10 +238,9 @@ async def start_founder(call: CallbackQuery, state: FSMContext) -> None:
 
     if not available:
         await state.clear()
-        await call.answer(
-            "⚠️ همه گروه‌های مشترک تو قبلاً ملت دارند.",
-            show_alert=True,
-        )
+        if call.message:
+            await call.message.answer("⚠️ همه گروه‌های مشترک تو قبلاً ملت دارند.")
+        await call.answer()
         return
 
     await state.update_data(username=trader_name)
@@ -266,7 +265,9 @@ async def select_group(call: CallbackQuery, state: FSMContext) -> None:
         group_id = int(call.data.split(":", 1)[1])
     except (AttributeError, ValueError):
         await state.clear()
-        await call.answer("❌ گروه انتخاب‌شده معتبر نیست.", show_alert=True)
+        if call.message:
+            await call.message.answer("❌ گروه انتخاب‌شده معتبر نیست.")
+        await call.answer()
         return
 
     groups = await _shared_groups(call.bot, call.from_user.id)
@@ -277,7 +278,9 @@ async def select_group(call: CallbackQuery, state: FSMContext) -> None:
 
     if selected is None:
         await state.clear()
-        await call.answer("⚠️ این گروه دیگه در دسترس نیست.", show_alert=True)
+        if call.message:
+            await call.message.answer("⚠️ این گروه دیگه در دسترس نیست.")
+        await call.answer()
         return
 
     async with async_session() as session:
@@ -295,10 +298,9 @@ async def select_group(call: CallbackQuery, state: FSMContext) -> None:
 
     if active is not None:
         await state.clear()
-        await call.answer(
-            "⚠️ این گروه قبلاً پایتخت یک ملت شده.",
-            show_alert=True,
-        )
+        if call.message:
+            await call.message.answer("⚠️ این گروه قبلاً پایتخت یک ملت شده.")
+        await call.answer()
         return
 
     await state.update_data(
@@ -361,12 +363,11 @@ async def set_currency_code(message: Message, state: FSMContext) -> None:
     await state.set_state(FounderStates.CONFIRM_CREATE)
 
     await message.answer(
-        "🏛 <b>ملت آماده تأسیسه.</b>\n\n"
+        "🏛 <b>ملت آماده تأسیسه.</b>\n"
         f"🏛 ملت: {html.escape(data['nation_name'])}\n"
         f"💱 ارز: {html.escape(code)}\n"
         f"🗺 پایتخت: {html.escape(data['group_name'])}\n"
-        f"👑 بنیان‌گذار: "
-        f"{html.escape(data.get('username') or message.from_user.first_name or 'معامله‌گر')}",
+        f"👑 بنیان‌گذار: {html.escape(data.get('username') or message.from_user.first_name or 'معامله‌گر')}",
         reply_markup=_confirm_keyboard(),
         parse_mode="HTML",
     )
@@ -382,7 +383,9 @@ async def confirm_create(call: CallbackQuery, state: FSMContext) -> None:
 
     if not required.issubset(data):
         await state.clear()
-        await call.answer("⚠️ فرآیند تأسیس منقضی شد.", show_alert=True)
+        if call.message:
+            await call.message.answer("⚠️ فرآیند تأسیس منقضی شد.")
+        await call.answer()
         return
 
     async with async_session() as session:
@@ -396,26 +399,27 @@ async def confirm_create(call: CallbackQuery, state: FSMContext) -> None:
             )
         except ValueError as exc:
             await state.clear()
-            await call.answer(f"⚠️ {exc}", show_alert=True)
+            if call.message:
+                await call.message.answer(f"⚠️ {exc}")
+            await call.answer()
             return
         except Exception:
             await state.clear()
             logger.exception("Nation creation failed")
-            await call.answer(
-                "❌ تأسیس ملت انجام نشد. دوباره تلاش کن.",
-                show_alert=True,
-            )
+            if call.message:
+                await call.message.answer("❌ تأسیس ملت انجام نشد. دوباره تلاش کن.")
+            await call.answer()
             return
 
     await state.clear()
 
     if call.message is not None:
         await call.message.edit_text(
-            f"🎉 <b>ملت {html.escape(nation.name)} رسماً تأسیس شد!</b>\n\n"
-            "👑 تو بنیان‌گذار این ملتی\n\n"
-            f"💰 موجودی اولیه‌ات: ۱۰۰۰ {html.escape(nation.currency_code)}\n"
-            f"🌐 ارز ملتت: {html.escape(nation.currency_code)}\n\n"
-            "حالا می‌تونی از پنل ملت، اقتصاد رو مدیریت کنی.",
+            f"🎉 <b>ملت {html.escape(nation.name)} رسماً تأسیس شد!</b>\n"
+            "👑 تو بنیان‌گذار این ملتی.\n"
+            f"💰 موجودی اولیه: ۱۰۰۰ {html.escape(nation.currency_code)}\n"
+            f"🌐 ارز ملت: {html.escape(nation.currency_code)}\n"
+            "پنل ملت آماده مدیریت اقتصاده.",
             parse_mode="HTML",
         )
 
@@ -423,12 +427,11 @@ async def confirm_create(call: CallbackQuery, state: FSMContext) -> None:
         await call.bot.send_message(
             chat_id=nation.group_id,
             text=(
-                f"🏛 <b>ملت {html.escape(nation.name)} تأسیس شد!</b>\n\n"
+                f"🏛 <b>ملت {html.escape(nation.name)} تأسیس شد!</b>\n"
                 f"💱 ارز رسمی: {html.escape(nation.currency_code)}\n"
-                f"👑 بنیان‌گذار: "
-                f"{html.escape(str(data.get('username') or call.from_user.first_name or 'معامله‌گر'))}\n\n"
-                "📈 نرخ اولیه: ۱.۰۰ ΩXR\n\n"
-                "برای پیوستن به این ملت، ربات رو Start کن."
+                f"👑 بنیان‌گذار: {html.escape(str(data.get('username') or call.from_user.first_name or 'معامله‌گر'))}\n"
+                "📈 نرخ اولیه: ۱.۰۰ ΩXR\n"
+                "برای پیوستن، ربات رو اجرا کن."
             ),
             parse_mode="HTML",
         )
