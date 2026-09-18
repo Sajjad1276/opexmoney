@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import html
 import logging
-import re
 from datetime import datetime
 from decimal import Decimal
 
@@ -11,12 +10,12 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import CommandStart
 from aiogram.filters.state import StateFilter
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message, ReplyKeyboardRemove
+from aiogram.types import CallbackQuery, Message
 from sqlalchemy import func, select
 
 from app.database.models import CurrencyHolding, Nation, Transaction, User, UserActivity
 from app.database.session import async_session
-from app.keyboards.inline import cancel_keyboard, first_trade_keyboard, nation_keyboard, trade_confirmation_keyboard, welcome_keyboard
+from app.keyboards.inline import cancel_keyboard, first_trade_keyboard, nation_selection_keyboard, trade_confirmation_keyboard, welcome_keyboard
 from app.keyboards.reply import main_menu
 from app.services.nation_service import get_active_nations, get_nation_rank
 from app.services.user_service import get_registration_status, get_user
@@ -35,9 +34,6 @@ def current_date_fa() -> str:
     now = datetime.now()
     return to_fa(now.strftime("%Y/%m/%d"))
 
-
-def _valid_username(value: str) -> bool:
-    return bool(re.fullmatch(r"[A-Za-z]{3,15}", value))
 
 
 async def _safe_edit_text(call: CallbackQuery, text: str, reply_markup=None) -> bool:
@@ -76,11 +72,9 @@ USERNAME_CAPTION = """💹 <b>اسم معامله‌گرت رو انتخاب ک�
 · ۳ تا ۱۵ حرف انگلیسی
 · فقط حروف A-Z، بدون فاصله، عدد و @"""
 
-DUPLICATE_NAME = """🔴 «{user_input}» قبلاً ثبت شده.
 
 یه اسم دیگه انتخاب کن:"""
 
-LENGTH_ERROR = """🔴 «{user_input}» قابل قبول نیست.
 
 فقط ۳ تا ۱۵ حرف انگلیسی وارد کن.
 دوباره بنویس:"""
@@ -120,6 +114,17 @@ async def continue_registration(
     user: User,
     missing: list[str],
 ) -> None:
+    if "username" in missing or not (user.username or "").strip():
+        await state.set_state(OnboardingStates.SET_USERNAME_PLAYER)
+        await message.answer(
+            USERNAME_CAPTION.format(
+                user_mention=user_mention(message.from_user),
+            ),
+            reply_markup=cancel_keyboard(),
+            parse_mode="HTML",
+        )
+        return
+
     await state.update_data(
         user_id=user.user_id,
         username=user.username,
@@ -160,12 +165,18 @@ async def continue_registration(
     await state.set_state(OnboardingStates.SELECT_NATION)
 
     if not nations:
-        await message.answer("⚠️ ثبت‌نامت ناقصه، اما هنوز هیچ ملتی برای پیوستن وجود نداره.")
+        await message.answer(
+            "🌍 <b>هنوز هیچ ملتی تأسیس نشده!</b>\n\n"
+            "تو می‌تونی اولین بنیان‌گذار تاریخ باشی\n"
+            "و اولین ملت OPEX MONEY رو بسازی.",
+            reply_markup=nation_selection_keyboard([]),
+            parse_mode="HTML",
+        )
         return
 
     await message.answer(
         nation_list_text(message.from_user, user.username, nations),
-        reply_markup=nation_keyboard(nations),
+        reply_markup=nation_selection_keyboard(nations),
         parse_mode="HTML",
     )
 
