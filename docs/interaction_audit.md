@@ -207,3 +207,178 @@ Therefore no runtime PASS is claimed in this baseline document. The final versio
 ## Protected areas
 
 Do not change economic logic in `app/services/economic_engine.py`, `app/services/rules/`, or `app/services/governance_service.py`. No Phase 4 interaction change may alter economy formulas or governance rules.
+
+
+---
+
+# Final Phase 4 Verification
+
+## Runtime environment
+
+Final verification was executed by GitHub Actions on Python 3.12 with PostgreSQL 16.
+
+The CI test environment uses:
+- `ALLOW_MEMORY_FSM_DEV=true`
+- PostgreSQL test database
+- `pytest -q -s`
+
+Production behavior is different: `REDIS_URL` is required unless the explicit development flag is enabled.
+
+## Final CI result
+
+**Workflow run:** 284  
+**Result:** `success`  
+**Steps:** compile, migration upgrade, migration downgrade/upgrade, full pytest.
+
+Final pytest result from CI:
+
+```
+20 passed, 19 warnings in 3.38s
+```
+
+The warnings are existing `datetime.utcnow()` deprecation warnings in temporal/economic code. No Phase 4 test failed.
+
+## E2E output
+
+The required user journey was executed against the real test PostgreSQL database.
+
+```
+E2E|PASS|01|/start|welcome sent
+E2E|PASS|02|start_game|FSM=SET_USERNAME_PLAYER|keyboard=inline:onboarding
+E2E|PASS|03|invalid_username|state_preserved
+E2E|PASS|04|username|DB_saved|draft_saved
+E2E|PASS|05|join_nation|User+Holding persisted
+E2E|PASS|06|founder_start|draft=waiting_group_admin
+E2E|PASS|07|group_connect|draft=persistent
+E2E|PASS|08|invalid_nation_name|state_preserved
+E2E|PASS|09|nation_name|confirm_draft_saved
+E2E|PASS|10|restart|FSM_reset_but_draft_detected
+E2E|PASS|11|resume_draft|state+payload_recovered
+E2E|PASS|12|confirm_founder|Nation+User+Holding persisted|draft_cleared
+E2E|PASS|13|market_open|reply_to_inline_transition
+E2E|PASS|14|sell_wizard|state=WAITING_SELL_AMOUNT
+E2E|PASS|15|invalid_amount|state_preserved
+E2E|PASS|16|cancel|inline_to_reply_restored|draft_cleared
+E2E|PASS|17|trade|Transaction+balances persisted
+E2E|PASS|18|full_journey|all assertions passed
+```
+
+This verifies:
+- registration
+- DB persistence
+- founder wizard
+- progressive draft save
+- FSM restart
+- draft recovery
+- nation creation
+- market entry
+- invalid input
+- /cancel
+- reply/inline keyboard transition
+- real transaction persistence
+
+## Intent result
+
+All five required intent types passed:
+
+```
+INTENT|system_command|expected=system_command|actual=system_command
+INTENT|state_input|expected=state_input|actual=state_input
+INTENT|navigation_text|expected=navigation_text|actual=navigation_text
+INTENT|off_topic|expected=off_topic|actual=off_topic
+INTENT|ambiguous|expected=ambiguous|actual=ambiguous
+```
+
+## Restart result
+
+```
+RESTART|PASS|fsm_lost|draft_present
+RESTART|PASS|state_recovered_from_db
+```
+
+This confirms that a new `MemoryStorage` loses the FSM state while the DB draft remains available and can restore the wizard.
+
+## Migration result
+
+CI successfully executed:
+1. `0003 -> 0004`
+2. `0004 -> 0003`
+3. `0003 -> 0004`
+
+No migration error occurred.
+
+## Keyboard architecture result
+
+A final source scan found **no direct `reply_markup=` send/edit in the seven handler files**:
+
+- `app/handlers/start.py`
+- `app/handlers/onboarding_fix.py`
+- `app/handlers/founder.py`
+- `app/handlers/market.py`
+- `app/handlers/nation.py`
+- `app/handlers/sections.py`
+- `app/handlers/governance.py`
+
+Keyboard writes are routed through `app/services/keyboard_state.py`.
+
+The E2E test verified:
+- Reply -> Inline transition when entering market.
+- Inline -> Reply transition after cancel.
+- Inline wizard state persisted in `KeyboardState`.
+
+## Callback surface result
+
+All callback producers left in `app/keyboards/inline.py` have a live owner in the handlers/services.
+
+Removed dead producers:
+- `confirm_trade`
+- `cancel_trade`
+- `founder_panel`
+
+Removed dead handler:
+- `market_chart`
+
+Removed unused FSM state:
+- `NationStates.IDLE`
+
+Recovery callbacks (`confirm_restart`, `keep_wizard`, `resume_draft`, `discard_draft`) are owned by `app/services/intent_router.py`.
+
+Dynamic callback families are owned by:
+- `join_nation:`
+- `buy_`
+- `buyq_`
+- `cbuy_`
+- `sell_`
+- `sellq_`
+- `csell_`
+- `gov_rule:`
+- `gov_proposal:`
+- `gov_vote:`
+- `gov_history:`
+- `gov_revoke:`
+
+## Final decision status
+
+| Item | Final decision | Final status |
+|---|---|---|
+| MemoryStorage production fallback | fail-fast unless explicit dev flag | ✅ |
+| Founder FSM-only data | progressive `OnboardingDraft` | ✅ |
+| Governance wizard draft | progressive `OnboardingDraft` | ✅ |
+| Market wizard context | persistent draft | ✅ |
+| Keyboard conflict | central manager | ✅ |
+| Intent classification | central middleware | ✅ |
+| Dead legacy callbacks | removed | ✅ |
+| Placeholder sections | honest temporary message | ✅ |
+| Duplicate cancel path | central cancel path | ✅ |
+| Nation legacy state | removed | ✅ |
+
+## Protected areas
+
+GitHub compare against `main` shows no Phase 4 change in:
+- `app/services/economic_engine.py`
+- `app/services/rules/`
+- `shadow`
+- `blackswan`
+- `ruin`
+
+No Phase 4 change was made to economic formulas or the existing governance service logic.
