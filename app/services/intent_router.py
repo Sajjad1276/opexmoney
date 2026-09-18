@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
+from decimal import Decimal, InvalidOperation
 from typing import Awaitable, Callable
 
 from aiogram import BaseMiddleware
-from aiogram.filters import Command
 
 from app.states.founder import FounderStates
 from app.states.governance import GovernanceStates
@@ -37,10 +37,15 @@ async def _noop(*args, **kwargs) -> None:
 
 def _decimal_validator(text: str, _: object | None = None) -> bool:
     try:
-        value = float((text or "").replace("٬", "").replace(",", "").replace("٫", "."))
-    except (TypeError, ValueError):
+        value = Decimal(
+            (text or "")
+            .replace("٬", "")
+            .replace(",", "")
+            .replace("٫", ".")
+        )
+    except (InvalidOperation, ValueError):
         return False
-    return value > 0
+    return value > Decimal("0")
 
 
 def _governance_validator(text: str, context: object | None = None) -> bool:
