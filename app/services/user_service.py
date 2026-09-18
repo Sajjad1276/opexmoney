@@ -27,9 +27,9 @@ async def get_registration_status(
         return {"status": "new", "user": None, "missing": ["user"]}
 
     holding = await session.execute(
-        select(CurrencyHolding).where(
-            CurrencyHolding.user_id == telegram_id,
-        )
+        select(CurrencyHolding.id)
+        .where(CurrencyHolding.user_id == telegram_id)
+        .limit(1)
     )
     if holding.scalar_one_or_none() is None:
         return {"status": "partial", "user": user, "missing": ["holding"]}
