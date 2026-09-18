@@ -110,7 +110,9 @@ class KeyboardStateManager:
             )
             return sent
 
-        if previous and previous.kind == KeyboardKind.INLINE.value and kind != KeyboardKind.INLINE:
+        if previous and previous.kind == KeyboardKind.INLINE.value and (
+            kind != KeyboardKind.INLINE or previous.message_id is not None
+        ):
             await self._remove_inline(bot, previous)
 
         sent = await bot.send_message(
@@ -153,7 +155,9 @@ class KeyboardStateManager:
             except Exception:
                 pass
 
-        if previous and previous.kind == KeyboardKind.INLINE.value and kind != KeyboardKind.INLINE:
+        if previous and previous.kind == KeyboardKind.INLINE.value and (
+            kind != KeyboardKind.INLINE or previous.message_id != message.message_id
+        ):
             await self._remove_inline(message.bot, previous)
 
         edited = await message.edit_text(
@@ -191,7 +195,9 @@ class KeyboardStateManager:
                 reply_markup=ReplyKeyboardRemove(),
                 disable_notification=True,
             )
-        if previous and previous.kind == KeyboardKind.INLINE.value and kind != KeyboardKind.INLINE:
+        if previous and previous.kind == KeyboardKind.INLINE.value and (
+            kind != KeyboardKind.INLINE or previous.message_id != message_id
+        ):
             await self._remove_inline(bot, previous)
         await bot.edit_message_text(
             chat_id=chat_id,
@@ -229,7 +235,9 @@ class KeyboardStateManager:
                 reply_markup=ReplyKeyboardRemove(),
                 disable_notification=True,
             )
-        if previous and previous.kind == KeyboardKind.INLINE.value and kind != KeyboardKind.INLINE:
+        if previous and previous.kind == KeyboardKind.INLINE.value and (
+            kind != KeyboardKind.INLINE or previous.message_id != message_id
+        ):
             await self._remove_inline(bot, previous)
         await bot.edit_message_caption(
             chat_id=chat_id,
