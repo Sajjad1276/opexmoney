@@ -159,10 +159,7 @@ async def continue_registration(
     await state.set_state(OnboardingStates.SELECT_NATION)
 
     if not nations:
-        await message.answer(
-            "⚠️ ثبت‌نامت ناقصه، اما هنوز هیچ ملتی برای پیوستن وجود نداره.",
-            reply_markup=None,
-        )
+        await message.answer("⚠️ ثبت‌نامت ناقصه، اما هنوز هیچ ملتی برای پیوستن وجود نداره.")
         return
 
     await message.answer(
