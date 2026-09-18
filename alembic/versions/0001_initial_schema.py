@@ -16,8 +16,6 @@ activity_type = postgresql.ENUM("trade", "login", "mission", name="activity_type
 
 
 def upgrade() -> None:
-    bind = op.get_bind()
-    activity_type.create(bind, checkfirst=True)
     op.create_table("nations",
         sa.Column("nation_id", sa.Integer(), primary_key=True),
         sa.Column("group_id", sa.BigInteger()),
