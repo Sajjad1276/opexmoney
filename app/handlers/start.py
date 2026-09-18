@@ -6,7 +6,6 @@ from datetime import datetime
 from decimal import Decimal
 
 from aiogram import F, Router
-from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import CommandStart
 from aiogram.filters.state import StateFilter
 from aiogram.fsm.context import FSMContext
@@ -37,27 +36,6 @@ def current_date_fa() -> str:
     return to_fa(now.strftime("%Y/%m/%d"))
 
 
-
-async def _safe_edit_text(call: CallbackQuery, text: str, reply_markup=None) -> bool:
-    try:
-        if call.message is None or not hasattr(call.message, "edit_text"):
-            return False
-        await call.message.edit_text(text, reply_markup=reply_markup, parse_mode="HTML")
-        return True
-    except TelegramBadRequest as exc:
-        logger.info("Message edit failed: %s", exc)
-        return False
-
-
-async def _safe_edit_caption(call: CallbackQuery, caption: str, reply_markup=None) -> bool:
-    try:
-        if call.message is None or not hasattr(call.message, "edit_caption"):
-            return False
-        await call.message.edit_caption(caption=caption, reply_markup=reply_markup, parse_mode="HTML")
-        return True
-    except TelegramBadRequest as exc:
-        logger.info("Caption edit failed: %s", exc)
-        return False
 
 
 START_CAPTION = """🌐 <b>{bot_name}</b>
