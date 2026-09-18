@@ -4,7 +4,19 @@ from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
 
-from sqlalchemy import BigInteger, DateTime, Enum as SAEnum, ForeignKey, Index, Integer, Numeric, String, UniqueConstraint, func, text
+from sqlalchemy import (
+    BigInteger,
+    DateTime,
+    Enum as SAEnum,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    String,
+    UniqueConstraint,
+    func,
+    text,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -100,7 +112,10 @@ class UserActivity(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.user_id"), nullable=False)
     nation_id: Mapped[int] = mapped_column(ForeignKey("nations.nation_id"), nullable=False)
-    activity_type: Mapped[ActivityType] = mapped_column(SAEnum(ActivityType, name="activity_type", values_callable=lambda values: [item.value for item in values]), nullable=False)
+    activity_type: Mapped[ActivityType] = mapped_column(
+        SAEnum(ActivityType, name="activity_type", values_callable=lambda values: [item.value for item in values]),
+        nullable=False,
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
@@ -141,3 +156,104 @@ class NationRank(Base):
     nation_id: Mapped[int] = mapped_column(ForeignKey("nations.nation_id", ondelete="CASCADE"), primary_key=True)
     rank: Mapped[int] = mapped_column(Integer, nullable=False)
     calculated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class Proposal(Base):
+    __tablename__ = "proposals"
+    __table_args__ = (
+        Index("ix_proposals_status_closing", "status", "voting_closes_at"),
+        Index("ix_proposals_proposer_created", "proposer_player_id", "created_at"),
+    )
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    proposer_player_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    rule_key: Mapped[str] = mapped_column(String(100), nullable=False)
+    proposed_value: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
+    target_scope: Mapped[str] = mapped_column(String(20), nullable=False)
+    target_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="draft")
+    voting_opens_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    voting_closes_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    effective_from: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    effective_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class Vote(Base):
+    __tablename__ = "votes"
+    __table_args__ = (
+        UniqueConstraint("proposal_id", "player_id", name="uq_vote_proposal_player"),
+        Index("ix_votes_proposal", "proposal_id"),
+    )
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    proposal_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("proposals.id", ondelete="CASCADE"), nullable=False)
+    player_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    choice: Mapped[str] = mapped_column(String(10), nullable=False)
+    weight: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class RuleOverride(Base):
+    __tablename__ = "rule_overrides"
+    __table_args__ = (
+        Index("ix_rule_overrides_rule_active", "rule_key", "is_active"),
+        Index(
+            "uq_rule_override_active_target",
+            "rule_key",
+            "scope",
+            "target_id",
+            unique=True,
+            postgresql_where=text("is_active = TRUE"),
+            sqlite_where=text("is_active = 1"),
+        ),
+    )
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    rule_key: Mapped[str] = mapped_column(String(100), nullable=False)
+    value: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
+    scope: Mapped[str] = mapped_column(String(20), nullable=False)
+    target_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    source_proposal_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("proposals.id", ondelete="SET NULL"), nullable=True)
+    active_from: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    active_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    suspended_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
+
+
+class GovernanceLedger(Base):
+    __tablename__ = "governance_ledger"
+    __table_args__ = (Index("ix_governance_ledger_at", "at"),)
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    actor_player_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True)
+    action: Mapped[str] = mapped_column(String(40), nullable=False)
+    rule_key: Mapped[str] = mapped_column(String(100), nullable=False)
+    old_value: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    new_value: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+
+class PlayerTemporalProfile(Base):
+    __tablename__ = "player_temporal_profiles"
+    __table_args__ = (Index("ix_temporal_next_rotation", "next_rotation_at"),)
+    player_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="CASCADE"), primary_key=True)
+    peak_hour_start: Mapped[int] = mapped_column(Integer, nullable=False)
+    peak_window_hours: Mapped[int] = mapped_column(Integer, nullable=False, default=2)
+    peak_multiplier: Mapped[Decimal] = mapped_column(Numeric(8, 4), nullable=False, default=Decimal("1.5"))
+    assigned_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    next_rotation_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
+class BehaviorSnapshot(Base):
+    __tablename__ = "behavior_snapshots"
+    __table_args__ = (Index("ix_behavior_snapshots_at", "at"),)
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    active_players_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    buy_tx_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    sell_tx_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    export_tx_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    import_tx_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    total_volume: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False)
+    avg_net_worth: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False)
+    median_net_worth: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False)
+    gini_coefficient: Mapped[Decimal] = mapped_column(Numeric(10, 8), nullable=False)
+    top10_wealth_share: Mapped[Decimal] = mapped_column(Numeric(10, 8), nullable=False)
