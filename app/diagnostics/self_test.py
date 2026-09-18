@@ -26,7 +26,6 @@ CONTRACTS = {
         "first_trade_tutorial",
         "confirm_first_trade",
         "skip_first_trade",
-        "cancel_start",
     ],
     "market": [
         "market_main",
@@ -45,6 +44,11 @@ CONTRACTS = {
         "found_nation",
         "cancel_founder",
         "confirm_founder",
+    ],
+    "onboarding_fix": [
+        "cancel_start",
+        "SET_USERNAME_PLAYER",
+        "show_nation_selection",
     ],
     "nation": ["🌍 ملت‌ها"],
     "sections": [
@@ -150,8 +154,8 @@ async def run_startup_smoke_test(
                 "governance_ledger",
                 "player_temporal_profiles",
                 "behavior_snapshots",
-            "onboarding_drafts",
-            "keyboard_states",
+                "onboarding_drafts",
+                "keyboard_states",
             )
             if not await _table_exists(table_name)
         ]
