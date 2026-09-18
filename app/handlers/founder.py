@@ -17,6 +17,7 @@ from app.keyboards.reply import main_menu
 from app.services.nation_service import create_nation
 from app.services.user_service import get_user
 from app.states.founder import FounderStates
+from app.states.onboarding import OnboardingStates
 from app.utils.validators import validate_currency_code, validate_nation_name
 
 logger = logging.getLogger(__name__)
@@ -74,7 +75,7 @@ async def _registered_user(
 
 @founder_router.callback_query(
     F.data == "found_nation",
-    StateFilter(None),
+    StateFilter(None, OnboardingStates.SELECT_NATION),
 )
 async def start_founder(call: CallbackQuery, state: FSMContext) -> None:
     registered, user = await _registered_user(call.from_user.id)
