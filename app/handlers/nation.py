@@ -24,13 +24,15 @@ async def open_nations(message: Message) -> None:
     async with async_session() as session:
         async with session.begin():
             user = await session.get(User, message.from_user.id)
-            if not await is_fully_registered(session, message.from_user.id):
-                await message.answer(
-                    "⚠️ اول باید وارد بازی بشی.\n"
-                    "برای شروع، /start رو بزن."
-                )
-                return
+            registered = await is_fully_registered(session, message.from_user.id)
             is_founder = user is not None and user.role == "founder"
+
+    if not registered:
+        await message.answer(
+            "⚠️ اول باید وارد بازی بشی.\n"
+            "برای شروع، /start رو بزن."
+        )
+        return
 
     await message.answer(
         "🌍 <b>ملت‌ها</b>\n"
