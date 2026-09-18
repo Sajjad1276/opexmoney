@@ -72,6 +72,14 @@ def upgrade() -> None:
         ["rule_key", "is_active"],
     )
     op.create_index(
+        "uq_rule_override_active_global",
+        "rule_overrides",
+        ["rule_key"],
+        unique=True,
+        postgresql_where=sa.text("is_active = TRUE AND scope = 'global'"),
+        sqlite_where=sa.text("is_active = 1 AND scope = 'global'"),
+    )
+    op.create_index(
         "uq_rule_override_active_target",
         "rule_overrides",
         ["rule_key", "scope", "target_id"],
@@ -141,6 +149,7 @@ def downgrade() -> None:
     op.drop_table("governance_ledger")
 
     op.drop_index("uq_rule_override_active_target", table_name="rule_overrides")
+    op.drop_index("uq_rule_override_active_global", table_name="rule_overrides")
     op.drop_index("ix_rule_overrides_rule_active", table_name="rule_overrides")
     op.drop_table("rule_overrides")
 
