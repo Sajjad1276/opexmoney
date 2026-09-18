@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 from app.services.intent_router import STEP_DEFINITIONS
 
@@ -45,13 +46,13 @@ def test_all_defined_fsm_states_have_step_definitions():
     states = []
     for path in source_files:
         text = path.read_text(encoding="utf-8")
+        current_group = None
         for line in text.splitlines():
-            line = line.strip()
-            if line.startswith("class ") and "States" in line:
-                current_group = line.split("class ", 1)[1].split("(", 1)[0]
-            if line.endswith("State()") and ":" in line:
-                name = line.split(":", 1)[0].strip()
-                if current_group:
-                    states.append(f"{current_group}:{name}")
+            class_match = re.match(r"^class\s+(\w+States)\(", line)
+            if class_match:
+                current_group = class_match.group(1)
+            state_match = re.match(r"^\s*(\w+)\s*=\s*State\(\)\s*$", line)
+            if current_group and state_match:
+                states.append(f"{current_group}:{state_match.group(1)}")
     assert set(states).issubset(STEP_DEFINITIONS)
     print(f"ARCH|PASS|step_definitions={len(STEP_DEFINITIONS)}")
