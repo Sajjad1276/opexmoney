@@ -427,6 +427,7 @@ async def join_nation(call: CallbackQuery, state: FSMContext) -> None:
                 xr_balance=Decimal("0.00"),
                 role="player",
             )
+            await clear_draft(session, call.from_user.id)
             holding = CurrencyHolding(
                 user_id=user.user_id,
                 nation_id=nation.nation_id,
@@ -599,6 +600,9 @@ async def _get_holding_amount(user_id: int, nation_id: int) -> Decimal:
 @router.callback_query(F.data == "cancel_start")
 async def cancel_start(call: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
+    async with async_session() as session:
+        async with session.begin():
+            await clear_draft(session, call.from_user.id)
     text = f"{html.escape(call.from_user.first_name or 'معامله‌گر')}، ثبت‌نام لغو شد.\n\nهر وقت خواستی، /start بزن."
     if call.message and getattr(call.message, "photo", None):
         await _safe_edit_caption(call, text)
