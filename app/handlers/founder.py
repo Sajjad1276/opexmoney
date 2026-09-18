@@ -287,16 +287,16 @@ async def select_group(call: CallbackQuery, state: FSMContext) -> None:
     async with async_session() as session:
         async with session.begin():
             active = await session.scalar(
-            text(
-                """
-                SELECT 1
-                FROM nations
-                WHERE group_id = :group_id AND is_active = TRUE
-                LIMIT 1
-                """
-            ),
-            {"group_id": group_id},
-        )
+                text(
+                    """
+                    SELECT 1
+                    FROM nations
+                    WHERE group_id = :group_id AND is_active = TRUE
+                    LIMIT 1
+                    """
+                ),
+                {"group_id": group_id},
+            )
 
     if active is not None:
         await state.clear()
@@ -349,11 +349,11 @@ async def set_currency_code(message: Message, state: FSMContext) -> None:
     async with async_session() as session:
         async with session.begin():
             exists = await session.scalar(
-            text(
-                "SELECT 1 FROM nations WHERE currency_code = :code LIMIT 1"
-            ),
-            {"code": code},
-        )
+                text(
+                    "SELECT 1 FROM nations WHERE currency_code = :code LIMIT 1"
+                ),
+                {"code": code},
+            )
 
     if exists is not None:
         await message.answer(
