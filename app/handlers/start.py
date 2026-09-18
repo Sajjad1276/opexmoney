@@ -154,7 +154,8 @@ async def continue_registration(
         return
 
     async with async_session() as session:
-        nations = await get_active_nations(session, limit=3)
+        async with session.begin():
+            nations = await get_active_nations(session, limit=3)
 
     await state.set_state(OnboardingStates.SELECT_NATION)
 
