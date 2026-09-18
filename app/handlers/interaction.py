@@ -51,9 +51,13 @@ async def system_start(message: Message, state: FSMContext) -> None:
         await start(message, state)
         return
 
-    await message.answer(
-        "⚠️ هنوز داخل یک مرحله هستی. اگر /start را اجرا کنی، مرحله فعلی متوقف می‌شود.",
-        reply_markup=restart_confirmation_keyboard(),
+    await keyboard_manager.send_message(
+        message.bot,
+        chat_id=message.chat.id,
+        text="⚠️ هنوز داخل یک مرحله هستی. اگر /start را اجرا کنی، مرحله فعلی متوقف می‌شود.",
+        kind=KeyboardKind.INLINE,
+        name="restart_confirmation",
+        markup=restart_confirmation_keyboard(),
         parse_mode="HTML",
     )
 
