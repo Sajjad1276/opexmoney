@@ -62,23 +62,18 @@ async def _safe_edit_caption(call: CallbackQuery, caption: str, reply_markup=Non
 
 
 START_CAPTION = """🌐 <b>{bot_name}</b>
-─────────────────
 سلام {user_name}.
 
 بازارهای OPEX هر روز
 میلیاردها واحد ارز جابه‌جا می‌کنن.
-
 تو کجا می‌ایستی؟"""
 
 USERNAME_CAPTION = """💹 <b>اسم معامله‌گرت رو انتخاب کن</b>
-─────────────────
-{user_mention}، این اسم روی تابلوی
-معاملات OPEX نمایش داده میشه.
+{user_mention}، این اسم روی تابلوی معاملات OPEX نمایش داده میشه.
 
 بنویس:
 · ۳ تا ۱۵ حرف انگلیسی
-· فقط حروف A-Z
-· بدون فاصله، عدد و @"""
+· فقط حروف A-Z، بدون فاصله، عدد و @"""
 
 DUPLICATE_NAME = """🔴 «{user_input}» قبلاً ثبت شده.
 
