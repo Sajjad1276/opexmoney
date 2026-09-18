@@ -16,7 +16,7 @@ from app.database.session import async_session
 from app.keyboards.inline import confirm_found_nation_keyboard
 from app.keyboards.reply import main_menu_keyboard
 from app.services.nation_service import create_nation
-from app.services.user_service import get_user, is_fully_registered
+from app.services.user_service import get_user
 from app.states.founder import FounderStates
 from app.states.onboarding import OnboardingStates
 from app.utils.validators import validate_currency_code, validate_nation_name
@@ -44,11 +44,13 @@ def _group_id_is_valid(value: str) -> bool:
 async def start_founder(call: CallbackQuery, state: FSMContext) -> None:
     async with async_session() as session:
         async with session.begin():
-            if not await is_fully_registered(session, call.from_user.id):
+            user = await get_user(session, call.from_user.id)
+            # تأسیس ملت قبل از پیوستن به یک ملت دیگر مجاز است.
+            # در این مرحله وجود نام معامله‌گر برای ورود به بازی کافی است.
+            if user is None or not (user.username or "").strip():
                 await call.answer("⚠️ اول باید وارد بازی بشی.", show_alert=True)
                 return
-            user = await get_user(session, call.from_user.id)
-            if user is not None and user.role == "founder":
+            if user.role == "founder":
                 await call.answer("⚠️ تو قبلاً یه ملت داری.", show_alert=True)
                 return
 
