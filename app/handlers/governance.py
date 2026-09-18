@@ -100,8 +100,7 @@ async def governance_active(call: CallbackQuery):
 
     lines = ["📜 <b>قوانین فعال</b>", "━━━━━━━━━━━━━━━━━━━━"]
     if not overrides:
-        lines.append("فعلاً قانون ویژه‌ای فعال نیست.
-مقدار پایه رجیستری اجرا میشه.")
+        lines.append("فعلاً قانون ویژه‌ای فعال نیست.\nمقدار پایه رجیستری اجرا میشه.")
     for override in overrides[:12]:
         rule = get_rule(override.rule_key)
         scope_text = {
