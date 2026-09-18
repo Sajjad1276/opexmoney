@@ -171,4 +171,4 @@ async def cleanup_test_rows():
         async with session.begin():
             await session.execute(delete(CurrencyHolding).where(CurrencyHolding.user_id >= 910001, CurrencyHolding.user_id <= 910006))
             await session.execute(delete(User).where(User.user_id >= 910001, User.user_id <= 910006))
-            await session.execute(delete(Nation).where(Nation.group_id >= -100910008, Nation.group_id <= -100910001))
+            await session.execute(delete(Nation).where(Nation.group_id >= -100910010, Nation.group_id <= -100910001))
