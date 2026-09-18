@@ -42,13 +42,6 @@ def market_keyboard() -> InlineKeyboardMarkup:
     ])
 
 
-def confirm_trade_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="✅ تأیید", callback_data="confirm_trade", style=ButtonStyle.SUCCESS),
-        InlineKeyboardButton(text="❌ انصراف", callback_data="cancel_trade", style=ButtonStyle.DANGER),
-    ]])
-
-
 def nation_panel_keyboard(is_founder: bool = False) -> InlineKeyboardMarkup:
     buttons = [
         [InlineKeyboardButton(text="🌍 ملت‌های من", callback_data="my_nations")],
@@ -56,10 +49,6 @@ def nation_panel_keyboard(is_founder: bool = False) -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="🏛 تأسیس ملت", callback_data="found_nation")],
         [InlineKeyboardButton(text="📜 قانون اساسی", callback_data="governance_main")],
     ]
-    if is_founder:
-        buttons.insert(0, [
-            InlineKeyboardButton(text="👑 پنل مدیریت", callback_data="founder_panel")
-        ])
     buttons.append([
         InlineKeyboardButton(text="↩️ بازگشت", callback_data="back_to_dashboard")
     ])
@@ -249,3 +238,42 @@ def governance_revoke_keyboard(overrides) -> InlineKeyboardMarkup:
     ]
     rows.append([InlineKeyboardButton(text="↩️ قوانین", callback_data="governance_main")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+
+def restart_confirmation_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="✅ بله، از اول", callback_data="confirm_restart", style=ButtonStyle.DANGER),
+        InlineKeyboardButton(text="❌ نه، ادامه می‌دم", callback_data="keep_wizard"),
+    ]])
+
+
+def resume_draft_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="▶️ ادامه از همین‌جا", callback_data="resume_draft", style=ButtonStyle.SUCCESS),
+        InlineKeyboardButton(text="🗑 شروع تازه", callback_data="discard_draft", style=ButtonStyle.DANGER),
+    ]])
+
+
+def governance_cancel_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="❌ انصراف", callback_data="gov_cancel", style=ButtonStyle.DANGER),
+    ]])
+
+
+def nation_explore_keyboard(nations) -> InlineKeyboardMarkup:
+    rows = [
+        [InlineKeyboardButton(
+            text=f"🏴 {nation.name} · {nation.currency_code} · {nation.member_count} نفر",
+            callback_data=f"join_nation:{nation.nation_id}",
+        )]
+        for nation in nations
+    ]
+    rows.append([InlineKeyboardButton(text="↩️ بازگشت", callback_data="back_to_dashboard")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def empty_nation_explore_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="🏛 تأسیس اولین ملت", callback_data="found_nation")
+    ]])

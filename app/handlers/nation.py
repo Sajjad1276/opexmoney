@@ -1,25 +1,19 @@
 from __future__ import annotations
 
 from aiogram import F, Router
-from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
+from aiogram.types import CallbackQuery, Message
 from sqlalchemy import select
 
 from app.database.models import Nation, User
 from app.database.session import async_session
 from app.handlers.start import show_dashboard
-from app.keyboards.inline import nation_panel_keyboard
+from app.keyboards.inline import nation_explore_keyboard, nation_panel_keyboard, empty_nation_explore_keyboard
+from app.services.keyboard_state import keyboard_manager
 from app.services.user_service import is_fully_registered
 
 nation_router = Router(name="nation")
 
 
-def _soon_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="↩️ بازگشت", callback_data="back_to_dashboard")]
-    ])
-
-
-@nation_router.message(F.text == "🌍 ملت‌ها")
 async def open_nations(message: Message) -> None:
     async with async_session() as session:
         async with session.begin():
@@ -34,14 +28,23 @@ async def open_nations(message: Message) -> None:
         )
         return
 
-    await message.answer(
+    await keyboard_manager.send(
+        message,
         "🌍 <b>ملت‌ها</b>\n"
         "اینجا می‌تونی ملت‌ها رو بررسی کنی.\n"
         "از گزینه‌ها برای ادامه استفاده کن.",
-        reply_markup=nation_panel_keyboard(is_founder),
+        kind="inline:nation-panel",
+        markup=nation_panel_keyboard(is_founder),
         parse_mode="HTML",
     )
 
+
+
+
+
+@nation_router.message(F.text == "🌍 ملت‌ها")
+async def nation_button(message: Message) -> None:
+    await open_nations(message)
 
 @nation_router.callback_query(F.data == "back_to_dashboard")
 async def back_to_dashboard(call: CallbackQuery) -> None:
@@ -78,13 +81,16 @@ async def my_nations(call: CallbackQuery) -> None:
             "🌍 <b>ملت‌های من</b>\n"
             f"🏛 {nation.name} · {nation.currency_code}\n"
             f"👥 {nation.member_count} نفر\n"
-            "برای جزئیات بیشتر، این بخش در حال توسعه است."
+            f"💱 نرخ فعلی: {nation.exchange_rate} ΩXR"
         )
-    await call.message.edit_text(
-        text,
-        reply_markup=_soon_keyboard(),
-        parse_mode="HTML",
-    ) if call.message else None
+    if call.message:
+        await keyboard_manager.edit_inline(
+            call.message,
+            text,
+            kind="inline:nation-panel",
+            markup=nation_panel_keyboard(True),
+            parse_mode="HTML",
+        )
     await call.answer()
 
 
@@ -105,46 +111,27 @@ async def explore_nations(call: CallbackQuery) -> None:
             ).scalars().all()
 
     if not nations:
-        await call.message.edit_text(
-            "🌍 <b>هنوز ملتی وجود نداره.</b>\n"
-            "تو می‌تونی اولین ملت رو تأسیس کنی.",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="🏛 تأسیس اولین ملت", callback_data="found_nation")]
-            ]),
-            parse_mode="HTML",
-        ) if call.message else None
+        if call.message:
+            await keyboard_manager.edit_inline(
+                call.message,
+                "🌍 <b>هنوز ملتی وجود نداره.</b>\n"
+                "تو می‌تونی اولین ملت رو تأسیس کنی.",
+                kind="inline:nation-explore",
+                markup=empty_nation_explore_keyboard(),
+                parse_mode="HTML",
+            )
         await call.answer()
         return
 
-    rows = [
-        [InlineKeyboardButton(
-            text=f"🏴 {nation.name} · {nation.currency_code} · {nation.member_count} نفر",
-            callback_data=f"join_nation:{nation.nation_id}",
-        )]
-        for nation in nations
-    ]
-    rows.append([InlineKeyboardButton(text="↩️ بازگشت", callback_data="back_to_dashboard")])
     if call.message:
-        await call.message.edit_text(
+        await keyboard_manager.edit_inline(
+            call.message,
             "🔍 <b>کاوش ملت‌ها</b>\n"
             "ملت فعال موردنظرت رو انتخاب کن.",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=rows),
+            kind="inline:nation-explore",
+            markup=nation_explore_keyboard(nations),
             parse_mode="HTML",
         )
     await call.answer()
 
 
-@nation_router.callback_query(F.data.in_({"founder_panel", "create_nation"}))
-async def unavailable_nation_panel(call: CallbackQuery) -> None:
-    await call.answer(
-        "ℹ️ این بخش هنوز فعال نشده.",
-        show_alert=True,
-    )
-
-
-@nation_router.callback_query(F.data.in_({"confirm_trade", "cancel_trade"}))
-async def unavailable_trade_confirmation(call: CallbackQuery) -> None:
-    await call.answer(
-        "ℹ️ این تأیید در نسخه فعلی استفاده نمی‌شود.",
-        show_alert=True,
-    )

@@ -24,6 +24,7 @@ jobs:
           --health-retries 10
     env:
       BOT_TOKEN: test-token
+      ALLOW_MEMORY_FSM_DEV: "true"
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/opex_test
     steps:
       - uses: actions/checkout@v4
@@ -41,4 +42,4 @@ jobs:
           alembic downgrade 0002_founder_constraints
           alembic upgrade head
       - name: Run tests
-        run: pytest -q
+        run: pytest -q -s

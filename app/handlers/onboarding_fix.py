@@ -3,9 +3,7 @@ from __future__ import annotations
 import html
 
 from aiogram import F, Router
-from aiogram.filters import CommandStart
 from aiogram.filters.state import StateFilter
-from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy import select
@@ -13,8 +11,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import Nation, User
 from app.database.session import async_session
-from app.handlers.start import _safe_edit_caption, _safe_edit_text, start as restart_flow, user_mention
+from app.handlers.start import start as restart_flow, user_mention
 from app.keyboards.inline import cancel_keyboard, nation_selection_keyboard
+from app.services.draft_service import clear_draft, save_draft
+from app.services.keyboard_state import keyboard_manager
+from app.services.intent_router import cancel_current_flow
 from app.services.nation_service import get_active_nations
 from app.services.temporal_service import ensure_temporal_profile
 from app.services.user_service import get_user, is_fully_registered, username_exists
@@ -54,10 +55,6 @@ BLOCKED_NAME = rtl_text("""🔴 <b>این نام قابل قبول نیست.</b>
 این نام شامل عبارت نامناسب یا مستهجن است.
 یک نام صحیح و مناسب برای معامله‌گر انتخاب کن.""")
 
-CANCEL_TEXT = rtl_text("""<b>{user_name}، ثبت‌نام لغو شد.</b>
-
-هر وقت خواستی، /start بزن.""")
-
 NAME_ACCEPTED_TEXT = rtl_text("""🎉 <b>تبریک! «{username}» با موفقیت ثبت شد.</b>
 
 اسم معامله‌گری تو آماده است و از این به بعد در OPEX با همین نام شناخته میشی.""")
@@ -85,11 +82,13 @@ async def show_nation_selection(
     await state.set_state(OnboardingStates.SELECT_NATION)
 
     if not nations:
-        await message.answer(
+        await keyboard_manager.send(
+            message,
             "🌍 هنوز هیچ ملتی تأسیس نشده!\n"
             "تو می‌تونی اولین بنیان‌گذار باشی.\n"
             "اولین ملت رو از همین‌جا بساز.",
-            reply_markup=nation_selection_keyboard([]),
+            kind="inline:nation-selection",
+            markup=nation_selection_keyboard([]),
         )
         return
 
@@ -99,9 +98,11 @@ async def show_nation_selection(
         for nation in nations[:4]
     )
     lines.append("ملت جدید هم می‌تونی تأسیس کنی.")
-    await message.answer(
+    await keyboard_manager.send(
+        message,
         "\n".join(lines),
-        reply_markup=nation_selection_keyboard(nations[:4]),
+        kind="inline:nation-selection",
+        markup=nation_selection_keyboard(nations[:4]),
         parse_mode="HTML",
     )
 
@@ -132,41 +133,6 @@ def clean_nation_list_text(user, trader_name: str, nations) -> str:
         "نرخ‌ها هر ۱۵ دقیقه آپدیت میشن.",
     ])
     return rtl_text("\n".join(lines))
-
-
-async def _edit_onboarding_prompt(message: Message, state: FSMContext, text: str, reply_markup=None) -> bool:
-    """Edit the original trader-name prompt when it is still available."""
-    data = await state.get_data()
-    prompt_message_id = data.get("onboarding_prompt_message_id")
-    prompt_chat_id = data.get("onboarding_prompt_chat_id")
-    if not prompt_message_id or not prompt_chat_id:
-        return False
-
-    try:
-        if data.get("onboarding_prompt_has_photo"):
-            await message.bot.edit_message_caption(
-                chat_id=prompt_chat_id,
-                message_id=prompt_message_id,
-                caption=text,
-                reply_markup=reply_markup,
-                parse_mode="HTML",
-            )
-        else:
-            await message.bot.edit_message_text(
-                chat_id=prompt_chat_id,
-                message_id=prompt_message_id,
-                text=text,
-                reply_markup=reply_markup,
-                parse_mode="HTML",
-            )
-        return True
-    except TelegramBadRequest:
-        return False
-
-
-@router.message(OnboardingStates.SET_USERNAME_PLAYER, CommandStart())
-async def restart_onboarding_with_command(message: Message, state: FSMContext) -> None:
-    await restart_flow(message, state)
 
 
 @router.message(
@@ -244,9 +210,23 @@ async def accept_valid_name(message: Message, state: FSMContext) -> None:
 
     await state.update_data(username=username)
 
+    async with async_session() as session:
+        async with session.begin():
+            await save_draft(
+                message.from_user.id,
+                "onboarding.select_nation",
+                {"username": username},
+                session=session,
+            )
+
     confirmation = NAME_ACCEPTED_TEXT.format(username=html.escape(username))
-    if not await _edit_onboarding_prompt(message, state, confirmation):
-        await message.answer(confirmation, parse_mode="HTML")
+    await keyboard_manager.send(
+        message,
+        confirmation,
+        kind="none",
+        markup=None,
+        parse_mode="HTML",
+    )
 
     async with async_session() as session:
         await show_nation_selection(message, session, state)
@@ -254,14 +234,6 @@ async def accept_valid_name(message: Message, state: FSMContext) -> None:
 
 @router.callback_query(F.data == "cancel_start", StateFilter(OnboardingStates.SET_USERNAME_PLAYER))
 async def cancel_start_fix(call: CallbackQuery, state: FSMContext) -> None:
-    await state.clear()
-    user_name = html.escape(call.from_user.first_name or "معامله‌گر")
-    text = CANCEL_TEXT.format(user_name=user_name)
-    try:
-        if call.message and getattr(call.message, "photo", None):
-            await _safe_edit_caption(call, text)
-        else:
-            await _safe_edit_text(call, text)
-        await call.answer()
-    except TelegramBadRequest:
-        await call.answer("ثبت‌نام لغو شد.", show_alert=False)
+    if call.message:
+        await cancel_current_flow(call.message, state)
+    await call.answer("ثبت‌نام لغو شد.")

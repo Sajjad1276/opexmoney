@@ -22,6 +22,9 @@ from app.keyboards.inline import (
     governance_rule_keyboard,
     governance_vote_keyboard,
 )
+from app.services.draft_service import clear_draft, save_draft
+from app.services.keyboard_state import keyboard_manager
+from app.services.intent_router import cancel_current_flow
 from app.services.governance_service import (
     cast_vote,
     create_proposal,
@@ -80,10 +83,22 @@ async def _send_governance_home(call: CallbackQuery | None, message: Message | N
     markup = governance_main_keyboard(user.role == "founder")
     if call:
         if call.message:
-            await call.message.edit_text(text, reply_markup=markup, parse_mode="HTML")
+            await keyboard_manager.edit_inline(
+                call.message,
+                text,
+                kind="inline:governance",
+                markup=markup,
+                parse_mode="HTML",
+            )
         await call.answer()
     else:
-        await message.answer(text, reply_markup=markup, parse_mode="HTML")
+        await keyboard_manager.send(
+            message,
+            text,
+            kind="inline:governance",
+            markup=markup,
+            parse_mode="HTML",
+        )
 
 
 @governance_router.callback_query(F.data == "governance_main")
@@ -117,9 +132,11 @@ async def governance_active(call: CallbackQuery):
     if len(overrides) > 12:
         lines.append(f"\n... و {to_fa(len(overrides) - 12)} قانون دیگر")
 
-    await call.message.edit_text(
+    await keyboard_manager.edit_inline(
+        call.message,
         "\n".join(lines),
-        reply_markup=governance_main_keyboard(user.role == "founder"),
+        kind="inline:governance",
+        markup=governance_main_keyboard(user.role == "founder"),
         parse_mode="HTML",
     )
     await call.answer()
@@ -140,12 +157,15 @@ async def governance_new(call: CallbackQuery, state: FSMContext):
         return
 
     await state.clear()
-    await call.message.edit_text(
+    await clear_draft(call.from_user.id)
+    await keyboard_manager.edit_inline(
+        call.message,
         "📝 <b>ثبت طرح جدید</b>\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
         "یک قانون از فهرست مجاز انتخاب کن.\n"
         "هیچ قانون خارج از این فهرست قابل ثبت نیست.",
-        reply_markup=governance_rule_keyboard(
+        kind="inline:governance",
+        markup=governance_rule_keyboard(
             [(key, definition.title_fa) for key, definition in RULE_REGISTRY.items()]
         ),
         parse_mode="HTML",
@@ -176,6 +196,11 @@ async def governance_select_rule(call: CallbackQuery, state: FSMContext):
 
     await state.set_state(GovernanceStates.WAITING_VALUE)
     await state.update_data(rule_key=key)
+    await save_draft(
+        call.from_user.id,
+        "governance.waiting_value",
+        {"rule_key": key},
+    )
 
     range_text = (
         f"بین {html.escape(_format_value(rule, rule.min_value))} "
@@ -183,12 +208,15 @@ async def governance_select_rule(call: CallbackQuery, state: FSMContext):
     )
     scope_text = "برای ملت خودت" if rule.target_scope == "nation" else "در سطح جهانی"
 
-    await call.message.edit_text(
+    await keyboard_manager.edit_inline(
+        call.message,
         f"⚙️ <b>{html.escape(rule.title_fa)}</b>\n"
         f"مقدار فعلی: <b>{html.escape(_format_value(rule, current))}</b>\n"
         f"بازه امن: <b>{range_text}</b>\n"
         f"دامنه: {scope_text}\n\n"
         "مقدار پیشنهادی رو به عدد بفرست.",
+        kind="inline:governance-value",
+        markup=governance_cancel_keyboard(),
         parse_mode="HTML",
     )
     await call.answer()
@@ -228,23 +256,31 @@ async def governance_receive_value(message: Message, state: FSMContext):
                 player_id=user.user_id,
             )
 
-    await state.update_data(
-        rule_key=key,
-        proposed_value=str(parsed),
-        target_scope=rule.target_scope,
-        target_id=target_id,
-        current_value=str(current),
-    )
+    draft_data = {
+        "rule_key": key,
+        "proposed_value": str(parsed),
+        "target_scope": rule.target_scope,
+        "target_id": target_id,
+        "current_value": str(current),
+    }
+    await state.update_data(**draft_data)
     await state.set_state(GovernanceStates.CONFIRM_PROPOSAL)
+    await save_draft(
+        message.from_user.id,
+        "governance.confirm_proposal",
+        draft_data,
+    )
 
-    await message.answer(
+    await keyboard_manager.send(
+        message,
         "📋 <b>پیش‌نمایش طرح</b>\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
         f"قانون: <b>{html.escape(rule.title_fa)}</b>\n"
         f"مقدار فعلی: <b>{html.escape(_format_value(rule, current))}</b>\n"
         f"مقدار پیشنهادی: <b>{html.escape(_format_value(rule, parsed))}</b>\n\n"
         "بعد از ثبت، طرح وارد صف رأی‌گیری میشه.",
-        reply_markup=governance_confirm_keyboard(),
+        kind="inline:governance-confirm",
+        markup=governance_confirm_keyboard(),
         parse_mode="HTML",
     )
 
@@ -276,14 +312,17 @@ async def governance_confirm(call: CallbackQuery, state: FSMContext):
                 await call.answer(str(exc), show_alert=True)
                 return
 
+    await clear_draft(call.from_user.id)
     await state.clear()
-    await call.message.edit_text(
+    await keyboard_manager.edit_inline(
+        call.message,
         "✅ <b>طرح ثبت شد.</b>\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
         f"شماره طرح: <b>#{proposal.id}</b>\n"
         "⏱ رأی‌گیری طبق چرخه اقتصادی باز میشه.\n"
         "برای دیدن وضعیت طرح‌ها برو به «رأی‌گیری‌های جاری».",
-        reply_markup=governance_main_keyboard(False),
+        kind="inline:governance",
+        markup=governance_main_keyboard(False),
         parse_mode="HTML",
     )
     await call.answer("✅ طرح ثبت شد")
@@ -291,9 +330,9 @@ async def governance_confirm(call: CallbackQuery, state: FSMContext):
 
 @governance_router.callback_query(F.data == "gov_cancel")
 async def governance_cancel(call: CallbackQuery, state: FSMContext):
-    await state.clear()
+    if call.message:
+        await cancel_current_flow(call.message, state)
     await call.answer("لغو شد")
-    await _send_governance_home(call)
 
 
 @governance_router.callback_query(F.data == "gov_voting")
@@ -320,7 +359,13 @@ async def governance_voting(call: CallbackQuery):
         )
         markup = governance_proposal_list_keyboard(proposals)
 
-    await call.message.edit_text(text, reply_markup=markup, parse_mode="HTML")
+    await keyboard_manager.edit_inline(
+        call.message,
+        text,
+        kind="inline:governance",
+        markup=markup,
+        parse_mode="HTML",
+    )
     await call.answer()
 
 
@@ -363,7 +408,13 @@ async def governance_proposal(call: CallbackQuery):
         f"❌ مخالف: <b>{to_fa(weights['against'])}</b>\n"
         f"⚪ ممتنع: <b>{to_fa(weights['abstain'])}</b>"
     )
-    await call.message.edit_text(text, reply_markup=markup, parse_mode="HTML")
+    await keyboard_manager.edit_inline(
+        call.message,
+        text,
+        kind="inline:governance",
+        markup=markup,
+        parse_mode="HTML",
+    )
     await call.answer()
 
 
@@ -419,9 +470,11 @@ async def governance_history(call: CallbackQuery):
             f"{html.escape(ledger.new_value or '—')}"
         )
 
-    await call.message.edit_text(
+    await keyboard_manager.edit_inline(
+        call.message,
         "\n".join(lines),
-        reply_markup=governance_history_keyboard(
+        kind="inline:governance",
+        markup=governance_history_keyboard(
             offset,
             has_next=len(rows) == 9,
         ),
@@ -447,11 +500,13 @@ async def governance_revoke_list(call: CallbackQuery):
         await call.answer("قانون فعالی برای لغو نیست.", show_alert=True)
         return
 
-    await call.message.edit_text(
+    await keyboard_manager.edit_inline(
+        call.message,
         "👑 <b>لغو فوری قانون</b>\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
         "لغو فوری، قانون مربوطه رو از همین لحظه غیرفعال می‌کنه.",
-        reply_markup=governance_revoke_keyboard(overrides[:10]),
+        kind="inline:governance",
+        markup=governance_revoke_keyboard(overrides[:10]),
         parse_mode="HTML",
     )
     await call.answer()

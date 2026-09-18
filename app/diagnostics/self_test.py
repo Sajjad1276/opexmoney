@@ -8,9 +8,12 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy import inspect, text
 
 from app.database.models import Base
+from config import settings
 from app.database.session import async_session, engine
 from app.services.rules.registry import RULE_REGISTRY, validate_registry
 from app.services.rules.resolver import resolve
+from app.services.intent_router import IntentType, classify_intent, STEP_REGISTRY
+from app.services.keyboard_state import KeyboardStateManager
 
 logger = logging.getLogger("opexmoney.selftest")
 
@@ -23,15 +26,13 @@ CONTRACTS = {
         "first_trade_tutorial",
         "confirm_first_trade",
         "skip_first_trade",
-        "cancel_start",
     ],
     "market": [
         "market_main",
         "market_refresh",
         "market_buy",
         "market_sell",
-        "market_chart",
-        "market_history",
+                "market_history",
         "buy_",
         "buyq_",
         "cbuy_",
@@ -43,6 +44,11 @@ CONTRACTS = {
         "found_nation",
         "cancel_founder",
         "confirm_founder",
+    ],
+    "onboarding_fix": [
+        "cancel_start",
+        "SET_USERNAME_PLAYER",
+        "show_nation_selection",
     ],
     "nation": ["🌍 ملت‌ها"],
     "sections": [
@@ -111,6 +117,33 @@ async def run_startup_smoke_test(
         logger.exception("SELFTEST|FAIL|database+resolver")
         ok = False
 
+    if not settings.redis_url and not settings.allow_memory_fsm_dev:
+        logger.error(
+            "SELFTEST|FAIL|fsm-storage|REDIS_URL is required outside explicit dev mode"
+        )
+        ok = False
+    else:
+        logger.info(
+            "SELFTEST|PASS|fsm-storage|redis=%s|memory_dev=%s",
+            bool(settings.redis_url),
+            settings.allow_memory_fsm_dev,
+        )
+
+    logger.info(
+        "SELFTEST|PASS|keyboard-manager|class=%s",
+        KeyboardStateManager.__name__,
+    )
+
+    class _IntentMessage:
+        text = "/cancel"
+
+    intent = await classify_intent(_IntentMessage(), None, STEP_REGISTRY)
+    if intent is not IntentType.SYSTEM_COMMAND:
+        logger.error("SELFTEST|FAIL|intent-router|cancel=%s", intent)
+        ok = False
+    else:
+        logger.info("SELFTEST|PASS|intent-router|cancel=%s", intent.value)
+
     try:
         missing_tables = [
             table_name
@@ -121,6 +154,8 @@ async def run_startup_smoke_test(
                 "governance_ledger",
                 "player_temporal_profiles",
                 "behavior_snapshots",
+                "onboarding_drafts",
+                "keyboard_states",
             )
             if not await _table_exists(table_name)
         ]
@@ -194,6 +229,8 @@ async def run_startup_smoke_test(
         "governance_ledger",
         "player_temporal_profiles",
         "behavior_snapshots",
+        "onboarding_drafts",
+        "keyboard_states",
     }
     missing_metadata = expected_model_tables.difference(Base.metadata.tables)
     if missing_metadata:
