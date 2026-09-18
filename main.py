@@ -18,6 +18,7 @@ from app.database.session import async_session, engine
 from app.diagnostics.flow_trace import FlowTraceMiddleware
 from app.diagnostics.self_test import run_startup_smoke_test
 from app.handlers.founder import founder_router
+from app.services.intent_router import IntentRoutingMiddleware, interaction_router
 from app.handlers.governance import governance_router
 from app.handlers.market import router as market_router
 from app.handlers.nation import nation_router
@@ -44,8 +45,10 @@ def build_storage():
     if settings.redis_url:
         logger.info("Using Redis FSM storage")
         return RedisStorage.from_url(settings.redis_url)
-    logger.warning("REDIS_URL is not configured; using in-memory FSM storage")
-    return MemoryStorage()
+    if settings.allow_memory_fsm_dev:
+        logger.warning("REDIS_URL is not configured; using in-memory FSM storage in explicit dev mode")
+        return MemoryStorage()
+    raise RuntimeError("REDIS_URL is required in production. Set ALLOW_MEMORY_FSM_DEV=true only for explicit local development.")
 
 
 async def run_rate_job() -> None:
@@ -170,6 +173,7 @@ async def main() -> None:
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
     dp = Dispatcher(storage=build_storage())
+    dp.message.middleware(IntentRoutingMiddleware())
     flow_trace = FlowTraceMiddleware()
     dp.message.middleware(flow_trace)
     dp.callback_query.middleware(flow_trace)
@@ -198,6 +202,7 @@ async def main() -> None:
             logger.exception("Failed to send user-facing error message")
         return True
 
+    dp.include_router(interaction_router)
     dp.include_router(onboarding_fix_router)
     dp.include_router(start_router)
     dp.include_router(market_router)
