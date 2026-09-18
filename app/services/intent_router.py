@@ -6,7 +6,6 @@ from enum import Enum
 from typing import Any, Awaitable, Callable
 
 from aiogram import BaseMiddleware, F, Router
-from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
@@ -18,7 +17,6 @@ from app.states.founder import FounderStates
 from app.states.governance import GovernanceStates
 from app.states.market import MarketStates
 from app.states.onboarding import OnboardingStates
-from app.utils.name_filter import is_valid_trader_name
 from app.utils.validators import validate_nation_name
 
 
@@ -46,19 +44,23 @@ async def _noop(*args: Any, **kwargs: Any) -> None:
     return None
 
 
-def _decimal_input(value: str) -> bool:
-    try:
-        number = Decimal(value.strip().replace(",", "").replace("٬", "").replace("٫", "."))
-    except (InvalidOperation, ValueError):
+def _looks_like_form_input(value: str) -> bool:
+    value = (value or "").strip()
+    if not value:
         return False
-    return number.is_finite()
+    lowered = value.casefold()
+    return not any(marker in lowered for marker in QUESTION_MARKERS)
+
+
+def _looks_like_numeric_step(value: str) -> bool:
+    return _looks_like_form_input(value)
 
 
 STEP_REGISTRY: dict[str, StepDefinition] = {
     OnboardingStates.SET_USERNAME_PLAYER.state: StepDefinition(
         OnboardingStates.SET_USERNAME_PLAYER,
         "اسم معامله‌گرت را بفرست.",
-        is_valid_trader_name,
+        _looks_like_form_input,
         _noop,
     ),
     OnboardingStates.SELECT_NATION.state: StepDefinition(
@@ -76,7 +78,7 @@ STEP_REGISTRY: dict[str, StepDefinition] = {
     FounderStates.SET_NATION_NAME.state: StepDefinition(
         FounderStates.SET_NATION_NAME,
         "نام انگلیسی ملت را بفرست.",
-        lambda value: validate_nation_name(value)[0],
+        _looks_like_form_input,
         _noop,
     ),
     FounderStates.CONFIRM.state: StepDefinition(
@@ -88,7 +90,7 @@ STEP_REGISTRY: dict[str, StepDefinition] = {
     MarketStates.WAITING_BUY_AMOUNT.state: StepDefinition(
         MarketStates.WAITING_BUY_AMOUNT,
         "مقدار ΩXR برای خرید را به عدد بفرست.",
-        _decimal_input,
+        _looks_like_numeric_step,
         _noop,
     ),
     MarketStates.WAITING_SELL_AMOUNT.state: StepDefinition(
@@ -253,7 +255,12 @@ async def _resume_prompt(message: Message, state: FSMContext, draft: Any) -> Non
 
     if step == "founder.set_nation_name":
         from app.handlers.founder import founder_cancel_keyboard
-        await message.answer("🏛 مرحله بعد: نام انگلیسی ملتت را بفرست.", reply_markup=founder_cancel_keyboard())
+        await keyboard_manager.send(
+            message,
+            "🏛 مرحله بعد: نام انگلیسی ملتت را بفرست.",
+            kind="inline:founder",
+            markup=founder_cancel_keyboard(),
+        )
         return
 
     if step == "founder.confirm":
@@ -266,22 +273,42 @@ async def _resume_prompt(message: Message, state: FSMContext, draft: Any) -> Non
 
     if step == "market.waiting_buy_amount":
         from app.keyboards.inline import buy_amount_keyboard
-        await message.answer("📈 مقدار ΩXR برای خرید را وارد کن.", reply_markup=buy_amount_keyboard(int(payload['nation_id'])))
+        await keyboard_manager.send(
+            message,
+            "📈 مقدار ΩXR برای خرید را وارد کن.",
+            kind="inline:market-buy",
+            markup=buy_amount_keyboard(int(payload["nation_id"])),
+        )
         return
 
     if step == "market.waiting_sell_amount":
         from app.keyboards.inline import sell_amount_keyboard
-        await message.answer("📉 مقدار ارز برای فروش را وارد کن.", reply_markup=sell_amount_keyboard(str(payload['currency_code'])))
+        await keyboard_manager.send(
+            message,
+            "📉 مقدار ارز برای فروش را وارد کن.",
+            kind="inline:market-sell",
+            markup=sell_amount_keyboard(str(payload["currency_code"])),
+        )
         return
 
     if step == "governance.waiting_value":
         from app.keyboards.inline import governance_cancel_keyboard
-        await message.answer("📜 مقدار پیشنهادی قانون را وارد کن.", reply_markup=governance_cancel_keyboard())
+        await keyboard_manager.send(
+            message,
+            "📜 مقدار پیشنهادی قانون را وارد کن.",
+            kind="inline:governance-value",
+            markup=governance_cancel_keyboard(),
+        )
         return
 
     if step == "governance.confirm_proposal":
         from app.keyboards.inline import governance_confirm_keyboard
-        await message.answer("📋 طرح ذخیره‌شده آماده تأیید است.", reply_markup=governance_confirm_keyboard())
+        await keyboard_manager.send(
+            message,
+            "📋 طرح ذخیره‌شده آماده تأیید است.",
+            kind="inline:governance-confirm",
+            markup=governance_confirm_keyboard(),
+        )
         return
 
     await message.answer(_state_description(target.state))
