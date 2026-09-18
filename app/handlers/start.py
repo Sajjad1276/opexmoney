@@ -164,11 +164,13 @@ async def continue_registration(
     await state.set_state(OnboardingStates.SELECT_NATION)
 
     if not nations:
-        await message.answer(
+        await keyboard_manager.send(
+            message,
             "🌍 <b>هنوز هیچ ملتی تأسیس نشده!</b>\n\n"
             "تو می‌تونی اولین بنیان‌گذار تاریخ باشی\n"
             "و اولین ملت OPEX MONEY رو بسازی.",
-            reply_markup=nation_selection_keyboard([]),
+            kind="inline:nation-selection",
+            markup=nation_selection_keyboard([]),
             parse_mode="HTML",
         )
         return
@@ -295,14 +297,27 @@ async def start_game_callback(call: CallbackQuery, state: FSMContext) -> None:
     await _begin_registration(call.message, state)
 
 
-async def _show_help(message: Message) -> None:
-    await message.answer(
+async def _show_help(message: Message, *, preserve_keyboard: bool = False) -> None:
+    text = (
         "❓ <b>راهنمای OPEX MONEY</b>\n"
         "تو یه معامله‌گر اقتصادی هستی.\n"
         "به ملت‌ها بپیوند، ارز بخر و بفروش.\n"
         "نرخ ارز با فعالیت بازار تغییر می‌کنه.\n"
-        "برای شروع، اسم معامله‌گرت رو انتخاب کن.",
-        reply_markup=welcome_keyboard(),
+        "برای شروع، اسم معامله‌گرت رو انتخاب کن."
+    )
+    if preserve_keyboard:
+        await keyboard_manager.send_ephemeral_inline(
+            message,
+            text,
+            welcome_keyboard(),
+            parse_mode="HTML",
+        )
+        return
+    await keyboard_manager.send(
+        message,
+        text,
+        kind="inline:welcome",
+        markup=welcome_keyboard(),
         parse_mode="HTML",
     )
 
@@ -560,12 +575,3 @@ async def _get_holding_amount(user_id: int, nation_id: int) -> Decimal:
         return holding.amount if holding else Decimal("500")
 
 
-@router.callback_query(F.data == "cancel_start")
-async def cancel_start(call: CallbackQuery, state: FSMContext) -> None:
-    await state.clear()
-    text = f"{html.escape(call.from_user.first_name or 'معامله‌گر')}، ثبت‌نام لغو شد.\n\nهر وقت خواستی، /start بزن."
-    if call.message and getattr(call.message, "photo", None):
-        await _safe_edit_caption(call, text)
-    else:
-        await _safe_edit_text(call, text)
-    await call.answer()
