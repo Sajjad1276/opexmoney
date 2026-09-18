@@ -3,12 +3,13 @@ from __future__ import annotations
 import html
 
 from aiogram import F, Router
+from aiogram.filters import CommandStart
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from app.database.session import async_session
-from app.handlers.start import _safe_edit_caption, _safe_edit_text, user_mention
+from app.handlers.start import _safe_edit_caption, _safe_edit_text, start as restart_flow, user_mention
 from app.keyboards.inline import cancel_keyboard, nation_keyboard, no_nation_keyboard
 from app.services.nation_service import get_active_nations
 from app.services.user_service import username_exists
@@ -145,6 +146,21 @@ async def start_player_fix(call: CallbackQuery, state: FSMContext) -> None:
         await call.answer()
     except TelegramBadRequest:
         await call.answer("صفحه ثبت‌نام باز نشد. دوباره /start بزن.", show_alert=True)
+
+
+@router.message(OnboardingStates.SET_USERNAME_PLAYER, CommandStart())
+async def restart_onboarding_with_command(message: Message, state: FSMContext) -> None:
+    await restart_flow(message, state)
+
+
+@router.message(
+    OnboardingStates.SET_USERNAME_PLAYER,
+    F.text.func(
+        lambda value: (value or "").strip().casefold() in {"استارت", "شروع", "start"}
+    ),
+)
+async def restart_onboarding_with_text_command(message: Message, state: FSMContext) -> None:
+    await restart_flow(message, state)
 
 
 @router.message(OnboardingStates.SET_USERNAME_PLAYER, F.text.func(is_blocked_trader_name))
