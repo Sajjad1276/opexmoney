@@ -30,14 +30,15 @@ async def render_market(message,edit_call=None):
     async with async_session() as session:
         async with session.begin():
             user=await session.get(User,message.from_user.id)
-        if not user or user.home_nation_id is None:
-            text='🔴 حساب پیدا نشد. /start بزن.'
-            if edit_call: await edit_call.answer(text,show_alert=True)
-            else: await message.answer(text,parse_mode='HTML')
-            return
-        nation=await session.get(Nation,user.home_nation_id)
-        others=(await session.execute(select(Nation).where(Nation.is_active.is_(True),Nation.nation_id!=nation.nation_id).order_by(Nation.exchange_rate.desc()).limit(3))).scalars().all()
-        active=await get_active_members(session,nation.nation_id); text=market_text(user,nation,others,active)
+            if not user or user.home_nation_id is None:
+                text='🔴 حساب پیدا نشد. /start بزن.'
+                if edit_call: await edit_call.answer(text,show_alert=True)
+                else: await message.answer(text,parse_mode='HTML')
+                return
+            nation=await session.get(Nation,user.home_nation_id)
+            others=(await session.execute(select(Nation).where(Nation.is_active.is_(True),Nation.nation_id!=nation.nation_id).order_by(Nation.exchange_rate.desc()).limit(3))).scalars().all()
+            active=await get_active_members(session,nation.nation_id)
+            text=market_text(user,nation,others,active)
     if edit_call: await safe_edit(edit_call,text,market_keyboard())
     else: await message.answer(text,reply_markup=market_keyboard(),parse_mode='HTML')
 @router.message(F.text=='💹 بازار')
@@ -52,8 +53,13 @@ async def market_refresh(call:CallbackQuery):
         async with async_session() as session:
             async with session.begin():
                 user=await session.get(User,call.from_user.id)
-            if not user or user.home_nation_id is None: await call.answer('🔴 حساب پیدا نشد. /start بزن.',show_alert=True); return
-            nation=await session.get(Nation,user.home_nation_id); others=(await session.execute(select(Nation).where(Nation.is_active.is_(True),Nation.nation_id!=nation.nation_id).order_by(Nation.exchange_rate.desc()).limit(3))).scalars().all(); active=await get_active_members(session,nation.nation_id); text=market_text(user,nation,others,active)
+                if not user or user.home_nation_id is None:
+                    await call.answer('🔴 حساب پیدا نشد. /start بزن.',show_alert=True)
+                    return
+                nation=await session.get(Nation,user.home_nation_id)
+                others=(await session.execute(select(Nation).where(Nation.is_active.is_(True),Nation.nation_id!=nation.nation_id).order_by(Nation.exchange_rate.desc()).limit(3))).scalars().all()
+                active=await get_active_members(session,nation.nation_id)
+                text=market_text(user,nation,others,active)
         try: await call.message.edit_text(text,reply_markup=market_keyboard(),parse_mode='HTML'); await call.answer()
         except TelegramBadRequest as exc: await call.answer('نرخ‌ها تغییر نکردن.' if 'not modified' in str(exc).lower() else None)
     except Exception: await call.answer('⚠️ بازار موقتاً در دسترس نیست.',show_alert=True)
