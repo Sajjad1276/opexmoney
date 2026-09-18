@@ -4,21 +4,9 @@ from aiogram.enums import ButtonStyle
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 
-def start_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="🎮 شروع بازی", callback_data="start_player", style=ButtonStyle.SUCCESS),
-        InlineKeyboardButton(text="❓ راهنما", callback_data="start_help"),
-    ]])
-
 def cancel_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(text="❌ انصراف", callback_data="cancel_start", style=ButtonStyle.DANGER),
-    ]])
-
-
-def founder_cancel_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="❌ بستن", callback_data="cancel_founder", style=ButtonStyle.DANGER),
     ]])
 
 
@@ -26,12 +14,6 @@ def nation_keyboard(nations) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(text=f"🏛 پیوستن به {nation.name}", callback_data=f"join_{nation.nation_id}", style=ButtonStyle.SUCCESS),
     ] for nation in nations])
-
-
-def no_nation_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="👑 ساخت اولین ملت تاریخ", callback_data="start_founder", style=ButtonStyle.PRIMARY),
-    ]])
 
 
 def first_trade_keyboard() -> InlineKeyboardMarkup:
