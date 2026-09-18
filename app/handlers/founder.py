@@ -295,7 +295,7 @@ async def group_founder_start(
 async def receive_nation_name(message: Message, state: FSMContext) -> None:
     valid, error = validate_nation_name(message.text or "")
     if not valid:
-        await message.answer(error, reply_markup=founder_cancel_keyboard())
+        await keyboard_manager.send(message, error, kind="inline:founder", markup=founder_cancel_keyboard())
         return
 
     nation_name = " ".join((message.text or "").strip().split())
