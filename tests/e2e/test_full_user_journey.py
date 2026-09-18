@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import sys
 from types import SimpleNamespace
 from decimal import Decimal
 
@@ -482,4 +483,7 @@ async def test_full_user_journey_with_restart_and_keyboard_transitions(seeded_db
     print("E2E|PASS|17|trade|Transaction+balances persisted")
 
     captured = capsys.readouterr().out
+    sys.stdout.write(captured)
+    sys.stdout.flush()
     assert "E2E|PASS|17|trade" in captured
+    print("E2E|PASS|18|full_journey|all assertions passed")
