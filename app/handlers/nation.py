@@ -26,8 +26,7 @@ async def open_nations(message: Message) -> None:
             user = await session.get(User, message.from_user.id)
             if not await is_fully_registered(session, message.from_user.id):
                 await message.answer(
-                    "⚠️ اول باید وارد بازی بشی.
-"
+                    "⚠️ اول باید وارد بازی بشی.\n"
                     "برای شروع، /start رو بزن."
                 )
                 return
