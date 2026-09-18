@@ -28,11 +28,13 @@ async def open_nations(message: Message) -> None:
         )
         return
 
-    await message.answer(
+    await keyboard_manager.send(
+        message,
         "🌍 <b>ملت‌ها</b>\n"
         "اینجا می‌تونی ملت‌ها رو بررسی کنی.\n"
         "از گزینه‌ها برای ادامه استفاده کن.",
-        reply_markup=nation_panel_keyboard(is_founder),
+        kind="inline:nation-panel",
+        markup=nation_panel_keyboard(is_founder),
         parse_mode="HTML",
     )
 
@@ -109,30 +111,25 @@ async def explore_nations(call: CallbackQuery) -> None:
             ).scalars().all()
 
     if not nations:
-        await call.message.edit_text(
-            "🌍 <b>هنوز ملتی وجود نداره.</b>\n"
-            "تو می‌تونی اولین ملت رو تأسیس کنی.",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="🏛 تأسیس اولین ملت", callback_data="found_nation")]
-            ]),
-            parse_mode="HTML",
-        ) if call.message else None
+        if call.message:
+            await keyboard_manager.edit_inline(
+                call.message,
+                "🌍 <b>هنوز ملتی وجود نداره.</b>\n"
+                "تو می‌تونی اولین ملت رو تأسیس کنی.",
+                kind="inline:nation-explore",
+                markup=empty_nation_explore_keyboard(),
+                parse_mode="HTML",
+            )
         await call.answer()
         return
 
-    rows = [
-        [InlineKeyboardButton(
-            text=f"🏴 {nation.name} · {nation.currency_code} · {nation.member_count} نفر",
-            callback_data=f"join_nation:{nation.nation_id}",
-        )]
-        for nation in nations
-    ]
-    rows.append([InlineKeyboardButton(text="↩️ بازگشت", callback_data="back_to_dashboard")])
     if call.message:
-        await call.message.edit_text(
+        await keyboard_manager.edit_inline(
+            call.message,
             "🔍 <b>کاوش ملت‌ها</b>\n"
             "ملت فعال موردنظرت رو انتخاب کن.",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=rows),
+            kind="inline:nation-explore",
+            markup=nation_explore_keyboard(nations),
             parse_mode="HTML",
         )
     await call.answer()
