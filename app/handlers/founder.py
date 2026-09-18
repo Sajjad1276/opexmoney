@@ -88,6 +88,117 @@ async def start_founder(
         )
 
 
+async def _continue_group_onboarding(
+    *,
+    bot: Bot,
+    dispatcher: Dispatcher,
+    founder_user_id: int,
+    group_id: int,
+    group_title: str,
+    group_username: str | None,
+    group_type: str,
+) -> None:
+    founder_state = await dispatcher.fsm.get_context(
+        bot=bot,
+        chat_id=founder_user_id,
+        user_id=founder_user_id,
+    )
+    current_state = await founder_state.get_state()
+    if current_state != FounderStates.WAITING_GROUP_ADMIN.state:
+        return
+
+    data = await founder_state.get_data()
+    if data.get("founder_user_id") != founder_user_id:
+        return
+
+    try:
+        bot_member = await bot.get_chat_member(group_id, bot.id)
+        founder_member = await bot.get_chat_member(group_id, founder_user_id)
+        bot_status = getattr(bot_member.status, "value", bot_member.status)
+        founder_status = getattr(founder_member.status, "value", founder_member.status)
+    except Exception:
+        logger.exception("Could not verify group onboarding state for %s", group_id)
+        await bot.send_message(
+            founder_user_id,
+            "⚠️ وضعیت گروه قابل بررسی نیست. چند ثانیه بعد دوباره امتحان کن.",
+        )
+        return
+
+    if bot_status not in {"administrator", "creator"}:
+        return
+
+    if founder_status not in {"administrator", "creator"}:
+        await bot.send_message(
+            founder_user_id,
+            "⚠️ برای تأسیس ملت باید خودت ادمین یا مالک گروه باشی.",
+        )
+        return
+
+    async with async_session() as session:
+        async with session.begin():
+            existing = await session.execute(
+                select(Nation.nation_id)
+                .where(
+                    Nation.group_id == group_id,
+                    Nation.is_active.is_(True),
+                )
+                .limit(1)
+            )
+            if existing.scalar_one_or_none() is not None:
+                await founder_state.clear()
+                await bot.send_message(
+                    founder_user_id,
+                    "⚠️ این گروه قبلاً پایتخت یک ملت فعاله.",
+                )
+                return
+
+            bot_group = await session.get(BotGroup, group_id)
+            if bot_group is None:
+                session.add(
+                    BotGroup(
+                        group_id=group_id,
+                        title=group_title,
+                        username=group_username,
+                        is_active=True,
+                    )
+                )
+            else:
+                bot_group.title = group_title
+                bot_group.username = group_username
+                bot_group.is_active = True
+
+    await founder_state.update_data(
+        group_id=group_id,
+        group_title=group_title,
+        group_username=group_username,
+        group_type=group_type,
+    )
+    await founder_state.set_state(FounderStates.SET_NATION_NAME)
+
+    await bot.send_message(
+        founder_user_id,
+        "🎉 <b>گروه با موفقیت متصل شد!</b>\n"
+        f"🏛 پایتخت: <b>{html.escape(group_title)}</b>\n"
+        "🤖 ربات با دسترسی ادمین فعال شد.\n"
+        "حالا اسم انگلیسی ملتت رو بفرست.\n"
+        "فقط حروف انگلیسی و فاصله، بدون عدد و علامت.",
+        parse_mode="HTML",
+        reply_markup=founder_cancel_keyboard(),
+    )
+
+    try:
+        await bot.send_message(
+            group_id,
+            "🎉 <b>اتصال OPEX MONEY موفق شد!</b>\n"
+            "👑 بنیان‌گذار این گروه را برای تأسیس ملت انتخاب کرده.\n"
+            "🤖 ربات با دسترسی ادمین فعال شد.\n"
+            "حالا در پیام خصوصی اسم ملت را انتخاب کن.",
+            parse_mode="HTML",
+        )
+    except (TelegramBadRequest, TelegramForbiddenError):
+        logger.warning("Could not announce group onboarding in %s", group_id)
+
+
 @founder_router.my_chat_member()
 async def bot_group_status_changed(
     event: ChatMemberUpdated,
@@ -105,103 +216,44 @@ async def bot_group_status_changed(
     if actor is None:
         return
 
-    actor_state = await dispatcher.fsm.get_context(
+    await _continue_group_onboarding(
         bot=bot,
-        chat_id=actor.id,
-        user_id=actor.id,
-    )
-    current_state = await actor_state.get_state()
-    if current_state != FounderStates.WAITING_GROUP_ADMIN.state:
-        return
-
-    data = await actor_state.get_data()
-    if data.get("founder_user_id") != actor.id:
-        return
-
-    try:
-        actor_member = await bot.get_chat_member(event.chat.id, actor.id)
-    except Exception:
-        logger.exception("Could not verify founder admin status in chat %s", event.chat.id)
-        await bot.send_message(
-            actor.id,
-            "⚠️ نتونستم دسترسی ادمینت رو بررسی کنم. دوباره امتحان کن.",
-        )
-        return
-
-    actor_status = getattr(actor_member.status, "value", actor_member.status)
-    if actor_status not in {"administrator", "creator"}:
-        await bot.send_message(
-            actor.id,
-            "⚠️ برای تأسیس ملت باید خودت ادمین یا مالک گروه باشی.",
-        )
-        return
-
-    group_title = event.chat.title or "گروه بدون نام"
-    group_username = getattr(event.chat, "username", None)
-
-    async with async_session() as session:
-        async with session.begin():
-            existing = await session.execute(
-                select(Nation.nation_id)
-                .where(
-                    Nation.group_id == event.chat.id,
-                    Nation.is_active.is_(True),
-                )
-                .limit(1)
-            )
-            if existing.scalar_one_or_none() is not None:
-                await actor_state.clear()
-                await bot.send_message(
-                    actor.id,
-                    "⚠️ این گروه قبلاً پایتخت یک ملت فعاله.",
-                )
-                return
-
-            bot_group = await session.get(BotGroup, event.chat.id)
-            if bot_group is None:
-                session.add(
-                    BotGroup(
-                        group_id=event.chat.id,
-                        title=group_title,
-                        username=group_username,
-                        is_active=True,
-                    )
-                )
-            else:
-                bot_group.title = group_title
-                bot_group.username = group_username
-                bot_group.is_active = True
-
-    await actor_state.update_data(
+        dispatcher=dispatcher,
+        founder_user_id=actor.id,
         group_id=event.chat.id,
-        group_title=group_title,
-        group_username=group_username,
+        group_title=event.chat.title or "گروه بدون نام",
+        group_username=getattr(event.chat, "username", None),
         group_type=event.chat.type,
     )
-    await actor_state.set_state(FounderStates.SET_NATION_NAME)
 
-    await bot.send_message(
-        actor.id,
-        "🎉 <b>گروه با موفقیت متصل شد!</b>\n"
-        f"🏛 پایتخت: <b>{html.escape(group_title)}</b>\n"
-        "🤖 ربات با دسترسی ادمین فعال شد.\n"
-        "حالا اسم انگلیسی ملتت رو بفرست.\n"
-        "فقط حروف انگلیسی و فاصله، بدون عدد و علامت.",
-        parse_mode="HTML",
-        reply_markup=founder_cancel_keyboard(),
+
+@founder_router.message(
+    F.chat.type.in_({"group", "supergroup"}),
+    F.text.regexp(r"^/start(?:@[^ ]+)?\s+founder_(\d+)$"),
+)
+async def group_founder_start(
+    message: Message,
+    bot: Bot,
+    dispatcher: Dispatcher,
+) -> None:
+    match = message.text and __import__("re").match(
+        r"^/start(?:@[^ ]+)?\s+founder_(\d+)$",
+        message.text,
+    )
+    if not match:
+        return
+
+    await _continue_group_onboarding(
+        bot=bot,
+        dispatcher=dispatcher,
+        founder_user_id=int(match.group(1)),
+        group_id=message.chat.id,
+        group_title=message.chat.title or "گروه بدون نام",
+        group_username=getattr(message.chat, "username", None),
+        group_type=message.chat.type,
     )
 
-    try:
-        await bot.send_message(
-            event.chat.id,
-            "🎉 <b>اتصال OPEX MONEY موفق شد!</b>\n"
-            f"👑 {html.escape(actor.first_name or 'بنیان‌گذار')} این گروه رو برای تأسیس ملت انتخاب کرده.\n"
-            "🤖 ربات با دسترسی ادمین فعال شد.\n"
-            "حالا در پیام خصوصی اسم ملت رو انتخاب کن.",
-            parse_mode="HTML",
-        )
-    except (TelegramBadRequest, TelegramForbiddenError):
-        logger.warning("Could not announce group onboarding in %s", event.chat.id)
+
 
 
 @founder_router.message(
