@@ -5,7 +5,7 @@ from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 import pytest
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 
 from app.database.models import (
     BehaviorSnapshot,
@@ -45,28 +45,41 @@ async def cleanup_phase2_rows():
     yield
     async with async_session() as session:
         async with session.begin():
-            user_ids = select(User.user_id).where(
-                User.user_id.between(TEST_USER_MIN, TEST_USER_MAX)
+            await session.execute(delete(Vote))
+            await session.execute(delete(RuleOverride))
+            await session.execute(delete(GovernanceLedger))
+            await session.execute(delete(Proposal))
+            await session.execute(delete(BehaviorSnapshot))
+            await session.execute(
+                delete(PlayerTemporalProfile).where(
+                    PlayerTemporalProfile.player_id.between(TEST_USER_MIN, TEST_USER_MAX)
+                )
             )
-            nation_ids = select(Nation.nation_id).where(
-                Nation.group_id.between(TEST_GROUP_MIN, TEST_GROUP_MAX)
+            await session.execute(
+                delete(Transaction).where(
+                    Transaction.user_id.between(TEST_USER_MIN, TEST_USER_MAX)
+                )
             )
-
-            await session.execute(delete(Vote).where(Vote.player_id.in_(user_ids)))
-            await session.execute(delete(Transaction).where(Transaction.user_id.in_(user_ids)))
-            await session.execute(delete(UserActivity).where(UserActivity.user_id.in_(user_ids)))
-            await session.execute(delete(PlayerTemporalProfile).where(PlayerTemporalProfile.player_id.in_(user_ids)))
-            await session.execute(delete(CurrencyHolding).where(CurrencyHolding.user_id.in_(user_ids)))
-
-            proposal_ids = select(Proposal.id).where(
-                Proposal.proposer_player_id.in_(user_ids)
+            await session.execute(
+                delete(UserActivity).where(
+                    UserActivity.user_id.between(TEST_USER_MIN, TEST_USER_MAX)
+                )
             )
-            await session.execute(delete(RuleOverride).where(RuleOverride.source_proposal_id.in_(proposal_ids)))
-            await session.execute(delete(GovernanceLedger).where(GovernanceLedger.actor_player_id.in_(user_ids)))
-            await session.execute(delete(BehaviorSnapshot).where(BehaviorSnapshot.id >= 920001))
-            await session.execute(delete(Proposal).where(Proposal.id.in_(proposal_ids)))
-            await session.execute(delete(Nation).where(Nation.nation_id.in_(nation_ids)))
-            await session.execute(delete(User).where(User.user_id.between(TEST_USER_MIN, TEST_USER_MAX)))
+            await session.execute(
+                delete(CurrencyHolding).where(
+                    CurrencyHolding.user_id.between(TEST_USER_MIN, TEST_USER_MAX)
+                )
+            )
+            await session.execute(
+                delete(Nation).where(
+                    Nation.group_id.between(TEST_GROUP_MIN, TEST_GROUP_MAX)
+                )
+            )
+            await session.execute(
+                delete(User).where(
+                    User.user_id.between(TEST_USER_MIN, TEST_USER_MAX)
+                )
+            )
 
 
 async def seed_nation_user(
@@ -346,7 +359,7 @@ async def test_governance_cycle_is_idempotent():
             )
             assert count is not None
             total = await session.scalar(
-                select(__import__("sqlalchemy").func.count(RuleOverride.id)).where(
+                select(func.count(RuleOverride.id)).where(
                     RuleOverride.source_proposal_id == proposal_id,
                     RuleOverride.is_active.is_(True),
                 )
