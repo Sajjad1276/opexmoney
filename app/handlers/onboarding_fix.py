@@ -11,7 +11,7 @@ from aiogram.types import CallbackQuery, Message
 
 from app.database.session import async_session
 from app.handlers.start import _safe_edit_caption, _safe_edit_text, start as restart_flow, user_mention
-from app.keyboards.inline import cancel_keyboard, nation_keyboard, nation_selection_keyboard
+from app.keyboards.inline import cancel_keyboard, nation_selection_keyboard
 from app.services.nation_service import get_active_nations
 from app.services.user_service import username_exists
 from app.states.onboarding import OnboardingStates
