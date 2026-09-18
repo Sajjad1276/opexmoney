@@ -14,12 +14,6 @@ from app.services.user_service import is_fully_registered
 nation_router = Router(name="nation")
 
 
-def _soon_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="↩️ بازگشت", callback_data="back_to_dashboard")]
-    ])
-
-
 async def open_nations(message: Message) -> None:
     async with async_session() as session:
         async with session.begin():
