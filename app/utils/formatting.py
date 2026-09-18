@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from decimal import Decimal, ROUND_HALF_UP
 
+from app.services.rules.effects import apply_trade_benefit, calculate_trade_fee
+
 _FA_DIGITS = str.maketrans("0123456789.-", "۰۱۲۳۴۵۶۷۸۹٫−")
 _FA_TO_LATIN = str.maketrans("۰۱۲۳۴۵۶۷۸۹٫٬−", "0123456789.,-")
 
@@ -17,7 +19,11 @@ def from_fa(value: str) -> str:
 def get_rate_change(nation) -> float:
     if not nation.rate_24h_open:
         return 0.0
-    return float((nation.exchange_rate - nation.rate_24h_open) / nation.rate_24h_open * Decimal("100"))
+    return float(
+        (nation.exchange_rate - nation.rate_24h_open)
+        / nation.rate_24h_open
+        * Decimal("100")
+    )
 
 
 def get_rate_emoji(change: float) -> str:
@@ -42,30 +48,54 @@ def fmt_pct(value: float | Decimal) -> str:
     return to_fa(f"{float(value):+.2f}") + "٪"
 
 
-def calc_trade(spend: Decimal, rate: Decimal, is_buy: bool) -> dict[str, Decimal]:
+def calc_trade(
+    spend: Decimal,
+    rate: Decimal,
+    is_buy: bool,
+    *,
+    fee_rate_percent: Decimal = Decimal("0.5"),
+    benefit_multiplier: Decimal = Decimal("1"),
+) -> dict[str, Decimal]:
     spend = Decimal(str(spend))
     rate = Decimal(str(rate))
-    fee = spend * Decimal("0.005")
+    fee = calculate_trade_fee(spend, Decimal(str(fee_rate_percent)))
     if is_buy:
         net = spend - fee
         receive = net / rate
     else:
         receive = (spend * rate) - fee
         net = receive
-    return {"spend": spend, "fee": fee, "net": net, "receive": receive}
+
+    if benefit_multiplier != Decimal("1"):
+        receive = apply_trade_benefit(receive, benefit_multiplier)
+        net = receive
+
+    return {
+        "spend": spend,
+        "fee": fee,
+        "net": net,
+        "receive": receive,
+    }
 
 
 def gregorian_to_jalali(gy: int, gm: int, gd: int) -> tuple[int, int, int]:
-    """Convert Gregorian date to Persian calendar without an external dependency."""
     g_days_in_month = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
     j_days_in_month = [31, 31, 31, 31, 31, 31, 30, 30, 30, 30, 30, 29]
     gy2 = gy - 1600
     gm2 = gm - 1
     gd2 = gd - 1
-    g_day_no = 365 * gy2 + (gy2 + 3) // 4 - (gy2 + 99) // 100 + (gy2 + 399) // 400
+    g_day_no = (
+        365 * gy2
+        + (gy2 + 3) // 4
+        - (gy2 + 99) // 100
+        + (gy2 + 399) // 400
+    )
     for i in range(gm2):
         g_day_no += g_days_in_month[i]
-    if gm2 > 1 and ((gy % 4 == 0 and gy % 100 != 0) or gy % 400 == 0):
+    if gm2 > 1 and (
+        (gy % 4 == 0 and gy % 100 != 0)
+        or gy % 400 == 0
+    ):
         g_day_no += 1
     g_day_no += gd2
     j_day_no = g_day_no - 79
@@ -88,5 +118,9 @@ def gregorian_to_jalali(gy: int, gm: int, gd: int) -> tuple[int, int, int]:
 def today_jalali() -> str:
     from datetime import datetime
 
-    y, m, d = gregorian_to_jalali(datetime.now().year, datetime.now().month, datetime.now().day)
+    y, m, d = gregorian_to_jalali(
+        datetime.now().year,
+        datetime.now().month,
+        datetime.now().day,
+    )
     return to_fa(f"{y:04d}/{m:02d}/{d:02d}")
