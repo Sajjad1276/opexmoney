@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from aiogram import F, Router
-from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
+from aiogram.types import CallbackQuery, Message
 from sqlalchemy import select
 
 from app.database.models import Nation, User
 from app.database.session import async_session
 from app.handlers.start import show_dashboard
-from app.keyboards.inline import nation_panel_keyboard
+from app.keyboards.inline import nation_explore_keyboard, nation_panel_keyboard, empty_nation_explore_keyboard
+from app.services.keyboard_state import keyboard_manager
 from app.services.user_service import is_fully_registered
 
 nation_router = Router(name="nation")
@@ -19,7 +20,6 @@ def _soon_keyboard() -> InlineKeyboardMarkup:
     ])
 
 
-@nation_router.message(F.text == "🌍 ملت‌ها")
 async def open_nations(message: Message) -> None:
     async with async_session() as session:
         async with session.begin():
@@ -42,6 +42,13 @@ async def open_nations(message: Message) -> None:
         parse_mode="HTML",
     )
 
+
+
+
+
+@nation_router.message(F.text == "🌍 ملت‌ها")
+async def nation_button(message: Message) -> None:
+    await open_nations(message)
 
 @nation_router.callback_query(F.data == "back_to_dashboard")
 async def back_to_dashboard(call: CallbackQuery) -> None:
@@ -78,13 +85,16 @@ async def my_nations(call: CallbackQuery) -> None:
             "🌍 <b>ملت‌های من</b>\n"
             f"🏛 {nation.name} · {nation.currency_code}\n"
             f"👥 {nation.member_count} نفر\n"
-            "برای جزئیات بیشتر، این بخش در حال توسعه است."
+            f"💱 نرخ فعلی: {nation.exchange_rate} ΩXR"
         )
-    await call.message.edit_text(
-        text,
-        reply_markup=_soon_keyboard(),
-        parse_mode="HTML",
-    ) if call.message else None
+    if call.message:
+        await keyboard_manager.edit_inline(
+            call.message,
+            text,
+            kind="inline:nation-panel",
+            markup=nation_panel_keyboard(True),
+            parse_mode="HTML",
+        )
     await call.answer()
 
 
@@ -134,17 +144,3 @@ async def explore_nations(call: CallbackQuery) -> None:
     await call.answer()
 
 
-@nation_router.callback_query(F.data.in_({"founder_panel", "create_nation"}))
-async def unavailable_nation_panel(call: CallbackQuery) -> None:
-    await call.answer(
-        "ℹ️ این بخش هنوز فعال نشده.",
-        show_alert=True,
-    )
-
-
-@nation_router.callback_query(F.data.in_({"confirm_trade", "cancel_trade"}))
-async def unavailable_trade_confirmation(call: CallbackQuery) -> None:
-    await call.answer(
-        "ℹ️ این تأیید در نسخه فعلی استفاده نمی‌شود.",
-        show_alert=True,
-    )
