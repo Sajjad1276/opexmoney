@@ -10,13 +10,14 @@ from app.database.models import ActivityType, CurrencyHolding, Nation, User, Use
 
 
 async def get_active_nations(session: AsyncSession, limit: int = 3) -> list[Nation]:
-    result = await session.execute(
-        select(Nation)
-        .where(Nation.is_active.is_(True))
-        .order_by(desc(Nation.member_count), Nation.nation_id.asc())
-        .limit(limit)
-    )
-    return list(result.scalars().all())
+    async with session.begin():
+        result = await session.execute(
+            select(Nation)
+            .where(Nation.is_active.is_(True))
+            .order_by(desc(Nation.member_count), Nation.nation_id.asc())
+            .limit(limit)
+        )
+        return list(result.scalars().all())
 
 
 async def get_nation_rank(session: AsyncSession, nation_id: int) -> int:
@@ -50,21 +51,18 @@ async def create_nation(
         user = user_result.scalar_one_or_none()
 
         if user is None:
-            if not founder_username:
-                raise ValueError("حساب پیدا نشد.")
-            user = User(
-                user_id=founder_user_id,
-                username=founder_username,
-                home_nation_id=None,
-                balance=Decimal("0.00"),
-                xr_balance=Decimal("0.00"),
-                role="player",
-            )
-            session.add(user)
-            await session.flush()
+            raise ValueError("اول باید وارد بازی بشی.")
+
+        holding_result = await session.execute(
+            select(CurrencyHolding.id)
+            .where(CurrencyHolding.user_id == founder_user_id)
+            .limit(1)
+        )
+        if holding_result.scalar_one_or_none() is None:
+            raise ValueError("اول باید وارد بازی بشی.")
 
         if user.role == "founder":
-            raise ValueError("هر معامله‌گر فقط می‌تونه یک ملت بسازه.")
+            raise ValueError("هر معامله‌گر فقط یه ملت می‌تونه بسازه.")
 
         group_result = await session.execute(
             select(Nation)
@@ -119,7 +117,7 @@ async def create_nation(
             UserActivity(
                 user_id=founder_user_id,
                 nation_id=nation.nation_id,
-                activity_type=ActivityType.MISSION,
+                activity_type=ActivityType.LOGIN,
             )
         )
 
