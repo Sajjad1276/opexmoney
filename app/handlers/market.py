@@ -28,7 +28,8 @@ def market_text(user,nation,others,active):
     return '\n'.join(lines)
 async def render_market(message,edit_call=None):
     async with async_session() as session:
-        user=await session.get(User,message.from_user.id)
+        async with session.begin():
+            user=await session.get(User,message.from_user.id)
         if not user or user.home_nation_id is None:
             text='🔴 حساب پیدا نشد. /start بزن.'
             if edit_call: await edit_call.answer(text,show_alert=True)
@@ -49,7 +50,8 @@ async def market_main(call:CallbackQuery):
 async def market_refresh(call:CallbackQuery):
     try:
         async with async_session() as session:
-            user=await session.get(User,call.from_user.id)
+            async with session.begin():
+                user=await session.get(User,call.from_user.id)
             if not user or user.home_nation_id is None: await call.answer('🔴 حساب پیدا نشد. /start بزن.',show_alert=True); return
             nation=await session.get(Nation,user.home_nation_id); others=(await session.execute(select(Nation).where(Nation.is_active.is_(True),Nation.nation_id!=nation.nation_id).order_by(Nation.exchange_rate.desc()).limit(3))).scalars().all(); active=await get_active_members(session,nation.nation_id); text=market_text(user,nation,others,active)
         try: await call.message.edit_text(text,reply_markup=market_keyboard(),parse_mode='HTML'); await call.answer()
@@ -158,7 +160,8 @@ async def confirm_buy(call,state=None):
 @router.callback_query(F.data=='market_sell')
 async def market_sell(call,state):
     async with async_session() as session:
-        user=await session.get(User,call.from_user.id); rows=(await session.execute(select(CurrencyHolding,Nation.currency_code).join(Nation,Nation.nation_id==CurrencyHolding.nation_id).where(CurrencyHolding.user_id==call.from_user.id,CurrencyHolding.amount>0).order_by(CurrencyHolding.amount.desc()))).all()
+        async with session.begin():
+            user=await session.get(User,call.from_user.id); rows=(await session.execute(select(CurrencyHolding,Nation.currency_code).join(Nation,Nation.nation_id==CurrencyHolding.nation_id).where(CurrencyHolding.user_id==call.from_user.id,CurrencyHolding.amount>0).order_by(CurrencyHolding.amount.desc()))).all()
         if not user: await call.answer('🔴 حساب پیدا نشد. /start بزن.',show_alert=True); return
         if not rows: await safe_edit(call,'📉 <b>فروش ارز</b>\n─────────────────\nهنوز ارزی برای فروش نداری.\n\nاز 📈 خرید ارز شروع کن.',sell_currency_keyboard([])); await call.answer(); return
         holdings=[type('Holding',(),{'currency_code':code,'amount':h.amount}) for h,code in rows]; text='📉 <b>فروش ارز</b>\n━━━━━━━━━━━━━━━━━━━━\n<b>کدوم ارز می‌فروشی؟</b>'+''.join(f'\n💱 <code>{html.escape(h.currency_code)}</code> · موجودی: <b>{fmt_amount(h.amount)}</b>' for h in holdings)
@@ -197,7 +200,9 @@ async def make_sell_preview(message,state,nation_id,raw):
 @router.callback_query(F.data.startswith('sellq_'))
 async def sell_quick(call,state):
     _,pct,code=call.data.split('_',2)
-    async with async_session() as session: nation=await session.scalar(select(Nation).where(Nation.currency_code==code,Nation.is_active.is_(True))); holding=await session.scalar(select(CurrencyHolding).where(CurrencyHolding.user_id==call.from_user.id,CurrencyHolding.nation_id==nation.nation_id)) if nation else None
+    async with async_session() as session:
+        async with session.begin():
+            nation=await session.scalar(select(Nation).where(Nation.currency_code==code,Nation.is_active.is_(True))); holding=await session.scalar(select(CurrencyHolding).where(CurrencyHolding.user_id==call.from_user.id,CurrencyHolding.nation_id==nation.nation_id)) if nation else None
     if not nation or not holding: await call.answer('⚠️ موجودی این ارز پیدا نشد.',show_alert=True); return
     await make_sell_preview(call.message,state,nation.nation_id,str(holding.amount*Decimal(pct)/100)); await call.answer()
 @router.message(MarketStates.WAITING_SELL_AMOUNT)
