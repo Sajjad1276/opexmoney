@@ -53,13 +53,25 @@ async def username_exists(
     return result.scalar_one_or_none() is not None
 
 
-async def is_user_registered(session: AsyncSession, telegram_id: int) -> bool:
+async def is_fully_registered(
+    session: AsyncSession,
+    telegram_id: int,
+) -> bool:
+    """
+    Return True only when the persistent registration is complete.
+
+    Required conditions:
+    1. User exists.
+    2. User has a non-empty username.
+    3. User has at least one currency holding.
+    """
     user = await session.get(User, telegram_id)
-    if user is None:
+    if not user or not (user.username or "").strip():
         return False
-    holding = await session.scalar(
-        select(CurrencyHolding.id)
+
+    result = await session.execute(
+        select(CurrencyHolding)
         .where(CurrencyHolding.user_id == telegram_id)
         .limit(1)
     )
-    return holding is not None
+    return result.scalar_one_or_none() is not None
