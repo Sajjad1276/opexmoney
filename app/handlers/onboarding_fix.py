@@ -3,9 +3,7 @@ from __future__ import annotations
 import html
 
 from aiogram import F, Router
-from aiogram.filters import CommandStart
 from aiogram.filters.state import StateFilter
-from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy import select
@@ -13,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import Nation, User
 from app.database.session import async_session
-from app.handlers.start import user_mention
+from app.handlers.start import start as restart_flow, user_mention
 from app.keyboards.inline import cancel_keyboard, nation_selection_keyboard
 from app.services.draft_service import clear_draft, save_draft
 from app.services.keyboard_state import keyboard_manager
@@ -56,10 +54,6 @@ BLOCKED_NAME = rtl_text("""🔴 <b>این نام قابل قبول نیست.</b>
 
 این نام شامل عبارت نامناسب یا مستهجن است.
 یک نام صحیح و مناسب برای معامله‌گر انتخاب کن.""")
-
-CANCEL_TEXT = rtl_text("""<b>{user_name}، ثبت‌نام لغو شد.</b>
-
-هر وقت خواستی، /start بزن.""")
 
 NAME_ACCEPTED_TEXT = rtl_text("""🎉 <b>تبریک! «{username}» با موفقیت ثبت شد.</b>
 
@@ -139,28 +133,6 @@ def clean_nation_list_text(user, trader_name: str, nations) -> str:
         "نرخ‌ها هر ۱۵ دقیقه آپدیت میشن.",
     ])
     return rtl_text("\n".join(lines))
-
-
-    try:
-        if data.get("onboarding_prompt_has_photo"):
-            await message.bot.edit_message_caption(
-                chat_id=prompt_chat_id,
-                message_id=prompt_message_id,
-                caption=text,
-                reply_markup=reply_markup,
-                parse_mode="HTML",
-            )
-        else:
-            await message.bot.edit_message_text(
-                chat_id=prompt_chat_id,
-                message_id=prompt_message_id,
-                text=text,
-                reply_markup=reply_markup,
-                parse_mode="HTML",
-            )
-        return True
-    except TelegramBadRequest:
-        return False
 
 
 @router.message(
