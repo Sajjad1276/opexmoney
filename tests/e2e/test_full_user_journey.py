@@ -176,6 +176,12 @@ async def cleanup():
             await session.execute(delete(CurrencyHolding).where(CurrencyHolding.user_id.in_([TEST_USER_ID, SEED_USER_ID])))
             await session.execute(delete(OnboardingDraft).where(OnboardingDraft.player_id == TEST_USER_ID))
             await session.execute(delete(KeyboardState).where(KeyboardState.player_id == TEST_USER_ID))
+            await session.execute(
+                User.__table__.update().where(User.user_id.in_([TEST_USER_ID, SEED_USER_ID])).values(home_nation_id=None)
+            )
+            await session.execute(
+                Nation.__table__.update().where(Nation.group_id.in_([SEED_GROUP_ID, FOUNDER_GROUP_ID])).values(founder_user_id=None)
+            )
             await session.execute(delete(User).where(User.user_id.in_([TEST_USER_ID, SEED_USER_ID])))
             await session.execute(delete(Nation).where(Nation.group_id.in_([SEED_GROUP_ID, FOUNDER_GROUP_ID])))
             await session.execute(delete(BotGroup).where(BotGroup.group_id == FOUNDER_GROUP_ID))
