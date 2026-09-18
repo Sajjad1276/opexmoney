@@ -11,7 +11,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from sqlalchemy import select
 
-from app.database.models import CurrencyHolding, User
+from app.database.models import CurrencyHolding, Nation, User
 from app.database.session import async_session
 from app.keyboards.reply import main_menu
 from app.services.nation_service import create_nation
@@ -126,10 +126,10 @@ async def receive_group_id(message: Message, state: FSMContext) -> None:
     async with async_session() as session:
         async with session.begin():
             existing = await session.execute(
-                select(__import__("app.database.models", fromlist=["Nation"]).Nation.nation_id)
+                select(Nation.nation_id)
                 .where(
-                    __import__("app.database.models", fromlist=["Nation"]).Nation.group_id == group_id,
-                    __import__("app.database.models", fromlist=["Nation"]).Nation.is_active.is_(True),
+                    Nation.group_id == group_id,
+                    Nation.is_active.is_(True),
                 )
                 .limit(1)
             )
@@ -194,7 +194,7 @@ async def receive_currency_code(message: Message, state: FSMContext) -> None:
     await state.set_state(FounderStates.CONFIRM)
 
     await message.answer(
-        "📋 <b>اطلاعات ملت تو:</b>\n\n"
+        "📋 <b>اطلاعات ملت تو:</b>\n"
         f"🏛 نام: {html.escape(data['nation_name'])}\n"
         f"💱 ارز: {html.escape(code)}\n"
         f"🗺 پایتخت: گروه {data['group_id']}\n"
