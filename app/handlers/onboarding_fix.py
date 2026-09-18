@@ -115,13 +115,14 @@ async def show_nation_selection(
     session: AsyncSession,
     state: FSMContext,
 ) -> None:
-    result = await session.execute(
-        select(Nation)
-        .where(Nation.is_active.is_(True))
-        .order_by(Nation.member_count.desc(), Nation.nation_id.asc())
-        .limit(10)
-    )
-    nations = result.scalars().all()
+    async with session.begin():
+        result = await session.execute(
+            select(Nation)
+            .where(Nation.is_active.is_(True))
+            .order_by(Nation.member_count.desc(), Nation.nation_id.asc())
+            .limit(10)
+        )
+        nations = list(result.scalars().all())
 
     await state.set_state(OnboardingStates.SELECT_NATION)
 
@@ -145,8 +146,6 @@ async def show_nation_selection(
         reply_markup=nation_selection_keyboard(nations[:4]),
         parse_mode="HTML",
     )
-
-
 def clean_nation_list_text(user, trader_name: str, nations) -> str:
     """Render nation selection as clean RTL paragraphs without separators."""
     lines = [
@@ -281,8 +280,7 @@ async def accept_valid_name(message: Message, state: FSMContext) -> None:
         await message.answer(confirmation, parse_mode="HTML")
 
     async with async_session() as session:
-        async with session.begin():
-            await show_nation_selection(message, session, state)
+        await show_nation_selection(message, session, state)
 
 
 @router.callback_query(F.data == "cancel_start", StateFilter(OnboardingStates.SET_USERNAME_PLAYER))
