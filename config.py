@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     bot_token: str
     database_url: str
     redis_url: str | None = None
+    allow_memory_fsm_dev: bool = False
     owner_id: int | None = None
 
     governance_proposal_top_percent: Decimal = Decimal("10")
