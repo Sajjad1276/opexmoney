@@ -254,14 +254,14 @@ async def test_full_user_journey_and_restart_recovery(bot):
         market_state,
     )
     await market_module.buy_amount_message(
-        FakeMessage(bot=bot, chat_id=USER_ID, text="100"),
+        FakeMessage(bot=bot, chat_id=USER_ID, text="40"),
         market_state,
     )
     preview_callback = FakeCallback(
         bot=bot,
         user_id=USER_ID,
         message=market_message,
-        data=f"cbuy_{nation_id}_100",
+        data=f"cbuy_{nation_id}_40",
     )
     await market_module.confirm_buy(preview_callback, market_state)
 
@@ -316,7 +316,10 @@ async def test_full_user_journey_and_restart_recovery(bot):
     )
     assert await founder_state.get_state() == FounderStates.WAITING_GROUP_ADMIN.state
 
-    dispatcher = SimpleNamespace(fsm=SimpleNamespace(get_context=lambda **kwargs: founder_state))
+    async def get_context(**kwargs):
+        return founder_state
+
+    dispatcher = SimpleNamespace(fsm=SimpleNamespace(get_context=get_context))
     group_message = FakeMessage(bot=bot, chat_id=GROUP_ID, text=f"/start founder_{FOUNDER_ID}")
     group_message.chat = SimpleNamespace(
         id=GROUP_ID,
