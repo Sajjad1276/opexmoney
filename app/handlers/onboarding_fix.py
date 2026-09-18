@@ -3,6 +3,7 @@ from __future__ import annotations
 import html
 
 from aiogram import F, Router
+from aiogram.filters import CommandStart
 from aiogram.filters.state import StateFilter
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
@@ -15,7 +16,7 @@ from app.database.session import async_session
 from app.handlers.start import _safe_edit_caption, _safe_edit_text, start as restart_flow, user_mention
 from app.keyboards.inline import cancel_keyboard, nation_selection_keyboard
 from app.services.nation_service import get_active_nations
-from app.services.user_service import get_user, username_exists
+from app.services.user_service import get_user, is_fully_registered, username_exists
 from app.states.onboarding import OnboardingStates
 from app.utils.formatting import fmt_pct, fmt_rate, get_rate_change, get_rate_emoji, to_fa
 from app.utils.name_filter import is_blocked_trader_name, is_valid_trader_name
@@ -26,7 +27,6 @@ router = Router(name="onboarding_fix")
 # keep mixed Persian/Latin/emoji lines in an RTL paragraph direction and reduce
 # the visual jump to the left caused by mentions, numbers and symbols.
 RLM = "\u200f"
-
 
 
 def rtl_text(text: str) -> str:
@@ -103,6 +103,7 @@ async def show_nation_selection(
         reply_markup=nation_selection_keyboard(nations[:4]),
         parse_mode="HTML",
     )
+
 def clean_nation_list_text(user, trader_name: str, nations) -> str:
     """Render nation selection as clean RTL paragraphs without separators."""
     lines = [
