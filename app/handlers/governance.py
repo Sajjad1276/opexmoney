@@ -408,7 +408,13 @@ async def governance_proposal(call: CallbackQuery):
         f"❌ مخالف: <b>{to_fa(weights['against'])}</b>\n"
         f"⚪ ممتنع: <b>{to_fa(weights['abstain'])}</b>"
     )
-    await call.message.edit_text(text, reply_markup=markup, parse_mode="HTML")
+    await keyboard_manager.edit_inline(
+        call.message,
+        text,
+        kind="inline:governance",
+        markup=markup,
+        parse_mode="HTML",
+    )
     await call.answer()
 
 
@@ -494,11 +500,13 @@ async def governance_revoke_list(call: CallbackQuery):
         await call.answer("قانون فعالی برای لغو نیست.", show_alert=True)
         return
 
-    await call.message.edit_text(
+    await keyboard_manager.edit_inline(
+        call.message,
         "👑 <b>لغو فوری قانون</b>\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
         "لغو فوری، قانون مربوطه رو از همین لحظه غیرفعال می‌کنه.",
-        reply_markup=governance_revoke_keyboard(overrides[:10]),
+        kind="inline:governance",
+        markup=governance_revoke_keyboard(overrides[:10]),
         parse_mode="HTML",
     )
     await call.answer()
