@@ -189,16 +189,27 @@ async def _shared_groups(bot, user_id: int) -> list[dict]:
 
 @founder_router.callback_query(F.data == "start_founder")
 async def start_founder(call: CallbackQuery, state: FSMContext) -> None:
+    pending_data = await state.get_data()
+    pending_username = (pending_data.get("username") or "").strip()
     await state.clear()
 
     async with async_session() as session:
         async with session.begin():
             user = await get_user(session, call.from_user.id)
-        if user is None:
+
+        if user is None and not pending_username:
             if call.message:
                 await call.message.answer("⚠️ اول باید ثبت‌نام کنی.")
             await call.answer()
             return
+
+        if user is not None and user.role == "founder":
+            if call.message:
+                await call.message.answer("⚠️ هر معامله‌گر فقط می‌تونه یک ملت بسازه.")
+            await call.answer()
+            return
+
+        trader_name = user.username if user is not None else pending_username
 
         if user.role == "founder":
             if call.message:
