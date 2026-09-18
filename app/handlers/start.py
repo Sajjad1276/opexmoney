@@ -179,7 +179,8 @@ async def start(message: Message, state: FSMContext) -> None:
     await state.clear()
 
     async with async_session() as session:
-        status = await get_registration_status(session, message.from_user.id)
+        async with session.begin():
+            status = await get_registration_status(session, message.from_user.id)
         if status["status"] == "complete":
             user = status["user"]
             if user.home_nation_id is not None:
@@ -190,7 +191,6 @@ async def start(message: Message, state: FSMContext) -> None:
                         activity_type="login",
                     )
                 )
-                await session.commit()
 
     if status["status"] == "complete":
         user = status["user"]
