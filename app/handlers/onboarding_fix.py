@@ -10,7 +10,7 @@ from aiogram.types import CallbackQuery, Message
 
 from app.database.session import async_session
 from app.handlers.start import _safe_edit_caption, _safe_edit_text, start as restart_flow, user_mention
-from app.keyboards.inline import cancel_keyboard, nation_keyboard, no_nation_keyboard
+from app.keyboards.inline import cancel_keyboard, nation_keyboard
 from app.services.nation_service import get_active_nations
 from app.services.user_service import username_exists
 from app.states.onboarding import OnboardingStates
@@ -123,31 +123,6 @@ async def _edit_onboarding_prompt(message: Message, state: FSMContext, text: str
         return False
 
 
-@router.callback_query(F.data == "start_player")
-async def start_player_fix(call: CallbackQuery, state: FSMContext) -> None:
-    await state.clear()
-    await state.set_state(OnboardingStates.SET_USERNAME_PLAYER)
-    text = USERNAME_CAPTION.format(user_mention=user_mention(call.from_user))
-    try:
-        if call.message is None:
-            await call.answer("صفحه ثبت‌نام باز نشد.", show_alert=True)
-            return
-
-        await state.update_data(
-            onboarding_prompt_message_id=call.message.message_id,
-            onboarding_prompt_chat_id=call.message.chat.id,
-            onboarding_prompt_has_photo=bool(getattr(call.message, "photo", None)),
-        )
-
-        if getattr(call.message, "photo", None):
-            await call.message.edit_caption(caption=text, reply_markup=cancel_keyboard(), parse_mode="HTML")
-        else:
-            await _safe_edit_text(call, text, cancel_keyboard())
-        await call.answer()
-    except TelegramBadRequest:
-        await call.answer("صفحه ثبت‌نام باز نشد. دوباره /start بزن.", show_alert=True)
-
-
 @router.message(OnboardingStates.SET_USERNAME_PLAYER, CommandStart())
 async def restart_onboarding_with_command(message: Message, state: FSMContext) -> None:
     await restart_flow(message, state)
@@ -203,7 +178,6 @@ async def accept_valid_name(message: Message, state: FSMContext) -> None:
     if not nations:
         await message.answer(
             NO_NATION_TEXT.format(user_mention=user_mention(message.from_user)),
-            reply_markup=no_nation_keyboard(),
             parse_mode="HTML",
         )
         return
