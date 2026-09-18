@@ -90,7 +90,7 @@ async def show_dashboard(message: Message, user: User) -> None:
         async with session.begin():
             nation = await session.get(Nation, user.home_nation_id) if user.home_nation_id else None
         if nation is None:
-            await message.answer("<b>OPEX MONEY</b>\nحسابت آماده است، اما هنوز ملت اصلی نداری.", reply_markup=main_menu_keyboard(), parse_mode="HTML")
+            await keyboard_manager.send(message, "<b>OPEX MONEY</b>\nحسابت آماده است، اما هنوز ملت اصلی نداری.", kind="reply:main", markup=main_menu_keyboard(), parse_mode="HTML")
             return
         async with session.begin():
             rank = nation.nation_rank or await get_nation_rank(session, nation.nation_id)
@@ -101,7 +101,7 @@ async def show_dashboard(message: Message, user: User) -> None:
         minutes = max(0, int((datetime.utcnow() - nation.last_rate_update).total_seconds() // 60)) if nation.last_rate_update else 0
         balance = holding.amount if holding else user.balance
         text = ("🌐 <b>OPEX MONEY</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" f"{user_mention(message.from_user)}\n\n" f"🏛 {html.escape(nation.name)} · {html.escape(user.username)}\n" f"💰 <code>{html.escape(nation.currency_code)}</code>: <b>{fmt_amount(balance)}</b> · <code>ΩXR</code>: <b>{fmt_amount(user.xr_balance)}</b>\n\n" f"{get_rate_emoji(change)} <code>{html.escape(nation.currency_code)}</code>: <b>{fmt_rate(nation.exchange_rate)} ΩXR</b> · <i>{fmt_pct(change)} امروز</i>\n" f"🏆 رتبه #{to_fa(rank)} از {to_fa(total_nations)} · 👥 {to_fa(active)} فعال\n" f"⏱ <i>{to_fa(minutes)} دقیقه پیش</i>\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-    await message.answer(text, reply_markup=main_menu_keyboard(), parse_mode="HTML")
+    await keyboard_manager.send(message, text, kind="reply:main", markup=main_menu_keyboard(), parse_mode="HTML")
 
 
 async def continue_registration(
