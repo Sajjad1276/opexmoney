@@ -4,6 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import desc, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import ActivityType, CurrencyHolding, Nation, User, UserActivity
@@ -98,7 +99,16 @@ async def create_nation(
             is_active=True,
         )
         session.add(nation)
-        await session.flush()
+        try:
+            await session.flush()
+        except IntegrityError as exc:
+            constraint = getattr(getattr(exc, "orig", None), "diag", None)
+            constraint_name = getattr(constraint, "constraint_name", None)
+            if constraint_name == "uq_nations_currency_code":
+                raise ValueError("این کد ارز همزمان توسط ملت دیگری ثبت شد.") from exc
+            if constraint_name == "uq_nations_active_group":
+                raise ValueError("این گروه همزمان توسط ملت دیگری ثبت شد.") from exc
+            raise
 
         user.role = "founder"
         user.xr_balance += Decimal("1000.00")
