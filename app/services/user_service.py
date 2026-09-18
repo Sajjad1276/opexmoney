@@ -17,8 +17,8 @@ async def get_registration_status(
     Return the persistent registration status.
 
     status:
-      - complete: user exists and has at least one currency holding
-      - partial: user exists but has no currency holding
+      - complete: user exists, has a non-empty username, and has at least one currency holding
+      - partial: user exists but is missing a required registration field
       - new: no user row exists
     """
     async with session.begin():
