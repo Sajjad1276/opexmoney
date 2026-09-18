@@ -175,22 +175,19 @@ async def continue_registration(
 
 @router.message(CommandStart())
 async def start(message: Message, state: FSMContext) -> None:
-    # FSM is only transient UI state. Registration truth always comes from DB.
     await state.clear()
 
     async with async_session() as session:
         async with session.begin():
             status = await get_registration_status(session, message.from_user.id)
-        if status["status"] == "complete":
-            user = status["user"]
-            if user.home_nation_id is not None:
-                session.add(
-                    UserActivity(
+            if status["status"] == "complete":
+                user = status["user"]
+                if user.home_nation_id is not None:
+                    session.add(UserActivity(
                         user_id=user.user_id,
                         nation_id=user.home_nation_id,
                         activity_type="login",
-                    )
-                )
+                    ))
 
     if status["status"] == "complete":
         user = status["user"]
