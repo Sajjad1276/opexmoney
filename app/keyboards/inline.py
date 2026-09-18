@@ -10,7 +10,6 @@ def cancel_keyboard() -> InlineKeyboardMarkup:
     ]])
 
 
-
 def first_trade_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(text="⚡ اولین معامله‌ام رو انجام بده", callback_data="first_trade_tutorial", style=ButtonStyle.SUCCESS),
@@ -24,12 +23,70 @@ def trade_confirmation_keyboard() -> InlineKeyboardMarkup:
     ]])
 
 
+def welcome_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🎮 شروع بازی", callback_data="start_game")],
+        [InlineKeyboardButton(text="❓ راهنما", callback_data="show_help")],
+    ])
+
+
 def market_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="📈 خرید", callback_data="market_buy", style=ButtonStyle.SUCCESS), InlineKeyboardButton(text="📉 فروش", callback_data="market_sell", style=ButtonStyle.DANGER)],
-        [InlineKeyboardButton(text="📊 نمودار", callback_data="market_chart"), InlineKeyboardButton(text="📜 تاریخچه", callback_data="market_history")],
-        [InlineKeyboardButton(text="🔄 آپدیت", callback_data="market_refresh", style=ButtonStyle.PRIMARY)],
+        [
+            InlineKeyboardButton(text="🟢 خرید", callback_data="market_buy", style=ButtonStyle.SUCCESS),
+            InlineKeyboardButton(text="🔴 فروش", callback_data="market_sell", style=ButtonStyle.DANGER),
+        ],
+        [InlineKeyboardButton(text="📜 تاریخچه", callback_data="market_history")],
+        [InlineKeyboardButton(text="🔄 بروزرسانی", callback_data="market_refresh")],
+        [InlineKeyboardButton(text="↩️ بازگشت", callback_data="back_to_dashboard")],
     ])
+
+
+def confirm_trade_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="✅ تأیید", callback_data="confirm_trade", style=ButtonStyle.SUCCESS),
+        InlineKeyboardButton(text="❌ انصراف", callback_data="cancel_trade", style=ButtonStyle.DANGER),
+    ]])
+
+
+def nation_panel_keyboard(is_founder: bool = False) -> InlineKeyboardMarkup:
+    buttons = [
+        [InlineKeyboardButton(text="🌍 ملت‌های من", callback_data="my_nations")],
+        [InlineKeyboardButton(text="🔍 کاوش ملت‌ها", callback_data="explore_nations")],
+        [InlineKeyboardButton(text="🏛 تأسیس ملت", callback_data="found_nation")],
+    ]
+    if is_founder:
+        buttons.insert(0, [
+            InlineKeyboardButton(text="👑 پنل مدیریت", callback_data="founder_panel")
+        ])
+    buttons.append([
+        InlineKeyboardButton(text="↩️ بازگشت", callback_data="back_to_dashboard")
+    ])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def confirm_found_nation_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="✅ تأسیس ملت", callback_data="confirm_found"),
+        InlineKeyboardButton(text="❌ انصراف", callback_data="cancel_founder"),
+    ]])
+
+
+def nation_selection_keyboard(nations) -> InlineKeyboardMarkup:
+    rows = [
+        [InlineKeyboardButton(
+            text=f"🏴 {nation.name} ({nation.currency_code}) · {nation.member_count} نفر",
+            callback_data=f"join_nation:{nation.nation_id}",
+        )]
+        for nation in nations
+    ]
+    rows.append([
+        InlineKeyboardButton(
+            text="🏛 ساخت ملت جدید",
+            callback_data="found_nation",
+        )
+    ])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def market_buy_keyboard(nations) -> InlineKeyboardMarkup:
@@ -65,59 +122,3 @@ def sell_amount_keyboard(currency_code: str) -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="۷۵٪", callback_data=f"sellq_75_{currency_code}", style=ButtonStyle.PRIMARY), InlineKeyboardButton(text="همه", callback_data=f"sellq_100_{currency_code}", style=ButtonStyle.PRIMARY)],
         [InlineKeyboardButton(text="❌ انصراف", callback_data="market_sell", style=ButtonStyle.DANGER)],
     ])
-
-
-def welcome_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="🎮 شروع بازی", callback_data="start_game", style=ButtonStyle.PRIMARY)],
-            [InlineKeyboardButton(text="❓ راهنما", callback_data="show_help")],
-        ]
-    )
-
-
-def nation_selection_keyboard(nations) -> InlineKeyboardMarkup:
-    rows = [
-        [InlineKeyboardButton(
-            text=f"🏛 {nation.name} · {nation.currency_code} · {nation.member_count} نفر",
-            callback_data=f"join_{nation.nation_id}",
-            style=ButtonStyle.SUCCESS,
-        )]
-        for nation in nations
-    ]
-    rows.append([
-        InlineKeyboardButton(
-            text="🏛 ساخت ملت جدید",
-            callback_data="found_nation",
-            style=ButtonStyle.PRIMARY,
-        )
-    ])
-    return InlineKeyboardMarkup(inline_keyboard=rows)
-
-
-def nation_panel_keyboard(is_founder: bool) -> InlineKeyboardMarkup:
-    rows = []
-    if is_founder:
-        rows.append([InlineKeyboardButton(
-            text="👑 پنل مدیریت",
-            callback_data="founder_panel",
-            style=ButtonStyle.PRIMARY,
-        )])
-    rows.extend([
-        [InlineKeyboardButton(text="🌍 ملت‌های من", callback_data="my_nations")],
-        [InlineKeyboardButton(text="🔍 کاوش ملت‌ها", callback_data="explore_nations")],
-        [InlineKeyboardButton(text="🏛 تأسیس ملت", callback_data="create_nation", style=ButtonStyle.PRIMARY)],
-        [InlineKeyboardButton(text="↩️ بازگشت", callback_data="back_to_dashboard")],
-    ])
-    return InlineKeyboardMarkup(inline_keyboard=rows)
-
-
-def confirm_trade_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(text="✅ تأیید", callback_data="confirm_trade", style=ButtonStyle.SUCCESS),
-                InlineKeyboardButton(text="❌ انصراف", callback_data="cancel_trade", style=ButtonStyle.DANGER),
-            ]
-        ]
-    )
