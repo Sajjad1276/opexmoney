@@ -532,6 +532,35 @@ async def governance_cycle(
         )
     ).scalars().all()
     for override in suspended_overrides:
+        conflict = (
+            await session.execute(
+                select(RuleOverride)
+                .where(
+                    RuleOverride.id != override.id,
+                    RuleOverride.rule_key == override.rule_key,
+                    RuleOverride.scope == override.scope,
+                    RuleOverride.target_id == override.target_id,
+                    RuleOverride.is_active.is_(True),
+                )
+                .with_for_update()
+            )
+        ).scalar_one_or_none()
+
+        if conflict is not None:
+            override.suspended_until = None
+            session.add(
+                GovernanceLedger(
+                    actor_player_id=None,
+                    action="resume_conflict",
+                    rule_key=override.rule_key,
+                    old_value=str(override.value),
+                    new_value=str(conflict.value),
+                    reason="قانون جدید فعال بوده و قانون معلق دوباره فعال نشد.",
+                    at=now,
+                )
+            )
+            continue
+
         override.is_active = True
         override.suspended_until = None
         invalidate_rule_cache(override.rule_key)
