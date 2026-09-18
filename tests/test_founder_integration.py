@@ -31,6 +31,25 @@ async def test_registration_requires_currency_holding():
 
 
 @pytest.mark.asyncio
+async def test_nation_name_is_english_and_currency_is_generated_uniquely():
+    from app.utils.validators import generate_unique_currency_code, validate_nation_name
+
+    assert validate_nation_name("New Empire")[0] is True
+    assert validate_nation_name("New-Empire")[0] is False
+    assert validate_nation_name("Persian Empire!")[0] is False
+    assert validate_nation_name("OPEX")[0] is False
+
+    async with async_session() as session:
+        async with session.begin():
+            session.add(Nation(name="Origin Currency", currency_code="NEW", group_id=-100910010))
+            await session.flush()
+            code = await generate_unique_currency_code("New Empire", session)
+            assert code != "NEW"
+            assert len(code) == 3
+            assert code.isalpha() and code.isupper()
+
+
+@pytest.mark.asyncio
 async def test_create_nation_is_atomic_and_initializes_founder():
     async with async_session() as session:
         async with session.begin():
