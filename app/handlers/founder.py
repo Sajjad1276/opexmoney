@@ -15,7 +15,7 @@ from app.database.models import CurrencyHolding, Nation, User
 from app.database.session import async_session
 from app.keyboards.reply import main_menu
 from app.services.nation_service import create_nation
-from app.services.user_service import get_user, is_user_registered
+from app.services.user_service import get_user
 from app.states.founder import FounderStates
 from app.states.onboarding import OnboardingStates
 from app.utils.validators import validate_currency_code, validate_nation_name
@@ -60,10 +60,10 @@ def _group_id_is_valid(value: str) -> bool:
 async def start_founder(call: CallbackQuery, state: FSMContext) -> None:
     async with async_session() as session:
         async with session.begin():
-            if not await is_user_registered(session, call.from_user.id):
-                await call.answer("⚠️ اول باید وارد بازی بشی.", show_alert=True)
-                return
             user = await get_user(session, call.from_user.id)
+            if user is None or not (user.username or "").strip():
+                await call.answer("⚠️ اول باید اسم معامله‌گرت رو ثبت کنی.", show_alert=True)
+                return
 
     if user and user.role == "founder":
         await call.answer(
