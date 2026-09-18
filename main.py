@@ -53,10 +53,17 @@ async def run_rate_job() -> None:
         async with async_session() as session:
             async with session.begin():
                 await update_nation_rates(session)
-                await create_behavior_snapshot(session)
-        logger.info("Nation rate engine and behavior snapshot completed")
+        logger.info("Nation rate engine completed")
     except Exception:
         logger.exception("Nation rate engine failed")
+
+    try:
+        async with async_session() as session:
+            async with session.begin():
+                await create_behavior_snapshot(session)
+        logger.info("Behavior snapshot completed")
+    except Exception:
+        logger.exception("Behavior snapshot failed")
 
 
 async def run_rank_job() -> None:
