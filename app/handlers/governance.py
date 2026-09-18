@@ -402,11 +402,19 @@ async def governance_history(call: CallbackQuery):
     lines = ["📚 <b>تاریخ قوانین</b>", "━━━━━━━━━━━━━━━━━━━━"]
     if not rows:
         lines.append("هنوز سابقه‌ای ثبت نشده.")
+    action_labels = {
+        "activate": "فعال‌سازی",
+        "replace": "جایگزینی",
+        "revoke": "لغو",
+        "circuit_breaker": "ترمز ایمنی",
+    }
     for ledger, username in rows:
         actor = html.escape(username) if username else "سیستم"
+        rule = RULE_REGISTRY.get(ledger.rule_key)
+        rule_label = html.escape(rule.title_fa) if rule else html.escape(ledger.rule_key)
+        action = action_labels.get(ledger.action, "تغییر")
         lines.append(
-            f"• {actor} · <b>{html.escape(ledger.action)}</b> · "
-            f"{html.escape(ledger.rule_key)}\n"
+            f"• {actor} · <b>{action}</b> · {rule_label}\n"
             f"  {html.escape(ledger.old_value or '—')} → "
             f"{html.escape(ledger.new_value or '—')}"
         )
