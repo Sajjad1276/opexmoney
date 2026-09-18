@@ -133,13 +133,15 @@ async def receive_group_id(message: Message, state: FSMContext) -> None:
                 )
                 .limit(1)
             )
-            if existing.scalar_one_or_none() is not None:
-                await message.answer(
-                    "⚠️ این گروه قبلاً یه ملت فعال داره.\n"
-                    "یه گروه دیگه انتخاب کن.",
-                    reply_markup=founder_cancel_keyboard(),
-                )
-                return
+            group_taken = existing.scalar_one_or_none() is not None
+
+    if group_taken:
+        await message.answer(
+            "⚠️ این گروه قبلاً یه ملت فعال داره.\n"
+            "یه گروه دیگه انتخاب کن.",
+            reply_markup=founder_cancel_keyboard(),
+        )
+        return
 
     await state.update_data(group_id=group_id)
     await state.set_state(FounderStates.SET_NATION_NAME)
