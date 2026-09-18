@@ -14,7 +14,7 @@ from app.database.session import async_session
 from app.handlers.start import _safe_edit_caption, _safe_edit_text, start as restart_flow, user_mention
 from app.keyboards.inline import cancel_keyboard, nation_selection_keyboard
 from app.services.nation_service import get_active_nations
-from app.services.user_service import username_exists
+from app.services.user_service import get_user, is_fully_registered, username_exists
 from app.states.onboarding import OnboardingStates
 from app.utils.formatting import fmt_pct, fmt_rate, get_rate_change, get_rate_emoji, to_fa
 from app.utils.name_filter import is_blocked_trader_name, is_valid_trader_name
@@ -25,6 +25,49 @@ router = Router(name="onboarding_fix")
 # keep mixed Persian/Latin/emoji lines in an RTL paragraph direction and reduce
 # the visual jump to the left caused by mentions, numbers and symbols.
 RLM = "\u200f"
+
+@router.message(CommandStart())
+async def persistent_start_gate(message: Message, state: FSMContext) -> None:
+    async with async_session() as session:
+        async with session.begin():
+            if await is_fully_registered(session, message.from_user.id):
+                user = await get_user(session, message.from_user.id)
+            else:
+                user = None
+
+    if user is not None:
+        await state.clear()
+        from app.handlers.start import show_dashboard
+        await show_dashboard(message, user)
+        return
+
+    await restart_flow(message, state)
+
+
+@router.callback_query(F.data == "start_game")
+async def persistent_start_button_gate(call: CallbackQuery, state: FSMContext) -> None:
+    if call.message is None:
+        await call.answer("⚠️ پیام شروع بازی پیدا نشد.", show_alert=True)
+        return
+
+    async with async_session() as session:
+        async with session.begin():
+            if await is_fully_registered(session, call.from_user.id):
+                user = await get_user(session, call.from_user.id)
+            else:
+                user = None
+
+    if user is not None:
+        await state.clear()
+        from app.handlers.start import show_dashboard
+        await show_dashboard(call.message, user)
+        await call.answer()
+        return
+
+    await call.answer()
+    await restart_flow(call.message, state)
+
+
 
 
 def rtl_text(text: str) -> str:
@@ -152,6 +195,18 @@ async def reject_non_english_name(message: Message, state: FSMContext) -> None:
 @router.message(OnboardingStates.SET_USERNAME_PLAYER, F.text.func(is_valid_trader_name))
 async def accept_valid_name(message: Message, state: FSMContext) -> None:
     username = (message.text or "").strip()
+
+    async with async_session() as session:
+        async with session.begin():
+            if await is_fully_registered(session, message.from_user.id):
+                user = await get_user(session, message.from_user.id)
+            else:
+                user = None
+    if user is not None:
+        await state.clear()
+        from app.handlers.start import show_dashboard
+        await show_dashboard(message, user)
+        return
 
     if is_blocked_trader_name(username):
         await message.answer(BLOCKED_NAME, parse_mode="HTML")
