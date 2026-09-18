@@ -8,6 +8,8 @@ from aiogram.filters.state import StateFilter
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import Nation, User
 from app.database.session import async_session
@@ -110,7 +112,7 @@ NO_NATION_TEXT = rtl_text("""🌍 <b>هنوز هیچ ملتی تأسیس نشد�
 
 async def show_nation_selection(
     message: Message,
-    session,
+    session: AsyncSession,
     state: FSMContext,
 ) -> None:
     result = await session.execute(
@@ -271,31 +273,16 @@ async def accept_valid_name(message: Message, state: FSMContext) -> None:
                 ))
             else:
                 user.username = username
-            nations = await get_active_nations(session, limit=3)
 
     await state.update_data(username=username)
 
-    # The original name-entry message becomes the standalone confirmation.
     confirmation = NAME_ACCEPTED_TEXT.format(username=html.escape(username))
     if not await _edit_onboarding_prompt(message, state, confirmation):
         await message.answer(confirmation, parse_mode="HTML")
 
-    # Nation selection is deliberately a NEW message after the confirmation.
-    await state.set_state(OnboardingStates.SELECT_NATION)
-
-    if not nations:
-        await message.answer(
-            NO_NATION_TEXT,
-            reply_markup=nation_selection_keyboard([]),
-            parse_mode="HTML",
-        )
-        return
-
-    await message.answer(
-        clean_nation_list_text(message.from_user, username, nations),
-        reply_markup=nation_selection_keyboard(nations),
-        parse_mode="HTML",
-    )
+    async with async_session() as session:
+        async with session.begin():
+            await show_nation_selection(message, session, state)
 
 
 @router.callback_query(F.data == "cancel_start", StateFilter(OnboardingStates.SET_USERNAME_PLAYER))
