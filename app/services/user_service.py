@@ -75,3 +75,11 @@ async def is_fully_registered(
         .limit(1)
     )
     return result.scalar_one_or_none() is not None
+
+
+async def is_user_registered(
+    session: AsyncSession,
+    telegram_id: int,
+) -> bool:
+    """Backward-compatible alias for the persistent full-registration check."""
+    return await is_fully_registered(session, telegram_id)
