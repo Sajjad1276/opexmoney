@@ -83,13 +83,19 @@ async def generate_unique_currency_code(
         if len(candidates) >= 512:
             break
 
+    result = await session.execute(select(Nation.currency_code))
+    used_codes = {row[0].upper() for row in result.all()}
+
     for code in candidates:
-        if code in _RESERVED_CURRENCY_CODES:
-            continue
-        existing = await session.execute(
-            select(Nation.nation_id).where(Nation.currency_code == code).limit(1)
-        )
-        if existing.scalar_one_or_none() is None:
+        if code not in _RESERVED_CURRENCY_CODES and code not in used_codes:
             return code
 
-    raise ValueError("⚠️ کد ارز یکتای قابل استفاده پیدا نشد. دوباره امتحان کن.")
+    # The currency namespace has only 26^3 values. This fallback guarantees
+    # uniqueness even after many similarly named nations have consumed the
+    # natural abbreviations.
+    for first, second, third in itertools.product("ABCDEFGHIJKLMNOPQRSTUVWXYZ", repeat=3):
+        code = f"{first}{second}{third}"
+        if code not in _RESERVED_CURRENCY_CODES and code not in used_codes:
+            return code
+
+    raise ValueError("⚠️ ظرفیت کدهای ارز پر شده. فعلاً امکان تأسیس ملت جدید نیست.")
