@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import html
 from datetime import datetime
+from decimal import Decimal
 
 from aiogram import F, Router
 from aiogram.filters import Command
@@ -32,7 +33,7 @@ from app.services.governance_service import (
 from app.services.rules.registry import RULE_REGISTRY, get_rule, parse_rule_input
 from app.services.rules.resolver import resolve
 from app.states.governance import GovernanceStates
-from app.utils.formatting import fmt_amount, to_fa
+from app.utils.formatting import to_fa
 
 
 governance_router = Router(name="governance")
