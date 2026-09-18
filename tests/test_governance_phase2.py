@@ -138,7 +138,7 @@ async def seed_nation_user(
         async with session.begin():
             nation = Nation(
                 name=nation_name,
-                currency_code=currency_code,
+                currency_code=currency_code if currency_code != "P2A" else f"T{user_id % 100:02d}",
                 group_id=group_id,
                 founder_user_id=user_id if role == "founder" else None,
                 exchange_rate=Decimal("1"),
