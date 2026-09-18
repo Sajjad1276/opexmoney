@@ -18,7 +18,7 @@ from app.database.session import async_session
 from app.keyboards.inline import cancel_keyboard, first_trade_keyboard, founder_cancel_keyboard, no_nation_keyboard, nation_keyboard, start_keyboard, trade_confirmation_keyboard
 from app.keyboards.reply import main_menu
 from app.services.nation_service import get_active_nations, get_nation_rank
-from app.services.user_service import get_user, username_exists
+from app.services.user_service import get_registration_status, get_user, username_exists
 from app.states.onboarding import OnboardingStates
 from app.utils.formatting import fmt_amount, fmt_pct, fmt_rate, get_rate_change, get_rate_emoji, to_fa
 
@@ -118,22 +118,121 @@ async def show_dashboard(message: Message, user: User) -> None:
     await message.answer(text, reply_markup=main_menu(), parse_mode="HTML")
 
 
-@router.message(CommandStart())
-async def start(message: Message, state: FSMContext) -> None:
-    await state.clear()
-    async with async_session() as session:
-        user = await get_user(session, message.from_user.id)
-        if user is not None and user.home_nation_id:
-            session.add(UserActivity(user_id=user.user_id, nation_id=user.home_nation_id, activity_type="login"))
-            await session.commit()
-    if user is not None:
+async def continue_registration(
+    message: Message,
+    state: FSMContext,
+    user: User,
+    missing: list[str],
+) -> None:
+    await state.update_data(
+        user_id=user.user_id,
+        username=user.username,
+    )
+
+    if "holding" not in missing:
+        await state.clear()
         await show_dashboard(message, user)
         return
-    caption = START_CAPTION.format(bot_name="OPEX MONEY", user_name=html.escape(message.from_user.first_name or "معامله‌گر"), current_date=current_date_fa())
+
+    # A persisted home nation means the user is not really at the nation
+    # selection step. Repair the missing holding from the existing balance.
+    if user.home_nation_id is not None:
+        async with async_session() as session:
+            async with session.begin():
+                nation = await session.get(Nation, user.home_nation_id)
+                holding = await session.scalar(
+                    select(CurrencyHolding).where(
+                        CurrencyHolding.user_id == user.user_id,
+                        CurrencyHolding.nation_id == user.home_nation_id,
+                    )
+                )
+                if nation is not None and holding is None:
+                    session.add(
+                        CurrencyHolding(
+                            user_id=user.user_id,
+                            nation_id=user.home_nation_id,
+                            amount=user.balance,
+                        )
+                    )
+        await state.clear()
+        await show_dashboard(message, user)
+        return
+
+    async with async_session() as session:
+        nations = await get_active_nations(session, limit=3)
+
+    await state.set_state(OnboardingStates.SELECT_NATION)
+
+    if not nations:
+        await message.answer(
+            "⚠️ ثبت‌نامت ناقصه، اما هنوز هیچ ملتی برای پیوستن وجود نداره.",
+            reply_markup=no_nation_keyboard(),
+        )
+        return
+
+    await message.answer(
+        nation_list_text(message.from_user, user.username, nations),
+        reply_markup=nation_keyboard(nations),
+        parse_mode="HTML",
+    )
+
+
+@router.message(CommandStart())
+async def start(message: Message, state: FSMContext) -> None:
+    # FSM is only transient UI state. Registration truth always comes from DB.
+    await state.clear()
+
+    async with async_session() as session:
+        status = await get_registration_status(session, message.from_user.id)
+
+    if status["status"] == "complete":
+        user = status["user"]
+        await show_dashboard(message, user)
+        return
+
+    if status["status"] == "partial":
+        await continue_registration(
+            message,
+            state,
+            status["user"],
+            status["missing"],
+        )
+        return
+
+    caption = START_CAPTION.format(
+        bot_name="OPEX MONEY",
+        user_name=html.escape(message.from_user.first_name or "معامله‌گر"),
+        current_date=current_date_fa(),
+    )
     try:
-        await message.answer_photo("assets/welcome_banner.jpg", caption=caption, reply_markup=start_keyboard(), parse_mode="HTML")
+        await message.answer_photo(
+            "assets/welcome_banner.jpg",
+            caption=caption,
+            reply_markup=start_keyboard(),
+            parse_mode="HTML",
+        )
     except (TelegramBadRequest, TypeError):
-        await message.answer(caption, reply_markup=start_keyboard(), parse_mode="HTML")
+        await message.answer(
+            caption,
+            reply_markup=start_keyboard(),
+            parse_mode="HTML",
+        )
+
+
+@router.callback_query(F.data == "start_help")
+async def start_help(call: CallbackQuery) -> None:
+    text = (
+        "❓ <b>راهنمای OPEX MONEY</b>\n\n"
+        "در این بازی تو یه معامله‌گر اقتصادی هستی.\n"
+        "به ملت‌ها بپیوند، ارز بخر و بفروش،\n"
+        "و در اقتصاد زنده تلگرام رقابت کن.\n\n"
+        "برای شروع، یه اسم معامله‌گر انتخاب کن\n"
+        "و به ملتی بپیوند.\n\n"
+        "اگه بعداً خواستی ملت خودت رو بسازی،\n"
+        "از پنل بازی می‌تونی اقدام کنی."
+    )
+    await _safe_edit_caption(call, text, start_keyboard()) if getattr(call.message, "photo", None) else await _safe_edit_text(call, text, start_keyboard())
+    await call.answer()
 
 
 @router.callback_query(F.data == "start_player")
