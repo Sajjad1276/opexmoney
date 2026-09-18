@@ -250,28 +250,32 @@ async def accept_valid_name(message: Message, state: FSMContext) -> None:
         await message.answer(BLOCKED_NAME, parse_mode="HTML")
         return
 
+    duplicate = False
     async with async_session() as session:
         async with session.begin():
             if await username_exists(session, username):
                 existing = await session.get(User, message.from_user.id)
-                if existing is None or existing.username != username:
-                    duplicate_text = rtl_text(
-                        f"🔴 <b>«{html.escape(username)}» قبلاً ثبت شده.</b>\n\nیک اسم دیگه برای معامله‌گرت انتخاب کن."
-                    )
-                    await message.answer(duplicate_text, parse_mode="HTML")
-                    return
-            user = await session.get(User, message.from_user.id)
-            if user is None:
-                session.add(User(
-                    user_id=message.from_user.id,
-                    username=username,
-                    home_nation_id=None,
-                    balance=0,
-                    xr_balance=0,
-                    role="player",
-                ))
-            else:
-                user.username = username
+                duplicate = existing is None or existing.username != username
+            if not duplicate:
+                user = await session.get(User, message.from_user.id)
+                if user is None:
+                    session.add(User(
+                        user_id=message.from_user.id,
+                        username=username,
+                        home_nation_id=None,
+                        balance=0,
+                        xr_balance=0,
+                        role="player",
+                    ))
+                else:
+                    user.username = username
+
+    if duplicate:
+        duplicate_text = rtl_text(
+            f"🔴 <b>«{html.escape(username)}» قبلاً ثبت شده.</b>\n\nیک اسم دیگه برای معامله‌گرت انتخاب کن."
+        )
+        await message.answer(duplicate_text, parse_mode="HTML")
+        return
 
     await state.update_data(username=username)
 
