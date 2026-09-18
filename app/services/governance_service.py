@@ -299,6 +299,33 @@ async def _activate_proposal(
     return True
 
 
+async def _activate_passed_proposals(
+    session: AsyncSession,
+    *,
+    now: datetime,
+) -> int:
+    activated = 0
+    proposals = (
+        await session.execute(
+            select(Proposal)
+            .where(
+                Proposal.status == "passed",
+                Proposal.effective_from.is_not(None),
+                Proposal.effective_from <= now,
+                Proposal.effective_until.is_not(None),
+                Proposal.effective_until > now,
+            )
+            .with_for_update()
+        )
+    ).scalars().all()
+
+    for proposal in proposals:
+        if await _activate_proposal(session, proposal, now):
+            activated += 1
+
+    return activated
+
+
 async def _close_voting_and_activate(
     session: AsyncSession,
     *,
@@ -509,6 +536,19 @@ async def governance_cycle(
         override.suspended_until = None
         invalidate_rule_cache(override.rule_key)
 
+    stale_drafts = (
+        await session.execute(
+            select(Proposal)
+            .where(
+                Proposal.status == "draft",
+                Proposal.voting_opens_at <= now - timedelta(days=settings.governance_draft_window_days),
+            )
+            .with_for_update()
+        )
+    ).scalars().all()
+    for proposal in stale_drafts:
+        proposal.status = "expired"
+
     draft_proposals = (
         await session.execute(
             select(Proposal)
@@ -524,6 +564,7 @@ async def governance_cycle(
         proposal.status = "voting"
 
     activated, _ = await _close_voting_and_activate(session, now=now)
+    activated += await _activate_passed_proposals(session, now=now)
     revoked = await _revoke_expired_proposals(session, now=now)
     rotated = await rotate_due_profiles(session, now=now)
 
