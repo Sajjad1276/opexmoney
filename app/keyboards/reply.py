@@ -2,6 +2,17 @@ from aiogram.enums import ButtonStyle
 from aiogram.types import KeyboardButton, ReplyKeyboardMarkup
 
 
+def get_welcome_keyboard() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="🎮 شروع بازی")],
+            [KeyboardButton(text="❓ راهنما")],
+        ],
+        resize_keyboard=True,
+        one_time_keyboard=True,
+    )
+
+
 def main_menu() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         keyboard=[
