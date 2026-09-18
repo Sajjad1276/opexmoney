@@ -19,9 +19,11 @@ from app.database.models import (
     User,
     UserActivity,
     Vote,
+    NationMemberHistory,
+    RateHistory,
 )
 from app.database.session import async_session
-from app.services.economic_engine import clamp
+from app.services.economic_engine import clamp, update_nation_rates
 from app.services.governance_service import (
     cast_vote,
     check_circuit_breaker,
@@ -50,6 +52,8 @@ async def cleanup_phase2_rows():
             await session.execute(delete(GovernanceLedger))
             await session.execute(delete(Proposal))
             await session.execute(delete(BehaviorSnapshot))
+            await session.execute(delete(RateHistory))
+            await session.execute(delete(NationMemberHistory))
             await session.execute(
                 delete(PlayerTemporalProfile).where(
                     PlayerTemporalProfile.player_id.between(TEST_USER_MIN, TEST_USER_MAX)
@@ -205,6 +209,27 @@ async def test_resolver_priority_and_clamping():
                 nation_id=nation_id,
                 player_id=player_id,
             ) == Decimal("10.000000")
+
+
+@pytest.mark.asyncio
+async def test_rate_engine_default_regression():
+    nation_id, _ = await seed_nation_user(
+        TEST_USER_MIN + 8,
+        role="founder",
+        group_id=TEST_GROUP_MIN + 8,
+    )
+
+    async with async_session() as session:
+        async with session.begin():
+            nation = await session.get(Nation, nation_id, with_for_update=True)
+            await update_nation_rates(
+                session,
+                now=datetime(2026, 1, 15, 12, 0, 0),
+            )
+            await session.flush()
+
+            assert nation.exchange_rate == Decimal("0.9800")
+            assert nation.rate_prev == Decimal("1.0000")
 
 
 @pytest.mark.asyncio
