@@ -27,6 +27,7 @@ from app.keyboards.inline import (
     trade_preview_keyboard,
 )
 from app.services.economic_engine import get_active_members
+from app.services.keyboard_state import KeyboardKind, keyboard_manager
 from app.services.rules.resolver import resolve
 from app.services.temporal_service import get_peak_multiplier
 from app.states.market import MarketStates
@@ -45,11 +46,14 @@ router = Router(name="market")
 
 async def safe_edit(call, text, markup=None):
     try:
-        if call.message is None or not hasattr(call.message, "edit_text"):
+        if call.message is None:
             return False
-        await call.message.edit_text(
-            text,
-            reply_markup=markup,
+        await keyboard_manager.edit_message(
+            call.message,
+            text=text,
+            kind=KeyboardKind.INLINE if markup is not None else KeyboardKind.NONE,
+            name="market" if markup is not None else "none",
+            markup=markup,
             parse_mode="HTML",
         )
         return True
@@ -146,9 +150,13 @@ async def render_market(message: Message, edit_call=None):
     if edit_call:
         await safe_edit(edit_call, text, market_keyboard())
     else:
-        await message.answer(
-            text,
-            reply_markup=market_keyboard(),
+        await keyboard_manager.send_message(
+            message.bot,
+            chat_id=message.chat.id,
+            text=text,
+            kind=KeyboardKind.INLINE,
+            name="market",
+            markup=market_keyboard(),
             parse_mode="HTML",
         )
 
@@ -196,9 +204,12 @@ async def market_refresh(call: CallbackQuery):
                 text = market_text(user, nation, others, active)
 
         try:
-            await call.message.edit_text(
-                text,
-                reply_markup=market_keyboard(),
+            await keyboard_manager.edit_message(
+                call.message,
+                text=text,
+                kind=KeyboardKind.INLINE,
+                name="market",
+                markup=market_keyboard(),
                 parse_mode="HTML",
             )
             await call.answer()
@@ -350,9 +361,13 @@ async def make_buy_preview(
             )
 
     await state.clear()
-    await message.answer(
-        text,
-        reply_markup=trade_preview_keyboard(nation_id, spend, "buy"),
+    await keyboard_manager.send_message(
+        message.bot,
+        chat_id=message.chat.id,
+        text=text,
+        kind=KeyboardKind.INLINE,
+        name="trade_preview_buy",
+        markup=trade_preview_keyboard(nation_id, spend, "buy"),
         parse_mode="HTML",
     )
 
@@ -728,9 +743,13 @@ async def make_sell_preview(message, state, nation_id: int, raw: str):
             )
 
     await state.clear()
-    await message.answer(
-        text,
-        reply_markup=trade_preview_keyboard(nation_id, amount, "sell"),
+    await keyboard_manager.send_message(
+        message.bot,
+        chat_id=message.chat.id,
+        text=text,
+        kind=KeyboardKind.INLINE,
+        name="trade_preview_sell",
+        markup=trade_preview_keyboard(nation_id, amount, "sell"),
         parse_mode="HTML",
     )
 
