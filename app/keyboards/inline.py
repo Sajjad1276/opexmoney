@@ -65,6 +65,14 @@ def nation_panel_keyboard(is_founder: bool = False) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
+def add_to_group_keyboard(url: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="➕ افزودن ربات به گروه", url=url),
+    ], [
+        InlineKeyboardButton(text="❌ انصراف", callback_data="cancel_founder"),
+    ]])
+
+
 def confirm_found_nation_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(text="✅ تأسیس ملت", callback_data="confirm_found"),
