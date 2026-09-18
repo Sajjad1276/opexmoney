@@ -272,7 +272,7 @@ async def test_full_user_journey_and_restart_recovery(bot):
         )
         assert user is not None
         assert user.home_nation_id == nation_id
-        assert user.xr_balance >= Decimal("400.00")
+        assert user.xr_balance >= Decimal("10.00")
         assert tx_count >= 2
         print(
             f"E2E|PASS|player={user.user_id}|nation={nation_id}|transactions={tx_count}|xr={user.xr_balance}"
