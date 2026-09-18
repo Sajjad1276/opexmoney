@@ -4,13 +4,14 @@ import html
 
 from aiogram import F, Router
 from aiogram.filters import CommandStart
+from aiogram.filters.state import StateFilter
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from app.database.session import async_session
 from app.handlers.start import _safe_edit_caption, _safe_edit_text, start as restart_flow, user_mention
-from app.keyboards.inline import cancel_keyboard, nation_keyboard
+from app.keyboards.inline import cancel_keyboard, nation_keyboard, nation_selection_keyboard
 from app.services.nation_service import get_active_nations
 from app.services.user_service import username_exists
 from app.states.onboarding import OnboardingStates
@@ -57,11 +58,10 @@ NAME_ACCEPTED_TEXT = rtl_text("""🎉 <b>تبریک! «{username}» با موف�
 
 اسم معامله‌گری تو آماده است و از این به بعد در OPEX با همین نام شناخته میشی.""")
 
-NO_NATION_TEXT = rtl_text("""🌍 <b>هنوز هیچ ملتی در OPEX وجود نداره.</b>
+NO_NATION_TEXT = rtl_text("""🌍 <b>هنوز هیچ ملتی تأسیس نشده!</b>
 
-ثبت‌نامت انجام شد، {user_mention}.
-
-هر وقت اولین ملت ایجاد شد، می‌تونی به اون بپیوندی.""")
+تو می‌تونی اولین بنیان‌گذار تاریخ باشی
+و اولین ملت OPEX MONEY رو بسازی.""")
 
 
 def clean_nation_list_text(user, trader_name: str, nations) -> str:
@@ -177,19 +177,20 @@ async def accept_valid_name(message: Message, state: FSMContext) -> None:
 
     if not nations:
         await message.answer(
-            NO_NATION_TEXT.format(user_mention=user_mention(message.from_user)),
+            NO_NATION_TEXT,
+            reply_markup=nation_selection_keyboard([]),
             parse_mode="HTML",
         )
         return
 
     await message.answer(
         clean_nation_list_text(message.from_user, username, nations),
-        reply_markup=nation_keyboard(nations),
+        reply_markup=nation_selection_keyboard(nations),
         parse_mode="HTML",
     )
 
 
-@router.callback_query(F.data == "cancel_start")
+@router.callback_query(F.data == "cancel_start", StateFilter(OnboardingStates.SET_USERNAME_PLAYER))
 async def cancel_start_fix(call: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
     user_name = html.escape(call.from_user.first_name or "معامله‌گر")
