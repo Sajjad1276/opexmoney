@@ -488,8 +488,9 @@ async def confirm_first_trade(call: CallbackQuery, state: FSMContext) -> None:
 async def skip_first_trade(call: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
     async with async_session() as session:
-        user = await get_user(session, call.from_user.id)
-        nation = await session.get(Nation, user.home_nation_id) if user and user.home_nation_id else None
+        async with session.begin():
+            user = await get_user(session, call.from_user.id)
+            nation = await session.get(Nation, user.home_nation_id) if user and user.home_nation_id else None
     currency_code = nation.currency_code if nation else "ارز"
     balance = fmt_amount(nation and (await _get_holding_amount(call.from_user.id, nation.nation_id)) or Decimal("500")) if nation else "۵۰۰"
     text = f"{html.escape(call.from_user.first_name or 'معامله‌گر')}، هر وقت آماده شدی\nاز 💹 بازار شروع کن.\n\n💰 موجودی: {balance} <code>{html.escape(currency_code)}</code>"
