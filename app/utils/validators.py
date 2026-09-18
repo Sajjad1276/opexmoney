@@ -4,7 +4,7 @@ import re
 
 
 _NATION_NAME_RE = re.compile(
-    r"^[A-Za-z\u0621-\u063A\u0641-\u064A\u067E\u0686\u0698\u06AF]+"
+    r"^[A-Za-z\u0621-\u063A\u0641-\u064A\u067E\u06A9\u06CC\u0686\u0698\u06AF]+"
     r"(?:[ -][A-Za-z\u0621-\u063A\u064A\u067E\u0686\u0698\u06AF]+)*$"
 )
 _CURRENCY_CODE_RE = re.compile(r"^[A-Z]{3}$")
