@@ -7,6 +7,10 @@ from aiogram import Dispatcher
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy import inspect, text
 
+from config import settings
+from app.services.intent_router import IntentType, classify_intent
+from app.services.keyboard_state import KeyboardStateManager, keyboard_manager
+
 from app.database.models import Base
 from app.database.session import async_session, engine
 from app.services.rules.registry import RULE_REGISTRY, validate_registry
@@ -121,6 +125,8 @@ async def run_startup_smoke_test(
                 "governance_ledger",
                 "player_temporal_profiles",
                 "behavior_snapshots",
+                "onboarding_drafts",
+                "keyboard_states",
             )
             if not await _table_exists(table_name)
         ]
@@ -201,6 +207,34 @@ async def run_startup_smoke_test(
             "SELFTEST|FAIL|metadata|missing=%s",
             ",".join(sorted(missing_metadata)),
         )
+        ok = False
+
+    if not settings.redis_url and not settings.allow_memory_fsm_dev:
+        logger.error(
+            "SELFTEST|FAIL|fsm-storage|REDIS_URL missing and ALLOW_MEMORY_FSM_DEV is false"
+        )
+        ok = False
+    else:
+        logger.info(
+            "SELFTEST|PASS|fsm-storage|redis=%s|memory_dev=%s",
+            bool(settings.redis_url),
+            settings.allow_memory_fsm_dev,
+        )
+
+    if not isinstance(keyboard_manager, KeyboardStateManager):
+        logger.error("SELFTEST|FAIL|keyboard-manager|not initialized")
+        ok = False
+    else:
+        logger.info("SELFTEST|PASS|keyboard-manager|initialized")
+
+    try:
+        command_message = type("CommandMessage", (), {"text": "/cancel"})()
+        intent = await classify_intent(command_message, None)
+        if intent != IntentType.SYSTEM_COMMAND:
+            raise AssertionError(f"expected SYSTEM_COMMAND, got {intent}")
+        logger.info("SELFTEST|PASS|intent-router|/cancel=%s", intent.value)
+    except Exception:
+        logger.exception("SELFTEST|FAIL|intent-router|/cancel")
         ok = False
 
     logger.info(
