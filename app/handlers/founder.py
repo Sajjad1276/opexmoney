@@ -211,14 +211,6 @@ async def start_founder(call: CallbackQuery, state: FSMContext) -> None:
 
         trader_name = user.username if user is not None else pending_username
 
-        if user.role == "founder":
-            if call.message:
-                await call.message.answer("⚠️ هر معامله‌گر فقط می‌تونه یک ملت بسازه.")
-            await call.answer()
-            return
-
-        trader_name = user.username
-
     groups = await _shared_groups(call.bot, call.from_user.id)
     if not groups:
         await state.clear()
@@ -410,6 +402,7 @@ async def confirm_create(call: CallbackQuery, state: FSMContext) -> None:
                 group_id=int(data["group_id"]),
                 nation_name=str(data["nation_name"]),
                 currency_code=str(data["currency_code"]),
+                founder_username=str(data.get("username") or call.from_user.first_name or "معامله‌گر"),
             )
         except ValueError as exc:
             await state.clear()
