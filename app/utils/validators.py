@@ -36,13 +36,12 @@ async def validate_currency_code(
     if value in _RESERVED_CURRENCY_CODES:
         return False, "⚠️ این کد رزرو سیستمه. یه کد دیگه انتخاب کن."
 
-    async with session.begin():
-        existing = await session.execute(
-            select(Nation.nation_id)
-            .where(Nation.currency_code == value)
-            .limit(1)
-        )
-        if existing.scalar_one_or_none() is not None:
-            return False, "⚠️ این کد ارز قبلاً استفاده شده. یه کد دیگه انتخاب کن."
+    existing = await session.execute(
+        select(Nation.nation_id)
+        .where(Nation.currency_code == value)
+        .limit(1)
+    )
+    if existing.scalar_one_or_none() is not None:
+        return False, "⚠️ این کد ارز قبلاً استفاده شده. یه کد دیگه انتخاب کن."
 
     return True, ""
