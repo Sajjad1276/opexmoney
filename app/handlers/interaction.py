@@ -43,7 +43,7 @@ async def _send_home_after_cancel(message: Message) -> None:
         )
 
 
-@interaction_router.message(Command("start"))
+@interaction_router.message(F.chat.type == "private", Command("start"))
 async def system_start(message: Message, state: FSMContext) -> None:
     current = await state.get_state()
     if current is None:
@@ -79,7 +79,7 @@ async def keep_wizard(call: CallbackQuery) -> None:
     await call.answer("✅ مرحله فعلی حفظ شد.")
 
 
-@interaction_router.message(Command("cancel"))
+@interaction_router.message(F.chat.type == "private", Command("cancel"))
 async def system_cancel(message: Message, state: FSMContext) -> None:
     await state.clear()
     async with async_session() as session:
@@ -88,6 +88,6 @@ async def system_cancel(message: Message, state: FSMContext) -> None:
     await _send_home_after_cancel(message)
 
 
-@interaction_router.message(Command("help"))
+@interaction_router.message(F.chat.type == "private", Command("help"))
 async def system_help(message: Message) -> None:
     await _show_help(message)
