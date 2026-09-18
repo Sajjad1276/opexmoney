@@ -63,10 +63,19 @@ def test_all_fsm_states_have_step_definitions():
 @pytest.mark.asyncio
 async def test_draft_survives_new_memory_storage():
     user_id = 930001
-    from app.database.models import User
+    from app.database.models import User, OnboardingDraft
+
+    from sqlalchemy import delete
 
     async with __import__("app.database.session", fromlist=["async_session"]).async_session() as session:
         async with session.begin():
+            await session.execute(
+                delete(OnboardingDraft).where(OnboardingDraft.player_id == user_id)
+            )
+            old_user = await session.get(User, user_id)
+            if old_user is not None:
+                await session.delete(old_user)
+            await session.flush()
             session.add(User(
                 user_id=user_id,
                 username="Persist930001",
