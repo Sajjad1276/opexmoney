@@ -188,10 +188,10 @@ def governance_main_keyboard(is_founder: bool = False) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def governance_rule_keyboard(rule_keys: list[str]) -> InlineKeyboardMarkup:
+def governance_rule_keyboard(rules: list[tuple[str, str]]) -> InlineKeyboardMarkup:
     rows = [
-        [InlineKeyboardButton(text=key, callback_data=f"gov_rule:{key}")]
-        for key in rule_keys
+        [InlineKeyboardButton(text=title, callback_data=f"gov_rule:{key}")]
+        for key, title in rules
     ]
     rows.append([InlineKeyboardButton(text="❌ انصراف", callback_data="gov_cancel")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
