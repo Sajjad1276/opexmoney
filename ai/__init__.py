@@ -1,4 +1,4 @@
-"""OPEX MONEY AI companion facade.
+"""OPEX MONEY AI companion.
 
 Pipeline:
 context -> prompt -> Redis cache -> Gemini API -> parser -> fallback.
@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import logging.handlers
+import os
 import time
 from pathlib import Path
 
@@ -34,7 +35,10 @@ _LOG_DIR = Path(__file__).resolve().parent / "logs"
 _LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 logger = logging.getLogger("opex.ai")
-if not any(isinstance(handler, logging.handlers.RotatingFileHandler) for handler in logger.handlers):
+if not any(
+    isinstance(handler, logging.handlers.RotatingFileHandler)
+    for handler in logger.handlers
+):
     file_handler = logging.handlers.RotatingFileHandler(
         _LOG_DIR / "ai_calls.log",
         maxBytes=2_000_000,
@@ -42,7 +46,9 @@ if not any(isinstance(handler, logging.handlers.RotatingFileHandler) for handler
         encoding="utf-8",
     )
     file_handler.setFormatter(
-        logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(message)s")
+        logging.Formatter(
+            "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
+        )
     )
     logger.addHandler(file_handler)
     logger.setLevel(logging.INFO)
@@ -55,21 +61,74 @@ class AICompanion:
     def __init__(self) -> None:
         self._client: genai.Client | None = None
 
+    @staticmethod
+    def _api_key() -> str | None:
+        """Read the configured API key with environment fallbacks."""
+        candidates = (
+            settings.gemini_api_key,
+            os.getenv("GEMINI_API_KEY"),
+            os.getenv("GOOGLE_API_KEY"),
+            os.getenv("GOOGLE_GEMINI_API_KEY"),
+        )
+        for value in candidates:
+            if value and value.strip():
+                return value.strip()
+        return None
+
     def _get_client(self) -> genai.Client | None:
-        """Create the Gemini client only when credentials exist."""
-        if not settings.ai_enabled or not settings.gemini_api_key:
+        """Create the Gemini client only when AI is enabled and credentials exist."""
+        api_key = self._api_key()
+        if not settings.ai_enabled or not api_key:
             return None
 
         if self._client is None:
             self._client = genai.Client(
-                api_key=settings.gemini_api_key,
+                api_key=api_key,
                 http_options=types.HttpOptions(
                     timeout=settings.ai_timeout_seconds,
                 ),
             )
         return self._client
 
-    async def reply(self, user_id: int, user_message: str, db: AsyncSession) -> str:
+    async def health_check(self) -> bool:
+        """Verify that the configured Gemini key can access the configured model."""
+        if not settings.ai_enabled:
+            logger.warning("health_check status=disabled reason=AI_ENABLED=false")
+            return False
+
+        if not self._api_key():
+            logger.error(
+                "health_check status=failed reason=missing_api_key "
+                "expected=GEMINI_API_KEY"
+            )
+            return False
+
+        client = self._get_client()
+        if client is None:
+            logger.error("health_check status=failed reason=client_not_created")
+            return False
+
+        try:
+            model = await client.aio.models.get(model=settings.ai_model)
+            model_name = getattr(model, "name", None) or settings.ai_model
+            logger.info(
+                "health_check status=success provider=gemini model=%s",
+                model_name,
+            )
+            return True
+        except Exception:
+            logger.exception(
+                "health_check status=failed provider=gemini model=%s",
+                settings.ai_model,
+            )
+            return False
+
+    async def reply(
+        self,
+        user_id: int,
+        user_message: str,
+        db: AsyncSession,
+    ) -> str:
         """
         Generate one safe AI response.
 
@@ -99,9 +158,17 @@ class AICompanion:
 
             client = self._get_client()
             if client is None:
-                logger.info(
-                    "call user_id=%s status=disabled latency_ms=%.1f",
+                reason = (
+                    "disabled"
+                    if not settings.ai_enabled
+                    else "missing_api_key"
+                    if not self._api_key()
+                    else "client_not_created"
+                )
+                logger.warning(
+                    "call user_id=%s status=fallback reason=%s latency_ms=%.1f",
                     user_id,
+                    reason,
                     (time.perf_counter() - started) * 1000,
                 )
                 return AI_FALLBACK_MESSAGE
@@ -110,23 +177,17 @@ class AICompanion:
                 context=context,
                 user_message=clean_message,
             )
+
             response = await client.aio.models.generate_content(
                 model=settings.ai_model,
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     system_instruction=SYSTEM_PERSONALITY,
-                    response_mime_type="application/json",
-                    response_schema={
-                        "type": "OBJECT",
-                        "properties": {
-                            "reply": {"type": "STRING"},
-                        },
-                        "required": ["reply"],
-                    },
                     temperature=0.7,
                     max_output_tokens=300,
                 ),
             )
+
             raw_output = response.text or ""
             parsed = parse_ai_response(raw_output)
 
@@ -139,10 +200,13 @@ class AICompanion:
                 (time.perf_counter() - started) * 1000,
             )
             return parsed.reply
-        except Exception:
+        except Exception as exc:
             logger.exception(
-                "call user_id=%s status=fallback provider=gemini latency_ms=%.1f",
+                "call user_id=%s status=fallback provider=gemini model=%s "
+                "error_type=%s latency_ms=%.1f",
                 user_id,
+                settings.ai_model,
+                type(exc).__name__,
                 (time.perf_counter() - started) * 1000,
             )
             return AI_FALLBACK_MESSAGE
@@ -158,7 +222,11 @@ class AICompanion:
 companion = AICompanion()
 
 
-async def get_ai_reply(user_id: int, user_message: str, db: AsyncSession) -> str:
+async def get_ai_reply(
+    user_id: int,
+    user_message: str,
+    db: AsyncSession,
+) -> str:
     """Convenience facade for handlers."""
     return await companion.reply(user_id, user_message, db)
 
