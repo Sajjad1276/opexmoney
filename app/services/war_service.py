@@ -9,6 +9,7 @@ from aiogram import Bot
 from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.database.session import async_session
 from app.database.models import (
     Nation,
     NationLog,
@@ -224,10 +225,6 @@ async def resolve_war(
     bot: Bot | None = None,
 ) -> dict | None:
     """Resolve one war atomically and pay the 10% treasury reparation."""
-    initial_war = await session.get(NationWar, war_id)
-    if initial_war is None:
-        return None
-
     async with session.begin():
         initial_war = await session.get(NationWar, war_id)
         if initial_war is None:
