@@ -9,7 +9,6 @@ from app.database.models import (
     ActivityType,
     CurrencyHolding,
     Nation,
-    NationRank,
     Transaction,
     User,
     UserActivity,
