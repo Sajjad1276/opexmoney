@@ -1440,12 +1440,15 @@ async def approve_join_request(call: CallbackQuery, bot: Bot) -> None:
     _, _, nation_id, user_id = call.data.split(":")
     nation_id = int(nation_id)
     user_id = int(user_id)
+
     nation: Nation | None = None
     user: User | None = None
+    outcome = "not_found"
 
     async with async_session() as session:
         async with session.begin():
             await _require_admin(session, nation_id, call.from_user.id)
+
             nation = await session.get(Nation, nation_id, with_for_update=True)
             actor = await _get_member(session, nation_id, call.from_user.id)
             request = await session.scalar(
@@ -1462,23 +1465,22 @@ async def approve_join_request(call: CallbackQuery, bot: Bot) -> None:
 
             if nation is None or actor is None or request is None or user is None:
                 raise ValueError("⚠️ درخواست پیدا نشد.")
-            if request.expires_at <= _now():
+
+            now = _now()
+            if request.expires_at <= now:
                 request.status = "expired"
                 request.reviewed_by = call.from_user.id
-                request.reviewed_at = _now()
-                nation = None
-                user = None
+                request.reviewed_at = now
+                outcome = "expired"
             elif user.home_nation_id is not None:
                 request.status = "rejected"
                 request.reviewed_by = call.from_user.id
-                request.reviewed_at = _now()
-                nation = None
-                user = None
+                request.reviewed_at = now
+                outcome = "already_member"
             else:
-
                 request.status = "approved"
                 request.reviewed_by = call.from_user.id
-                request.reviewed_at = _now()
+                request.reviewed_at = now
                 user.home_nation_id = nation_id
                 user.role = "player"
                 nation.member_count += 1
@@ -1491,34 +1493,55 @@ async def approve_join_request(call: CallbackQuery, bot: Bot) -> None:
                     )
                 )
                 await _append_log(
-                session,
-                nation_id=nation_id,
-                actor_id=call.from_user.id,
-                action_type="MEMBER_JOIN",
-                target_id=user_id,
-                metadata={
-                    "role": NationMemberRole.CITIZEN.value,
-                    "policy": "APPROVAL",
-                    "approved_by": call.from_user.id,
-                },
-            )
+                    session,
+                    nation_id=nation_id,
+                    actor_id=call.from_user.id,
+                    action_type="MEMBER_JOIN",
+                    target_id=user_id,
+                    metadata={
+                        "role": NationMemberRole.CITIZEN.value,
+                        "policy": "APPROVAL",
+                        "approved_by": call.from_user.id,
+                    },
+                )
+                outcome = "approved"
+
+    if outcome == "expired":
+        await call.answer("⌛ مهلت درخواست تمام شده و درخواست منقضی شد.", show_alert=True)
+        if user is not None:
+            try:
+                await bot.send_message(
+                    user.user_id,
+                    f"⌛ درخواست عضویتت در «{html.escape(nation.name if nation else 'این ملت')}» منقضی شد.",
+                    parse_mode="HTML",
+                )
+            except Exception:
+                logger.exception("Could not notify expired approval request %s", user_id)
+        return
+
+    if outcome == "already_member":
+        await call.answer("⚠️ این کاربر قبلاً عضو یک ملت شده؛ درخواست رد شد.", show_alert=True)
+        return
+
+    if outcome != "approved" or nation is None or user is None:
+        await call.answer("⚠️ درخواست دیگر قابل تأیید نیست.", show_alert=True)
+        return
 
     await call.answer("✅ درخواست تأیید شد.")
-    if nation is not None and user is not None:
-        await _welcome_member(bot, nation=nation, user=user, actor_id=call.from_user.id)
-        await _notify_founder(
-            bot,
-            nation,
-            f"✅ درخواست عضویت {_safe_name(user, user.user_id)} تأیید شد.",
-        )
-        await publish_nation_event_analysis(
-            bot,
-            nation_id=nation_id,
-            event_type="MEMBER_JOIN",
-            actor_id=call.from_user.id,
-            target_id=user_id,
-            context="درخواست عضویت پس از بررسی مدیران تأیید شد.",
-        )
+    await _welcome_member(bot, nation=nation, user=user, actor_id=call.from_user.id)
+    await _notify_founder(
+        bot,
+        nation,
+        f"✅ درخواست عضویت {_safe_name(user, user.user_id)} تأیید شد.",
+    )
+    await publish_nation_event_analysis(
+        bot,
+        nation_id=nation_id,
+        event_type="MEMBER_JOIN",
+        actor_id=call.from_user.id,
+        target_id=user_id,
+        context="درخواست عضویت پس از بررسی مدیران تأیید شد.",
+    )
 
 
 @nation_management_router.callback_query(F.data.regexp(r"^nm:reject:\d+:\d+$"))
