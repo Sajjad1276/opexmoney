@@ -428,3 +428,44 @@ class UserMissionProgress(Base):
     __table_args__ = (
         UniqueConstraint("user_id", "mission_id", name="uq_user_mission"),
     )
+
+class NationTreasury(Base):
+    __tablename__ = "nation_treasury"
+
+    nation_id: Mapped[int] = mapped_column(
+        ForeignKey("nations.nation_id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    balance_xr: Mapped[Decimal] = mapped_column(
+        Numeric(18, 4), nullable=False, default=Decimal("0")
+    )
+    balance_local: Mapped[Decimal] = mapped_column(
+        Numeric(18, 4), nullable=False, default=Decimal("0")
+    )
+    last_deposit_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    total_deposited: Mapped[Decimal] = mapped_column(
+        Numeric(18, 4), nullable=False, default=Decimal("0")
+    )
+
+
+class TreasuryLog(Base):
+    __tablename__ = "treasury_logs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    nation_id: Mapped[int] = mapped_column(
+        ForeignKey("nations.nation_id", ondelete="CASCADE"), nullable=False
+    )
+    actor_id: Mapped[int | None] = mapped_column(
+        BigInteger,
+        ForeignKey("users.user_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    action: Mapped[str] = mapped_column(String(20), nullable=False)
+    amount_xr: Mapped[Decimal] = mapped_column(
+        Numeric(18, 4), nullable=False
+    )
+    note: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        default=lambda: datetime.utcnow(), nullable=False
+    )
+\n
