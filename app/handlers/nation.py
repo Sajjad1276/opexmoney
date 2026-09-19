@@ -34,7 +34,7 @@ async def open_nations(message: Message) -> None:
         )
         return
 
-    await message.answer(" ", reply_markup=ReplyKeyboardRemove())
+    await message.answer("\u2060", reply_markup=ReplyKeyboardRemove())
     await message.answer(
         "🌍 <b>ملت‌ها</b>\n"
         "اینجا می‌تونی ملت‌ها رو بررسی کنی.\n"
