@@ -39,12 +39,15 @@ def chart_keyboard(
             )
         )
 
-    rows = [window_row, [
-        InlineKeyboardButton(
-            text="↩️ بازگشت به بازار",
-            callback_data="back_to_market",
-        )
-    ])
+    rows = [
+        window_row,
+        [
+            InlineKeyboardButton(
+                text="↩️ بازگشت به بازار",
+                callback_data="back_to_market",
+            )
+        ],
+    ]
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
