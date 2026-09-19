@@ -64,7 +64,6 @@ def settings_keyboard() -> InlineKeyboardMarkup:
                     text="📊 آمار کامل من",
                     callback_data="settings:stats",
                     style=ButtonStyle.PRIMARY,
-                    style=ButtonStyle.PRIMARY,
                 )
             ],
             [
