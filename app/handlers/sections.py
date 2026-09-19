@@ -5,14 +5,6 @@ from aiogram.types import Message
 
 router = Router(name="sections")
 
-@router.message(F.text == "📊 پورتفولیو")
-async def portfolio(message: Message) -> None:
-    await message.answer(
-        "📊 <b>پورتفولیو</b>\n━━━━━━━━━━━━━━━━━━━━\n"
-        "این بخش هنوز در نسخه فعلی فعال نشده.",
-        parse_mode="HTML",
-    )
-
 @router.message(F.text == "⚡ مأموریت")
 async def missions(message: Message) -> None:
     await message.answer(
