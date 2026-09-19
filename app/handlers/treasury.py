@@ -31,6 +31,7 @@ from app.services.treasury_service import (
     withdraw_from_treasury,
 )
 from app.utils.formatting import fmt_amount, to_fa
+from app.utils.ui import close_inline_panel, remember_inline_panel
 
 
 logger = logging.getLogger(__name__)
@@ -407,6 +408,7 @@ async def start_deposit(
                 reply_markup=cancel_keyboard(nation_id),
                 parse_mode="HTML",
             )
+            await remember_inline_panel(state, callback.message)
         await callback.answer()
     except Exception:
         logger.exception(
@@ -494,6 +496,7 @@ async def receive_deposit_amount(
                     f"<code>{_amount_text(result['new_balance'])}</code> ΩXR"
                 )
 
+        await close_inline_panel(state, message.bot)
         await state.clear()
         await message.answer(success, parse_mode="HTML")
 
@@ -566,6 +569,7 @@ async def start_withdraw(
                 reply_markup=cancel_keyboard(nation_id),
                 parse_mode="HTML",
             )
+            await remember_inline_panel(state, callback.message)
         await callback.answer()
     except Exception:
         logger.exception(
@@ -694,6 +698,7 @@ async def confirm_withdraw(
                 )
                 refreshed_text = build_treasury_msg(treasury, logs)
 
+        await close_inline_panel(state, callback.bot)
         await state.clear()
 
         success_text = (
