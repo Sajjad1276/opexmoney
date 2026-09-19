@@ -9,6 +9,7 @@ from app.database.session import async_session
 from app.handlers.start import show_dashboard
 from app.keyboards.inline import nation_panel_keyboard
 from app.services.user_service import is_fully_registered
+from app.services.nation_service import get_user_active_nation_context
 
 nation_router = Router(name="nation")
 
@@ -25,8 +26,22 @@ async def open_nations(message: Message) -> None:
         async with session.begin():
             user = await session.get(User, message.from_user.id)
             registered = await is_fully_registered(session, message.from_user.id)
-            is_manager = _can_manage(user)
-            nation_id = user.home_nation_id if user is not None else None
+            context = (
+                await get_user_active_nation_context(
+                    session,
+                    message.from_user.id,
+                    repair=True,
+                )
+                if registered
+                else None
+            )
+            active_nation = context[0] if context is not None else None
+            active_role = context[1] if context is not None else None
+            is_manager = active_role in {
+                NationMemberRole.FOUNDER.value,
+                NationMemberRole.MINISTER.value,
+            }
+            nation_id = active_nation.nation_id if active_nation is not None else None
 
     if not registered:
         await message.answer(
@@ -90,12 +105,13 @@ async def my_nations(call: CallbackQuery) -> None:
             if not await is_fully_registered(session, call.from_user.id):
                 await call.answer("⚠️ اول باید وارد بازی بشی.", show_alert=True)
                 return
+            context = await get_user_active_nation_context(
+                session,
+                call.from_user.id,
+                repair=True,
+            )
             user = await session.get(User, call.from_user.id)
-            nations = []
-            if user and user.home_nation_id:
-                nation = await session.get(Nation, user.home_nation_id)
-                if nation:
-                    nations.append(nation)
+            nations = [context[0]] if context is not None else []
 
     if not nations:
         text = (
