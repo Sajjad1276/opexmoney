@@ -18,6 +18,7 @@ REVISION_CHAIN = [
     "0009_treasury",
     "0010_academy",
     "0011_price_alerts",
+    "0012_academy_seed",
 ]
 
 BASE_TABLES = {
@@ -89,6 +90,22 @@ async def index_exists(conn: asyncpg.Connection, index_name: str) -> bool:
     return bool(await conn.fetchval(
         "SELECT to_regclass($1) IS NOT NULL", f"public.{index_name}"
     ))
+
+
+async def academy_seed_complete(conn: asyncpg.Connection) -> bool:
+    rows = await conn.fetch("""
+        SELECT module_id, "order"
+        FROM lessons
+        WHERE (module_id, "order") IN (
+            (1, 1),
+            (1, 2),
+            (1, 3),
+            (2, 1),
+            (2, 2),
+            (2, 3)
+        )
+    """)
+    return len(rows) == 6
 
 
 async def column_has_generated_id(
@@ -175,6 +192,9 @@ async def detect_revision(conn: asyncpg.Connection) -> str | None:
 
     if await all_tables_exist(conn, PRICE_ALERT_TABLES):
         highest = "0011_price_alerts"
+
+    if await table_exists(conn, "lessons") and await academy_seed_complete(conn):
+        highest = "0012_academy_seed"
 
     return highest
 
