@@ -8,7 +8,7 @@ from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.filters.state import StateFilter
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, Message, ReplyKeyboardRemove
 from sqlalchemy import select
 
 from app.database.models import Proposal, User, Vote
@@ -83,8 +83,13 @@ async def _send_governance_home(call: CallbackQuery | None, message: Message | N
             await call.message.edit_text(text, reply_markup=markup, parse_mode="HTML")
         await call.answer()
     else:
+        await message.answer("⁠", reply_markup=ReplyKeyboardRemove())
         await message.answer(text, reply_markup=markup, parse_mode="HTML")
 
+
+@governance_router.message(F.text == "📜 قوانین")
+async def governance_menu_entry(message: Message):
+    await _send_governance_home(None, message)
 
 @governance_router.callback_query(F.data == "governance_main")
 async def governance_main(call: CallbackQuery):
