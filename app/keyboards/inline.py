@@ -42,12 +42,6 @@ def market_keyboard() -> InlineKeyboardMarkup:
     ])
 
 
-def confirm_trade_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="✅ تأیید", callback_data="confirm_trade", style=ButtonStyle.SUCCESS),
-        InlineKeyboardButton(text="❌ انصراف", callback_data="cancel_trade", style=ButtonStyle.DANGER),
-    ]])
-
 
 def nation_panel_keyboard(
     is_founder: bool = False,
