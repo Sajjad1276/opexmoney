@@ -299,6 +299,8 @@ class NationMember(Base):
         SAEnum(
             NationMemberRole,
             name="nation_member_role",
+            native_enum=False,
+            create_constraint=True,
             values_callable=lambda values: [item.value for item in values],
         ),
         nullable=False,
