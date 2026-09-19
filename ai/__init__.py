@@ -92,7 +92,7 @@ class AICompanion:
             self._client = genai.Client(
                 api_key=api_key,
                 http_options=types.HttpOptions(
-                    timeout=settings.ai_timeout_seconds,
+                    timeout=max(1000, int(settings.ai_timeout_seconds * 1000)),
                 ),
             )
         return self._client
