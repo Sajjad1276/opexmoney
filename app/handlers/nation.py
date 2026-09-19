@@ -4,7 +4,7 @@ from aiogram import F, Router
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message, ReplyKeyboardRemove
 from sqlalchemy import select
 
-from app.database.models import Nation, NationMember, NationMemberRole, User
+from app.database.models import Nation, NationMemberRole, User
 from app.database.session import async_session
 from app.handlers.start import show_dashboard
 from app.keyboards.inline import nation_panel_keyboard
