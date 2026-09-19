@@ -17,6 +17,7 @@ REVISION_CHAIN = [
     "0008_missions",
     "0009_treasury",
     "0010_academy",
+    "0011_price_alerts",
 ]
 
 BASE_TABLES = {
@@ -54,6 +55,10 @@ ACADEMY_TABLES = {
     "lessons",
     "user_lesson_progress",
     "user_xp",
+}
+
+PRICE_ALERT_TABLES = {
+    "price_alerts",
 }
 
 NATION_MANAGEMENT_TABLES = {
@@ -167,6 +172,9 @@ async def detect_revision(conn: asyncpg.Connection) -> str | None:
 
     if await all_tables_exist(conn, ACADEMY_TABLES):
         highest = "0010_academy"
+
+    if await all_tables_exist(conn, PRICE_ALERT_TABLES):
+        highest = "0011_price_alerts"
 
     return highest
 
