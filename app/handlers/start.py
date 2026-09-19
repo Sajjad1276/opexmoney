@@ -78,7 +78,7 @@ async def _send_expired(message: Message) -> None:
             """
 ⏱ <b>فرآیند منقضی شد</b>
 
-۳۰ ثانیه برای این مرحله فرصت داشتی.
+30 ثانیه برای این مرحله فرصت داشتی.
 برای شروع دوباره، /start رو بزن.
 """
         ),
@@ -205,7 +205,7 @@ USERNAME_CAPTION = """💹 <b>اسم معامله‌گرت رو انتخاب ک�
 {user_mention}، این اسم روی تابلوی معاملات OPEX نمایش داده میشه.
 
 بنویس:
-· ۳ تا ۱۵ حرف انگلیسی
+· 3 تا 15 حرف انگلیسی
 · فقط حروف A-Z، بدون فاصله، عدد و @"""
 
 def nation_list_text(user, trader_name: str, nations: list[Nation]) -> str:
@@ -215,7 +215,7 @@ def nation_list_text(user, trader_name: str, nations: list[Nation]) -> str:
         lines.extend([f"🏛 <b>{html.escape(nation.name)} · {html.escape(nation.currency_code)}</b>", f"{get_rate_emoji(change)} <b>{fmt_rate(nation.exchange_rate)} ΩXR</b> · <i>{fmt_pct(change)} امروز</i>", f"👥 {to_fa(nation.active_members_24h)} عضو · 🏆 رتبه #{to_fa(nation.nation_rank or 0)}"])
         if index != len(nations):
             lines.append("─────────────────")
-    lines.extend(["━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", "نرخ‌ها هر ۱۵ دقیقه آپدیت میشن."])
+    lines.extend(["━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", "نرخ‌ها هر 15 دقیقه آپدیت میشن."])
     return "\n".join(lines)
 
 
@@ -418,7 +418,7 @@ async def _begin_registration(message: Message, state: FSMContext) -> None:
 این نام به عنوان نام نمایشی تو در OPEX MONEY
 به بقیه بازیکن‌ها نمایش داده می‌شه.
 
-۳ تا ۲۰ کاراکتر وارد کن.
+3 تا 20 کاراکتر وارد کن.
 فقط حروف فارسی یا انگلیسی، عدد و خط تیره مجازه.
 """
 
@@ -476,13 +476,13 @@ async def render_nation_profile(nation: Nation) -> str:
     🏴 <b>نام ملت</b>
     ─────────────────
     💰 <b>واحد پول:</b> {symbol}
-    📈 <b>نرخ ارز:</b> {rate} ΩXR  <u>(آپدیت ۱۵ دقیقه پیش)</u>
+    📈 <b>نرخ ارز:</b> {rate} ΩXR  <u>(آپدیت 15 دقیقه پیش)</u>
     👥 <b>اعضا:</b> {member_count} نفر
     🏆 <b>رتبه جهانی:</b> #{rank}
     ⚔️ <b>وضعیت:</b> {status_emoji} {status_text}
 
     📊 <b>وضعیت اقتصادی:</b>
-    ▸ فعالیت: {activity_score}/۱۰۰
+    ▸ فعالیت: {activity_score}/100
     ▸ معاملات امروز: {today_trades}
     ▸ روند: {trend_emoji} {trend_text}
     """
@@ -545,7 +545,7 @@ async def render_nation_profile(nation: Nation) -> str:
 ⚔️ <b>وضعیت:</b> {6} {7}
 
 📊 <b>وضعیت اقتصادی:</b>
-▸ فعالیت: {8}/۱۰۰
+▸ فعالیت: {8}/100
 ▸ معاملات امروز: {9}
 ▸ روند: {10} {11}
 """.format(
@@ -605,7 +605,7 @@ async def _render_nation_page(
         text = """
 🌍 <b>ملت خودت رو انتخاب کن</b>
 
-۵ ملت در هر صفحه نمایش داده می‌شه.
+5 ملت در هر صفحه نمایش داده می‌شه.
 روی یک ملت بزن تا پروفایل کاملش رو ببینی.
 """
         keyboard = _nation_page_keyboard(nations, max(0, page), has_next)
@@ -661,7 +661,7 @@ async def _generate_personalized_welcome(
 تعداد اعضا: {4}
 
 قواعد:
-- حداکثر ۴ جمله.
+- حداکثر 4 جمله.
 - فقط متن ساده برگردان.
 - HTML و Markdown تولید نکن.
 - فقط از اطلاعات داده‌شده استفاده کن.
@@ -740,7 +740,7 @@ async def onboarding_name(message: Message, state: FSMContext) -> None:
                 """
 🔴 <b>طول نام قابل قبول نیست</b>
 
-نام معامله‌گر باید بین ۳ تا ۲۰ کاراکتر باشه.
+نام معامله‌گر باید بین 3 تا 20 کاراکتر باشه.
 """
             ),
             parse_mode=ParseMode.HTML,
@@ -1136,7 +1136,7 @@ async def join_nation(call: CallbackQuery, state: FSMContext) -> None:
     text = (
         f"🏛 <b>{html.escape(nation.name)}</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"{user_mention(call.from_user)}، شهروند رسمی این ملت شدی.\n\n"
-        f"💰 موجودی اولیه:\n<b>۵۰۰ <code>{html.escape(nation.currency_code)}</code> ≈ {fmt_amount(initial_omx)} ΩXR</b>\n\n"
+        f"💰 موجودی اولیه:\n<b>500 <code>{html.escape(nation.currency_code)}</code> ≈ {fmt_amount(initial_omx)} ΩXR</b>\n\n"
         "─────────────────\n"
         f"{get_rate_emoji(get_rate_change(nation))} نرخ <code>{html.escape(nation.currency_code)}</code>: <b>{fmt_rate(nation.exchange_rate)} ΩXR</b>\n"
         f"<i>{fmt_pct(get_rate_change(nation))} نسبت به دیروز</i>\n\n"
@@ -1166,7 +1166,7 @@ async def first_trade_tutorial(call: CallbackQuery, state: FSMContext) -> None:
         return
     receive_omx = Decimal("50") * nation.exchange_rate
     change = get_rate_change(nation)
-    text = ("⚡ <b>اولین معامله</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" f"📤 می‌فروشی:   <b>۵۰ <code>{html.escape(nation.currency_code)}</code></b>\n" f"📥 دریافت می‌کنی: <b>{fmt_amount(receive_omx)} <code>ΩXR</code></b>\n\n─────────────────\n" f"💹 نرخ: <code>۱ {html.escape(nation.currency_code)} = {fmt_rate(nation.exchange_rate)} ΩXR</code>\n" f"{get_rate_emoji(change)} تغییر ۲۴h: <b>{fmt_pct(change)}</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    text = ("⚡ <b>اولین معامله</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" f"📤 می‌فروشی:   <b>50 <code>{html.escape(nation.currency_code)}</code></b>\n" f"📥 دریافت می‌کنی: <b>{fmt_amount(receive_omx)} <code>ΩXR</code></b>\n\n─────────────────\n" f"💹 نرخ: <code>1 {html.escape(nation.currency_code)} = {fmt_rate(nation.exchange_rate)} ΩXR</code>\n" f"{get_rate_emoji(change)} تغییر 24h: <b>{fmt_pct(change)}</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     await _safe_edit_text(call, text, trade_confirmation_keyboard())
     await call.answer()
 
@@ -1226,7 +1226,7 @@ async def confirm_first_trade(call: CallbackQuery, state: FSMContext) -> None:
 
     text = (
         "✅ <b>معامله انجام شد.</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"📤 فروختی:   <s>۵۰ {html.escape(nation.currency_code)}</s>\n"
+        f"📤 فروختی:   <s>50 {html.escape(nation.currency_code)}</s>\n"
         f"📥 دریافتی:  <b>{fmt_amount(receive_omx)} ΩXR</b>\n\n"
         "─────────────────\n"
         f"💰 موجودی:\n<code>{html.escape(nation.currency_code)}</code>: <b>{fmt_amount(holding.amount)}</b>\n"
@@ -1253,7 +1253,7 @@ async def skip_first_trade(call: CallbackQuery, state: FSMContext) -> None:
             user = await get_user(session, call.from_user.id)
             nation = await session.get(Nation, user.home_nation_id) if user and user.home_nation_id else None
     currency_code = nation.currency_code if nation else "ارز"
-    balance = fmt_amount(nation and (await _get_holding_amount(call.from_user.id, nation.nation_id)) or Decimal("500")) if nation else "۵۰۰"
+    balance = fmt_amount(nation and (await _get_holding_amount(call.from_user.id, nation.nation_id)) or Decimal("500")) if nation else "500"
     text = f"{html.escape(call.from_user.first_name or 'معامله‌گر')}، هر وقت آماده شدی\nاز 💹 بازار شروع کن.\n\n💰 موجودی: {balance} <code>{html.escape(currency_code)}</code>"
     await _safe_edit_text(call, text)
     await call.answer()
