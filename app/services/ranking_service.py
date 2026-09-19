@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any, TypedDict
 
-from sqlalchemy import case, func, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.utils.formatting import fmt_amount, to_fa
 
 from app.database.models import (
     ActivityType,
@@ -415,14 +416,20 @@ async def get_trader_ranking(
 
 
 MEDAL = {1: "🥇", 2: "🥈", 3: "🥉"}
+RLM = "\u200f"
 
 
 def rank_prefix(n: int) -> str:
-    return MEDAL.get(n, f"  #{n}")
+    return MEDAL.get(n, f"  #{to_fa(n)}")
 
 
 def _fmt_rate_change(value: Decimal) -> str:
-    return f"{value:+.2f}" if value != 0 else "0.00"
+    value = Decimal(str(value)).quantize(Decimal("0.01"))
+    return to_fa(f"{value:+.2f}") if value != 0 else to_fa("0.00")
+
+
+def _rtl(lines: list[str]) -> str:
+    return "\n".join(f"{RLM}{line}" for line in lines)
 
 
 def build_nation_msg(data: dict) -> str:
@@ -439,26 +446,26 @@ def build_nation_msg(data: dict) -> str:
                 f"{row['nation_name']} · {row['currency_code']}"
             )
             lines.append(
-                f"        💹 {row['exchange_rate']:.2f} ΩXR · "
+                f"        💹 {to_fa(fmt_amount(row['exchange_rate']))} ΩXR · "
                 f"{row['rate_emoji']} {_fmt_rate_change(row['rate_change_pct'])}٪ · "
-                f"👥 {row['member_count']} نفر"
+                f"👥 {to_fa(row['member_count'])} نفر"
             )
 
     lines.append("━━━━━━━━━━━━━━━━━━")
     current_rank = data["current_rank"]
     if current_rank is not None and current_rank <= 10:
         lines.append(
-            f"🏛 ملت تو: #{current_rank} از {data['total_nations']}"
+            f"🏛 ملت تو: #{to_fa(current_rank)} از {to_fa(data['total_nations'])}"
         )
     elif current_rank is not None:
         lines.append("━━━━━━━━━━━━━━━━━━")
         lines.append(
-            f"📍 ملت تو: #{current_rank} از {data['total_nations']}"
+            f"📍 ملت تو: #{to_fa(current_rank)} از {to_fa(data['total_nations'])}"
         )
     else:
         lines.append("🏛 هنوز عضو هیچ ملتی نیستی")
 
-    return "\n".join(lines)
+    return _rtl(lines)
 
 
 def build_wealth_msg(data: dict) -> str:
@@ -467,15 +474,13 @@ def build_wealth_msg(data: dict) -> str:
         "━━━━━━━━━━━━━━━━━━",
     ]
     if not data["top10"]:
-        return "\n".join(lines + ["⚠️ هنوز داده‌ای برای نمایش وجود ندارد."])
+        lines.append("⚠️ هنوز داده‌ای برای نمایش وجود ندارد.")
+        return _rtl(lines)
 
     for row in data["top10"]:
+        lines.append(f"{rank_prefix(row['rank'])} {row['username']}")
         lines.append(
-            f"{rank_prefix(row['rank'])} "
-            f"{row['username']}"
-        )
-        lines.append(
-            f"        💎 {row['total_xr']:.2f} ΩXR"
+            f"        💎 {to_fa(fmt_amount(row['total_xr']))} ΩXR"
         )
 
     lines.append("━━━━━━━━━━━━━━━━━━")
@@ -483,10 +488,10 @@ def build_wealth_msg(data: dict) -> str:
     top_ranks = {row["rank"] for row in data["top10"]}
     if current_rank is not None and current_rank not in top_ranks:
         lines.append(
-            f"📍 رتبه تو: #{current_rank} از {data['total_users']} نفر"
+            f"📍 رتبه تو: #{to_fa(current_rank)} از {to_fa(data['total_users'])} نفر"
         )
 
-    return "\n".join(lines)
+    return _rtl(lines)
 
 
 def build_trader_msg(data: dict) -> str:
@@ -495,15 +500,13 @@ def build_trader_msg(data: dict) -> str:
         "━━━━━━━━━━━━━━━━━━",
     ]
     if not data["top10"]:
-        return "\n".join(lines + ["⚠️ هنوز داده‌ای برای نمایش وجود ندارد."])
+        lines.append("⚠️ هنوز داده‌ای برای نمایش وجود ندارد.")
+        return _rtl(lines)
 
     for row in data["top10"]:
+        lines.append(f"{rank_prefix(row['rank'])} {row['username']}")
         lines.append(
-            f"{rank_prefix(row['rank'])} "
-            f"{row['username']}"
-        )
-        lines.append(
-            f"        🔄 {row['trade_count']} معامله"
+            f"        🔄 {to_fa(row['trade_count'])} معامله"
         )
 
     lines.append("━━━━━━━━━━━━━━━━━━")
@@ -511,7 +514,7 @@ def build_trader_msg(data: dict) -> str:
     top_ranks = {row["rank"] for row in data["top10"]}
     if current_rank is not None and current_rank not in top_ranks:
         lines.append(
-            f"📍 رتبه تو: #{current_rank} از {data['total_users']} نفر"
+            f"📍 رتبه تو: #{to_fa(current_rank)} از {to_fa(data['total_users'])} نفر"
         )
 
-    return "\n".join(lines)
+    return _rtl(lines)
