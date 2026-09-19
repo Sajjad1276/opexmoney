@@ -38,6 +38,7 @@ from app.handlers.nation_management import (
 from app.handlers.onboarding_fix import router as onboarding_fix_router
 from app.handlers.sections import router as sections_router
 from app.handlers.start import router as start_router
+from app.handlers.treasury import router as treasury_router
 from app.services.economic_engine import (
     create_behavior_snapshot,
     reset_daily_metrics,
@@ -294,6 +295,7 @@ async def main() -> None:
     dp.include_router(settings_router)
     dp.include_router(founder_router)
     dp.include_router(nation_management_router)
+    dp.include_router(treasury_router)
     dp.include_router(nation_router)
     dp.include_router(governance_router)
     dp.include_router(sections_router)
