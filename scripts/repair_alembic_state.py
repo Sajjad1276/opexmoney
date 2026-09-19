@@ -14,6 +14,7 @@ REVISION_CHAIN = [
     "0005_nation_management",
     "0006_bigint_history_identities",
     "0007_seed_starter_nations",
+    "0008_missions",
 ]
 
 BASE_TABLES = {
@@ -37,6 +38,11 @@ GOVERNANCE_TABLES = {
     "behavior_snapshots",
 }
 
+MISSION_TABLES = {
+    "missions",
+    "user_mission_progress",
+}
+
 NATION_MANAGEMENT_TABLES = {
     "nation_members",
     "nation_logs",
@@ -46,19 +52,12 @@ NATION_MANAGEMENT_TABLES = {
 
 
 async def table_exists(conn: asyncpg.Connection, table_name: str) -> bool:
-    return bool(
-        await conn.fetchval(
-            """
-            SELECT EXISTS (
-                SELECT 1
-                FROM information_schema.tables
-                WHERE table_schema = 'public'
-                  AND table_name = $1
-            )
-            """,
-            table_name,
+    return bool(await conn.fetchval("""
+        SELECT EXISTS (
+            SELECT 1 FROM information_schema.tables
+            WHERE table_schema = 'public' AND table_name = $1
         )
-    )
+    """, table_name))
 
 
 async def all_tables_exist(conn: asyncpg.Connection, names: set[str]) -> bool:
@@ -69,50 +68,33 @@ async def all_tables_exist(conn: asyncpg.Connection, names: set[str]) -> bool:
 
 
 async def index_exists(conn: asyncpg.Connection, index_name: str) -> bool:
-    return bool(
-        await conn.fetchval(
-            "SELECT to_regclass($1) IS NOT NULL",
-            f"public.{index_name}",
-        )
-    )
+    return bool(await conn.fetchval(
+        "SELECT to_regclass($1) IS NOT NULL", f"public.{index_name}"
+    ))
 
 
 async def column_has_generated_id(
-    conn: asyncpg.Connection,
-    table_name: str,
-    column_name: str,
+    conn: asyncpg.Connection, table_name: str, column_name: str
 ) -> bool:
-    return bool(
-        await conn.fetchval(
-            """
-            SELECT EXISTS (
-                SELECT 1
-                FROM information_schema.columns
-                WHERE table_schema = 'public'
-                  AND table_name = $1
-                  AND column_name = $2
-                  AND (
-                      is_identity = 'YES'
-                      OR column_default LIKE 'nextval(%%'
-                  )
-            )
-            """,
-            table_name,
-            column_name,
+    return bool(await conn.fetchval("""
+        SELECT EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = $1
+              AND column_name = $2
+              AND (is_identity = 'YES' OR column_default LIKE 'nextval(%%')
         )
-    )
+    """, table_name, column_name))
 
 
 async def username_width(conn: asyncpg.Connection) -> int | None:
-    value = await conn.fetchval(
-        """
+    value = await conn.fetchval("""
         SELECT character_maximum_length
         FROM information_schema.columns
         WHERE table_schema = 'public'
           AND table_name = 'users'
           AND column_name = 'username'
-        """
-    )
+    """)
     return int(value) if value is not None else None
 
 
@@ -120,7 +102,6 @@ async def detect_revision(conn: asyncpg.Connection) -> str | None:
     if not await all_tables_exist(conn, BASE_TABLES):
         return None
 
-    # 0002 is only considered applied when its own schema markers are present.
     if not await table_exists(conn, "bot_groups"):
         return "0001_initial_schema"
 
@@ -143,24 +124,16 @@ async def detect_revision(conn: asyncpg.Connection) -> str | None:
     else:
         return highest
 
-    required_columns = {
-        "join_policy",
-        "personality",
-        "invite_code",
-        "treasury",
-    }
+    required_columns = {"join_policy", "personality", "invite_code", "treasury"}
     columns = {
         row["column_name"]
-        for row in await conn.fetch(
-            """
+        for row in await conn.fetch("""
             SELECT column_name
             FROM information_schema.columns
             WHERE table_schema = 'public'
               AND table_name = 'nations'
               AND column_name = ANY($1::text[])
-            """,
-            list(required_columns),
-        )
+        """, list(required_columns))
     }
 
     if required_columns.issubset(columns) and await all_tables_exist(
@@ -173,33 +146,30 @@ async def detect_revision(conn: asyncpg.Connection) -> str | None:
         ):
             highest = "0006_bigint_history_identities"
 
+    if await all_tables_exist(conn, MISSION_TABLES):
+        highest = "0008_missions"
+
     return highest
 
 
 async def ensure_version_tracking(
-    conn: asyncpg.Connection,
-    detected_revision: str | None,
+    conn: asyncpg.Connection, detected_revision: str | None
 ) -> None:
     exists = await table_exists(conn, "alembic_version")
 
     if not exists:
         if detected_revision is None:
             return
-        await conn.execute(
-            """
+        await conn.execute("""
             CREATE TABLE alembic_version (
                 version_num VARCHAR(32) NOT NULL PRIMARY KEY
             )
-            """
-        )
+        """)
         await conn.execute(
             "INSERT INTO alembic_version (version_num) VALUES ($1)",
             detected_revision,
         )
-        print(
-            f"REPAIR|created alembic_version|stamped={detected_revision}",
-            flush=True,
-        )
+        print(f"REPAIR|created alembic_version|stamped={detected_revision}", flush=True)
         return
 
     rows = await conn.fetch("SELECT version_num FROM alembic_version")
@@ -225,24 +195,13 @@ async def ensure_version_tracking(
             "INSERT INTO alembic_version (version_num) VALUES ($1)",
             detected_revision,
         )
-        print(
-            f"REPAIR|stamped empty tracking|version={detected_revision}",
-            flush=True,
-        )
+        print(f"REPAIR|stamped empty tracking|version={detected_revision}", flush=True)
         return
 
     current = rows[0]["version_num"]
-    if current == "0007_seed_starter_nations":
-        print(
-            "REPAIR|tracking already aligned|version=0007_seed_starter_nations",
-            flush=True,
-        )
-        return
 
     if current not in REVISION_CHAIN:
-        raise RuntimeError(
-            f"unknown alembic revision in production: {current}"
-        )
+        raise RuntimeError(f"unknown alembic revision in production: {current}")
 
     current_index = REVISION_CHAIN.index(current)
 
@@ -263,10 +222,7 @@ async def ensure_version_tracking(
             flush=True,
         )
     else:
-        print(
-            f"REPAIR|tracking already aligned|version={current}",
-            flush=True,
-        )
+        print(f"REPAIR|tracking already aligned|version={current}", flush=True)
 
 
 async def main() -> int:
@@ -278,10 +234,7 @@ async def main() -> int:
     conn = await asyncpg.connect(database_url)
     try:
         detected = await detect_revision(conn)
-        print(
-            f"REPAIR|detected_revision={detected or 'base'}",
-            flush=True,
-        )
+        print(f"REPAIR|detected_revision={detected or 'base'}", flush=True)
         await ensure_version_tracking(conn, detected)
         return 0
     finally:
