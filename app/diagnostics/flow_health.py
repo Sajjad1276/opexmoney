@@ -285,7 +285,7 @@ def run_flow_health_test() -> FlowHealthReport:
                     (handler_kind == "startswith" and pattern.startswith(candidate))
                     or (handler_kind == "regexp" and candidate in pattern)
                     or (handler_kind == "exact" and pattern.startswith(candidate))
-                    for handler_kind, pattern in handler_specs
+                    for handler_kind, pattern, _ in handler_specs
                 ):
                     family_prefix = candidate
                     break
