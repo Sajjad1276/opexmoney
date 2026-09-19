@@ -135,8 +135,14 @@ async def _send_chart_message(
 
     caption = build_chart_caption(chart_data)
 
+    try:
+        await callback.message.delete()
+    except Exception:
+        logger.debug("Could not delete market panel before chart", exc_info=True)
+
     if not chart_data["enough_data"]:
-        await callback.message.answer(
+        await callback.bot.send_message(
+            callback.from_user.id,
             caption,
             reply_markup=chart_keyboard(nation_id, window),
             parse_mode="HTML",
