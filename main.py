@@ -23,6 +23,7 @@ from app.diagnostics.flow_trace import FlowTraceMiddleware
 from app.diagnostics.self_test import run_startup_smoke_test
 from app.handlers.founder import founder_router
 from app.handlers.governance import governance_router
+from app.handlers.academy import router as academy_router
 from app.handlers.chart import router as chart_router
 from app.handlers.market import router as market_router
 from app.handlers.missions import router as missions_router
@@ -299,6 +300,7 @@ async def main() -> None:
     dp.include_router(nation_router)
     dp.include_router(governance_router)
     dp.include_router(sections_router)
+    dp.include_router(academy_router)
     dp.include_router(ai_router)
 
     ai_ok = await companion.health_check()
