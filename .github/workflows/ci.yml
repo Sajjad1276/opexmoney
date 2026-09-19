@@ -45,14 +45,23 @@ jobs:
           alembic downgrade 0002_founder_constraints
           alembic upgrade head
 
-      - name: Run flow health contract tests
-        run: pytest -q tests/test_flow_health.py
+      - name: Health contract - route callback coverage
+        run: pytest -q tests/test_flow_health.py::test_global_flow_contract_has_no_orphaned_controls
 
-      - name: Run market journey tests
+      - name: Health contract - keyboard factories
+        run: pytest -q tests/test_flow_health.py -k "all_inline_keyboard_factories"
+
+      - name: Health contract - dynamic keyboard callbacks
+        run: pytest -q tests/test_flow_health.py::test_dynamic_keyboard_callbacks_are_not_empty
+
+      - name: Health contract - reply keyboard
+        run: pytest -q tests/test_flow_health.py -k "main_reply_keyboard or required_main_menu_sections"
+
+      - name: Market journey
         run: pytest -q tests/test_market_flow.py
 
-      - name: Run core integration tests
+      - name: Core integration tests
         run: pytest -q tests/test_ai_layer.py tests/test_architecture.py tests/test_founder_integration.py tests/test_governance_phase2.py
 
-      - name: Run full test suite
+      - name: Full test suite
         run: pytest -q
