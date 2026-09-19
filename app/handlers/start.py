@@ -242,17 +242,30 @@ async def show_dashboard(
 
             nation = await session.get(Nation, user.home_nation_id) if user.home_nation_id else None
             if nation is None:
-                await message.answer(
-                    rtl_html(
-                        """
+                dashboard_text = rtl_html(
+                    """
 👋 {0}
 
 حساب تو آماده‌ست، اما هنوز ملت اصلی نداری.
-""".format(user_mention(message.from_user))
-                    ),
-                    reply_markup=main_menu_keyboard(),
-                    parse_mode=ParseMode.HTML,
+""".format(user_mention(display_user or message.from_user))
                 )
+                if replace_inline and bot is not None:
+                    try:
+                        await message.delete()
+                    except Exception:
+                        logger.debug("Could not delete previous inline panel", exc_info=True)
+                    await bot.send_message(
+                        user.user_id,
+                        dashboard_text,
+                        reply_markup=main_menu_keyboard(),
+                        parse_mode=ParseMode.HTML,
+                    )
+                else:
+                    await message.answer(
+                        dashboard_text,
+                        reply_markup=main_menu_keyboard(),
+                        parse_mode=ParseMode.HTML,
+                    )
                 return
 
             rank = nation.nation_rank or await get_nation_rank(session, nation.nation_id)
