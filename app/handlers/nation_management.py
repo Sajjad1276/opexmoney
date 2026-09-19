@@ -1257,6 +1257,11 @@ async def nation_settings(call: CallbackQuery) -> None:
     await call.answer()
 
 
+@nation_management_router.callback_query(F.data.regexp(r"^nm:noop:\d+$"))
+async def settings_read_only_notice(call: CallbackQuery) -> None:
+    await call.answer("ℹ️ تغییر تنظیمات فقط در اختیار بنیان‌گذار است.", show_alert=True)
+
+
 @nation_management_router.callback_query(F.data.regexp(r"^nm:policy:\d+:(OPEN|APPROVAL|INVITE_ONLY)$"))
 async def set_join_policy(call: CallbackQuery) -> None:
     _, _, nation_id, policy = call.data.split(":")
