@@ -2,6 +2,6 @@
 builder = "RAILPACK"
 
 [deploy]
-preDeployCommand = ["python -m alembic upgrade head"]
+preDeployCommand = "python migrate_fix.py && python -m alembic upgrade head"
 startCommand = "python main.py"
 restartPolicyType = "ON_FAILURE"
