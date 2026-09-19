@@ -952,6 +952,10 @@ async def confirm_nation(call: CallbackQuery, state: FSMContext) -> None:
                         role="player",
                     )
                     session.add(user)
+                    # Flush the parent row before inserting the FK child.
+                    # This makes the onboarding transaction deterministic even
+                    # without an ORM relationship configured between the models.
+                    await session.flush()
                     session.add(
                         CurrencyHolding(
                             user_id=user.user_id,
@@ -1000,6 +1004,11 @@ async def confirm_nation(call: CallbackQuery, state: FSMContext) -> None:
                 )
                 await session.flush()
     except IntegrityError:
+        logger.exception(
+            "Onboarding registration transaction failed | user_id=%s nation_id=%s",
+            call.from_user.id,
+            nation_id,
+        )
         await call.answer(
             rtl_html(
                 """
