@@ -579,7 +579,6 @@ async def _join_user(
                     )
                 else:
                     user.balance = holding.amount
-                await sync_user_balance(session, user_id)
                 member = NationMember(
                     nation_id=nation_id,
                     user_id=user_id,
@@ -590,6 +589,7 @@ async def _join_user(
                 await session.flush()
                 # SYNC RULE: home_nation_id always mirrors active NationMember wherever you touch these fields
                 user.home_nation_id = nation_id
+                await sync_user_balance(session, user_id)
                 await _append_log(
                     session,
                     nation_id=nation_id,
@@ -1513,7 +1513,6 @@ async def approve_join_request(call: CallbackQuery, bot: Bot) -> None:
                     )
                     session.add(holding)
                 user.balance = holding.amount
-                await sync_user_balance(session, user_id)
 
                 session.add(
                     NationMember(
@@ -1526,6 +1525,7 @@ async def approve_join_request(call: CallbackQuery, bot: Bot) -> None:
                 await session.flush()
                 # SYNC RULE: home_nation_id always mirrors active NationMember wherever you touch these fields
                 user.home_nation_id = nation_id
+                await sync_user_balance(session, user_id)
                 await _append_log(
                     session,
                     nation_id=nation_id,
