@@ -112,6 +112,25 @@ class Transaction(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
+class PriceAlert(Base):
+    __tablename__ = "price_alerts"
+    __table_args__ = (
+        Index("ix_price_alerts_user_created", "user_id", "created_at"),
+        Index("ix_price_alerts_pending", "triggered", "currency_code"),
+    )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    currency_code: Mapped[str] = mapped_column(String(4), nullable=False)
+    target_price: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False)
+    direction: Mapped[str] = mapped_column(String(5), nullable=False, default="above")
+    triggered: Mapped[bool] = mapped_column(default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
 class UserActivity(Base):
     __tablename__ = "user_activities"
     __table_args__ = (Index("ix_user_activities_nation_created", "nation_id", "created_at"),)
