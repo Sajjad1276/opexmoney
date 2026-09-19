@@ -76,7 +76,7 @@ async def index_exists(conn: asyncpg.Connection, index_name: str) -> bool:
     )
 
 
-async def column_is_identity(
+async def column_has_generated_id(
     conn: asyncpg.Connection,
     table_name: str,
     column_name: str,
@@ -86,13 +86,17 @@ async def column_is_identity(
             """
             SELECT EXISTS (
                 SELECT 1
-                FROM pg_attribute
-                WHERE attrelid = $1::regclass
-                  AND attname = $2
-                  AND attidentity IN ('a', 'd')
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = $1
+                  AND column_name = $2
+                  AND (
+                      is_identity = 'YES'
+                      OR column_default LIKE 'nextval(%%'
+                  )
             )
             """,
-            f"public.{table_name}",
+            table_name,
             column_name,
         )
     )
@@ -163,8 +167,8 @@ async def detect_revision(conn: asyncpg.Connection) -> str | None:
     ):
         highest = "0005_nation_management"
         if (
-            await column_is_identity(conn, "user_activities", "id")
-            and await column_is_identity(conn, "rate_history", "id")
+            await column_has_generated_id(conn, "user_activities", "id")
+            and await column_has_generated_id(conn, "rate_history", "id")
         ):
             highest = "0006_bigint_history_identities"
 
