@@ -1,261 +1,585 @@
 from __future__ import annotations
 
+import asyncio
+import math
+import threading
+from datetime import datetime
 from io import BytesIO
-from math import isfinite
-import struct
-import zlib
+from statistics import mean, pstdev
+
+import arabic_reshaper
+import matplotlib
+
+matplotlib.use("Agg")
+
+import matplotlib.pyplot as plt
+import numpy as np
+from bidi.algorithm import get_display
+from matplotlib.font_manager import FontProperties, findSystemFonts
+from matplotlib.patches import FancyBboxPatch
 
 
-RGBA = tuple[int, int, int, int]
+_RENDER_LOCK = threading.RLock()
+_RLM = "\u200f"
+
+_WINDOW_LABELS = {
+    "1h": "۱ ساعت",
+    "6h": "۶ ساعت",
+    "24h": "۲۴ ساعت",
+    "7d": "۷ روز",
+    # Kept for old inline messages. It is not shown in the new keyboard.
+    "72h": "۷۲ ساعت",
+}
 
 
-def _png_bytes(width: int, height: int, pixels: bytearray) -> bytes:
-    raw = bytearray()
-    stride = width * 4
-    for y in range(height):
-        raw.append(0)
-        start = y * stride
-        raw.extend(pixels[start : start + stride])
+def _find_persian_font() -> str | None:
+    candidates = (
+        "Vazirmatn",
+        "Vazir",
+        "NotoSansArabic",
+        "NotoNaskhArabic",
+        "DejaVuSans",
+    )
+    for path in findSystemFonts():
+        normalized = path.lower().replace(" ", "").replace("-", "")
+        if any(
+            candidate.lower().replace(" ", "").replace("-", "") in normalized
+            for candidate in candidates
+        ):
+            return path
+    return None
 
-    def chunk(name: bytes, payload: bytes) -> bytes:
-        return (
-            struct.pack(">I", len(payload))
-            + name
-            + payload
-            + struct.pack(">I", zlib.crc32(name + payload) & 0xFFFFFFFF)
+
+_FONT_PATH = _find_persian_font()
+_FONT_NORMAL = (
+    FontProperties(fname=_FONT_PATH)
+    if _FONT_PATH
+    else FontProperties()
+)
+_FONT_BOLD = (
+    FontProperties(fname=_FONT_PATH, weight="bold")
+    if _FONT_PATH
+    else FontProperties(weight="bold")
+)
+
+
+def _fa_text(text: str) -> str:
+    reshaped = arabic_reshaper.reshape(str(text))
+    return get_display(reshaped)
+
+
+def _fa_digits(value: object) -> str:
+    return str(value).translate(
+        str.maketrans(
+            "0123456789.-",
+            "۰۱۲۳۴۵۶۷۸۹٫−",
         )
-
-    return (
-        b"\x89PNG\r\n\x1a\n"
-        + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0))
-        + chunk(b"IDAT", zlib.compress(bytes(raw), level=6))
-        + chunk(b"IEND", b"")
     )
 
 
-def _set_pixel(
-    pixels: bytearray,
-    width: int,
-    x: int,
-    y: int,
-    color: RGBA,
-) -> None:
-    if x < 0 or y < 0:
-        return
-    height = len(pixels) // (width * 4)
-    if x >= width or y >= height:
-        return
-
-    index = (y * width + x) * 4
-    pixels[index : index + 4] = bytes(color)
+def _format_axis_value(value: float) -> str:
+    absolute = abs(value)
+    if absolute >= 100:
+        return f"{value:.2f}"
+    if absolute >= 1:
+        return f"{value:.3f}"
+    return f"{value:.4f}"
 
 
-def _blend_pixel(
-    pixels: bytearray,
-    width: int,
-    x: int,
-    y: int,
-    color: RGBA,
-) -> None:
-    if x < 0 or y < 0:
-        return
-    height = len(pixels) // (width * 4)
-    if x >= width or y >= height:
-        return
-
-    index = (y * width + x) * 4
-    alpha = color[3] / 255.0
-    old = pixels[index : index + 4]
-    for offset in range(3):
-        pixels[index + offset] = int(
-            old[offset] * (1.0 - alpha) + color[offset] * alpha
-        )
-    pixels[index + 3] = 255
+def _format_price(value: float) -> str:
+    absolute = abs(value)
+    if absolute >= 100:
+        return f"{value:.2f}"
+    if absolute >= 1:
+        return f"{value:.3f}"
+    return f"{value:.4f}"
 
 
-def _line(
-    pixels: bytearray,
-    width: int,
-    x1: int,
-    y1: int,
-    x2: int,
-    y2: int,
-    color: RGBA,
-    thickness: int = 3,
-) -> None:
-    dx = abs(x2 - x1)
-    dy = -abs(y2 - y1)
-    sx = 1 if x1 < x2 else -1
-    sy = 1 if y1 < y2 else -1
-    error = dx + dy
-
-    radius = max(0, thickness // 2)
-
-    while True:
-        for ox in range(-radius, radius + 1):
-            for oy in range(-radius, radius + 1):
-                if ox * ox + oy * oy <= radius * radius:
-                    _blend_pixel(pixels, width, x1 + ox, y1 + oy, color)
-
-        if x1 == x2 and y1 == y2:
-            break
-
-        twice = 2 * error
-        if twice >= dy:
-            error += dy
-            x1 += sx
-        if twice <= dx:
-            error += dx
-            y1 += sy
-
-
-def _fill_polygon(
-    pixels: bytearray,
-    width: int,
-    points: list[tuple[int, int]],
-    color: RGBA,
-) -> None:
-    if len(points) < 3:
-        return
-
-    height = len(pixels) // (width * 4)
-    min_y = max(0, min(y for _, y in points))
-    max_y = min(height - 1, max(y for _, y in points))
-
-    for y in range(min_y, max_y + 1):
-        intersections: list[int] = []
-        for index, (x1, y1) in enumerate(points):
-            x2, y2 = points[(index + 1) % len(points)]
-            if y1 == y2:
-                continue
-            if y < min(y1, y2) or y >= max(y1, y2):
-                continue
-            x = x1 + (y - y1) * (x2 - x1) / (y2 - y1)
-            intersections.append(int(x))
-
-        intersections.sort()
-        for start in range(0, len(intersections) - 1, 2):
-            left = max(0, intersections[start])
-            right = min(width - 1, intersections[start + 1])
-            for x in range(left, right + 1):
-                _blend_pixel(pixels, width, x, y, color)
-
-
-def _circle(
-    pixels: bytearray,
-    width: int,
-    cx: int,
-    cy: int,
-    radius: int,
-    color: RGBA,
-) -> None:
-    radius_sq = radius * radius
-    for y in range(cy - radius, cy + radius + 1):
-        for x in range(cx - radius, cx + radius + 1):
-            dx = x - cx
-            dy = y - cy
-            if dx * dx + dy * dy <= radius_sq:
-                _blend_pixel(pixels, width, x, y, color)
-
-
-def _resample(values: list[float], target: int = 110) -> list[float]:
+def calculate_volatility(rates: list[float]) -> float:
+    values = [float(value) for value in rates if math.isfinite(float(value))]
     if not values:
-        raise ValueError("empty_rates")
-    if len(values) == target:
-        return values[:]
-    if len(values) < target:
-        return values[:]
+        return 0.0
 
-    last = len(values) - 1
-    result: list[float] = []
-    for index in range(target):
-        position = index * last / (target - 1)
-        low = int(position)
-        high = min(last, low + 1)
-        fraction = position - low
-        result.append(
-            values[low] + (values[high] - values[low]) * fraction
+    average = mean(values)
+    if average == 0:
+        return 0.0
+
+    return pstdev(values) / abs(average)
+
+
+def classify_risk(rates: list[float]) -> tuple[str, str, str]:
+    volatility = calculate_volatility(rates)
+
+    if volatility < 0.02:
+        return "کم‌ریسک", "🟢", "#16A34A"
+    if volatility < 0.06:
+        return "پرنوسان", "🟡", "#CA8A04"
+    return "سقوط آزاد", "🔴", "#DC2626"
+
+
+def detect_three_day_downtrend(
+    rates: list[float],
+    timestamps: list[datetime],
+) -> bool:
+    daily_last: dict[object, float] = {}
+
+    for timestamp, rate in zip(timestamps, rates):
+        daily_last[timestamp.date()] = float(rate)
+
+    if len(daily_last) < 3:
+        return False
+
+    ordered_days = sorted(daily_last)
+    last_three = ordered_days[-3:]
+    values = [daily_last[day] for day in last_three]
+
+    return values[0] > values[1] > values[2]
+
+
+def _safe_percentage(old: float, new: float) -> float:
+    if old == 0:
+        return 0.0
+    return (new - old) / old * 100.0
+
+
+def build_smart_insight(
+    *,
+    market_status: str | None,
+    rates: list[float],
+    timestamps: list[datetime],
+    change_7d: float | None,
+) -> str:
+    if market_status == "best":
+        return _fa_text("بهترین عملکرد امروز")
+
+    if market_status == "worst":
+        return _fa_text("بدترین عملکرد امروز")
+
+    if detect_three_day_downtrend(rates, timestamps):
+        return _fa_text("روند نزولی ۳ روزه")
+
+    if change_7d is not None:
+        rounded = round(abs(change_7d))
+        if change_7d > 0:
+            return _fa_text(
+                f"نسبت به هفته پیش {_fa_digits(rounded)}٪ بالاتره"
+            )
+        if change_7d < 0:
+            return _fa_text(
+                f"نسبت به هفته پیش {_fa_digits(rounded)}٪ پایین‌تره"
+            )
+
+    if len(rates) >= 2:
+        change = _safe_percentage(
+            float(rates[0]),
+            float(rates[-1]),
         )
-    return result
+        if change > 0:
+            return _fa_text("امروز روند این ارز مثبت بوده")
+        if change < 0:
+            return _fa_text("امروز روند این ارز منفی بوده")
+
+    return _fa_text("امروز قیمت این ارز تقریباً بدون تغییر بوده")
+
+
+def _draw_gradient(
+    ax,
+    x: np.ndarray,
+    values: np.ndarray,
+    baseline: float,
+    color: str,
+) -> None:
+    layers = 48
+    for index in range(layers):
+        lower = index / layers
+        upper = (index + 1) / layers
+        y1 = baseline + (values - baseline) * lower
+        y2 = baseline + (values - baseline) * upper
+        alpha = 0.008 + upper * 0.075
+        ax.fill_between(
+            x,
+            y1,
+            y2,
+            color=color,
+            alpha=alpha,
+            linewidth=0,
+        )
+
+
+def _render_currency_chart(
+    *,
+    currency_code: str,
+    nation_name: str,
+    nation_flag: str,
+    rates: list[float],
+    timestamps: list[datetime],
+    current_rate: float | None,
+    window: str,
+    base_currency: str,
+    market_status: str | None,
+    change_7d: float | None,
+) -> BytesIO:
+    if window not in _WINDOW_LABELS:
+        raise ValueError("invalid_window")
+
+    if len(rates) < 3:
+        raise ValueError("not_enough_data")
+
+    if len(rates) != len(timestamps):
+        raise ValueError("history_length_mismatch")
+
+    values = [float(rate) for rate in rates]
+    if not all(math.isfinite(value) for value in values):
+        raise ValueError("invalid_rate")
+
+    if current_rate is not None:
+        current = float(current_rate)
+        if not math.isfinite(current):
+            raise ValueError("invalid_current_rate")
+        if values[-1] != current:
+            values.append(current)
+            timestamps = [*timestamps, datetime.utcnow()]
+
+    line_color = (
+        "#16A34A"
+        if values[-1] >= values[0]
+        else "#DC2626"
+    )
+    trend_icon = "▲" if values[-1] >= values[0] else "▼"
+    trend_word = "رشد" if values[-1] >= values[0] else "افت"
+
+    change_pct = _safe_percentage(
+        values[0],
+        values[-1],
+    )
+
+    risk_label, risk_icon, risk_color = classify_risk(values)
+
+    insight = build_smart_insight(
+        market_status=market_status,
+        rates=values,
+        timestamps=timestamps,
+        change_7d=change_7d,
+    )
+
+    chart_values = np.asarray(values, dtype=float)
+    x = np.arange(len(chart_values), dtype=float)
+
+    minimum = float(np.min(chart_values))
+    maximum = float(np.max(chart_values))
+
+    if math.isclose(minimum, maximum):
+        padding = max(abs(maximum) * 0.04, 0.01)
+    else:
+        padding = (maximum - minimum) * 0.12
+
+    y_min = minimum - padding
+    y_max = maximum + padding
+
+    fig = plt.figure(
+        figsize=(800 / 150, 450 / 150),
+        dpi=150,
+        facecolor="#EEF1F4",
+    )
+
+    card = FancyBboxPatch(
+        (0.02, 0.025),
+        0.96,
+        0.95,
+        transform=fig.transFigure,
+        boxstyle="round,pad=0.008,rounding_size=0.03",
+        facecolor="#FFFFFF",
+        edgecolor="none",
+        linewidth=0,
+        zorder=0,
+    )
+    fig.patches.append(card)
+
+    ax = fig.add_axes(
+        [0.095, 0.205, 0.84, 0.43],
+        facecolor="#FFFFFF",
+    )
+    ax.set_axisbelow(True)
+
+    ticks = np.linspace(y_min, y_max, 5)
+    ax.set_yticks(ticks)
+    ax.set_yticklabels(
+        [_format_axis_value(float(value)) for value in ticks],
+        fontproperties=_FONT_NORMAL,
+        fontsize=8.5,
+        color="#9CA3AF",
+    )
+
+    ax.tick_params(
+        axis="y",
+        length=0,
+        pad=6,
+    )
+    ax.set_xticks([])
+
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+
+    ax.grid(
+        axis="y",
+        color="#E5E7EB",
+        linewidth=0.7,
+        alpha=0.8,
+    )
+    ax.grid(
+        axis="x",
+        visible=False,
+    )
+
+    _draw_gradient(
+        ax=ax,
+        x=x,
+        values=chart_values,
+        baseline=y_min,
+        color=line_color,
+    )
+
+    ax.plot(
+        x,
+        chart_values,
+        color=line_color,
+        linewidth=2.6,
+        solid_capstyle="round",
+        solid_joinstyle="round",
+        zorder=5,
+    )
+
+    last_x = x[-1]
+    last_y = chart_values[-1]
+
+    ax.scatter(
+        [last_x],
+        [last_y],
+        s=130,
+        color=line_color,
+        alpha=0.12,
+        linewidths=0,
+        zorder=6,
+    )
+    ax.scatter(
+        [last_x],
+        [last_y],
+        s=48,
+        color=line_color,
+        edgecolors="#FFFFFF",
+        linewidths=2,
+        zorder=7,
+    )
+
+    ax.set_xlim(x[0], x[-1])
+    ax.set_ylim(y_min, y_max)
+
+    # Header badge.
+    badge = FancyBboxPatch(
+        (0.075, 0.87),
+        0.105,
+        0.052,
+        transform=fig.transFigure,
+        boxstyle="round,pad=0.007,rounding_size=0.016",
+        facecolor="#F3F4F6",
+        edgecolor="#E5E7EB",
+        linewidth=0.7,
+    )
+    fig.patches.append(badge)
+
+    fig.text(
+        0.1275,
+        0.896,
+        window,
+        ha="center",
+        va="center",
+        fontsize=9,
+        fontweight="bold",
+        color="#374151",
+    )
+
+    # Risk badge.
+    risk_badge = FancyBboxPatch(
+        (0.075, 0.803),
+        0.22,
+        0.052,
+        transform=fig.transFigure,
+        boxstyle="round,pad=0.007,rounding_size=0.016",
+        facecolor=risk_color,
+        edgecolor="none",
+        linewidth=0,
+        alpha=0.10,
+    )
+    fig.patches.append(risk_badge)
+
+    fig.text(
+        0.185,
+        0.829,
+        _fa_text(f"{risk_icon} {risk_label}"),
+        ha="center",
+        va="center",
+        fontproperties=_FONT_BOLD,
+        fontsize=8.5,
+        color=risk_color,
+    )
+
+    # Nation title.
+    nation_title = _fa_text(
+        f"{nation_name} {nation_flag}".strip()
+    )
+    fig.text(
+        0.925,
+        0.897,
+        nation_title,
+        ha="right",
+        va="center",
+        fontproperties=_FONT_BOLD,
+        fontsize=10.5,
+        color="#111827",
+    )
+
+    # Current price.
+    price_text = (
+        f"{_format_price(values[-1])} {base_currency}"
+    )
+    fig.text(
+        0.925,
+        0.835,
+        price_text,
+        ha="right",
+        va="center",
+        fontsize=22,
+        fontweight="bold",
+        color="#111827",
+    )
+
+    change_text = (
+        f"{trend_icon} {_fa_digits(round(abs(change_pct), 2))}٪ "
+        f"{trend_word} در {_WINDOW_LABELS[window]} گذشته"
+    )
+    fig.text(
+        0.925,
+        0.777,
+        _fa_text(change_text),
+        ha="right",
+        va="center",
+        fontproperties=_FONT_NORMAL,
+        fontsize=9,
+        color=line_color,
+    )
+
+    # Footer insight.
+    fig.text(
+        0.095,
+        0.095,
+        insight,
+        ha="left",
+        va="center",
+        fontproperties=_FONT_NORMAL,
+        fontsize=9,
+        color="#4B5563",
+    )
+
+    fig.text(
+        0.925,
+        0.095,
+        f"{currency_code}/{base_currency}",
+        ha="right",
+        va="center",
+        fontsize=8.5,
+        color="#9CA3AF",
+    )
+
+    output = BytesIO()
+
+    fig.savefig(
+        output,
+        format="png",
+        dpi=150,
+        facecolor=fig.get_facecolor(),
+        edgecolor="none",
+        pad_inches=0,
+    )
+    plt.close(fig)
+
+    output.name = "opex-market-chart.png"
+    output.seek(0)
+    return output
 
 
 def render_price_chart(
     rates: list[float],
     *,
-    width: int = 1000,
-    height: int = 520,
+    timestamps: list[datetime] | None = None,
+    currency_code: str = "",
+    nation_name: str = "",
+    nation_flag: str = "",
+    current_rate: float | None = None,
+    window: str = "24h",
+    base_currency: str = "OPX",
+    market_status: str | None = None,
+    change_7d: float | None = None,
+    width: int = 800,
+    height: int = 450,
 ) -> BytesIO:
-    if len(rates) < 3:
-        raise ValueError("not_enough_data")
-    if not all(isfinite(float(rate)) for rate in rates):
-        raise ValueError("invalid_rate")
+    """
+    Synchronous renderer kept for internal and backward-compatible use.
 
-    values = _resample([float(rate) for rate in rates])
-    minimum = min(values)
-    maximum = max(values)
+    Width and height are intentionally fixed by the requested design.
+    The arguments are accepted to keep existing callers readable.
+    """
+    if width != 800 or height != 450:
+        raise ValueError("chart_size_must_be_800x450")
 
-    if maximum == minimum:
-        padding = max(abs(maximum) * 0.02, 0.1)
-        minimum -= padding
-        maximum += padding
+    if timestamps is None:
+        timestamps = [
+            datetime.utcnow()
+            for _ in rates
+        ]
 
-    pixels = bytearray(width * height * 4)
-    background = (10, 15, 20, 255)
-    grid = (50, 60, 70, 155)
-    axis = (100, 112, 124, 220)
-    area = (45, 220, 128, 35)
-    line = (61, 235, 136, 255)
-    current = (245, 199, 66, 255)
-
-    for index in range(0, len(pixels), 4):
-        pixels[index : index + 4] = bytes(background)
-
-    left = 52
-    right = width - 26
-    top = 30
-    bottom = height - 42
-    chart_width = right - left
-    chart_height = bottom - top
-
-    for fraction in (0.0, 0.25, 0.5, 0.75, 1.0):
-        y = int(bottom - fraction * chart_height)
-        _line(pixels, width, left, y, right, y, grid, thickness=1)
-
-    for fraction in (0.0, 0.25, 0.5, 0.75, 1.0):
-        x = int(left + fraction * chart_width)
-        _line(pixels, width, x, top, x, bottom, grid, thickness=1)
-
-    _line(pixels, width, left, top, left, bottom, axis, thickness=1)
-    _line(pixels, width, left, bottom, right, bottom, axis, thickness=1)
-
-    points: list[tuple[int, int]] = []
-    span = maximum - minimum
-    for index, value in enumerate(values):
-        x = int(left + index * chart_width / max(1, len(values) - 1))
-        normalized = (value - minimum) / span
-        y = int(bottom - normalized * chart_height)
-        points.append((x, y))
-
-    area_points = points + [(points[-1][0], bottom), (points[0][0], bottom)]
-    _fill_polygon(pixels, width, area_points, area)
-
-    for first, second in zip(points, points[1:]):
-        _line(
-            pixels,
-            width,
-            first[0],
-            first[1],
-            second[0],
-            second[1],
-            line,
-            thickness=4,
+    with _RENDER_LOCK:
+        return _render_currency_chart(
+            currency_code=currency_code,
+            nation_name=nation_name,
+            nation_flag=nation_flag,
+            rates=rates,
+            timestamps=timestamps,
+            current_rate=current_rate,
+            window=window,
+            base_currency=base_currency,
+            market_status=market_status,
+            change_7d=change_7d,
         )
 
-    _circle(pixels, width, points[0][0], points[0][1], 4, line)
-    _circle(pixels, width, points[-1][0], points[-1][1], 8, current)
-    _circle(pixels, width, points[-1][0], points[-1][1], 4, background)
 
-    output = BytesIO(_png_bytes(width, height, pixels))
-    output.name = "opex-market-chart.png"
-    output.seek(0)
-    return output
+async def generate_currency_chart(
+    currency_code: str,
+    nation_name: str,
+    nation_flag: str,
+    price_history: list[float],
+    timestamps: list[datetime],
+    window: str = "24h",
+    base_currency: str = "OPX",
+    current_rate: float | None = None,
+    market_status: str | None = None,
+    change_7d: float | None = None,
+) -> BytesIO:
+    """
+    Async chart API for Telegram handlers.
+
+    Rendering runs in a worker thread so Matplotlib does not block
+    aiogram's event loop.
+    """
+    return await asyncio.to_thread(
+        render_price_chart,
+        price_history,
+        timestamps=timestamps,
+        currency_code=currency_code,
+        nation_name=nation_name,
+        nation_flag=nation_flag,
+        current_rate=current_rate,
+        window=window,
+        base_currency=base_currency,
+        market_status=market_status,
+        change_7d=change_7d,
+    )
