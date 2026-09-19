@@ -98,11 +98,13 @@ async def test_price_alert_triggers_and_can_be_deleted():
         )
         assert alert is not None
         assert alert.triggered is True
+        alert_id = alert.id
 
+    async with async_session() as session:
         async with session.begin():
             deleted = await delete_price_alert(
                 session,
                 user_id=TEST_USER_ID,
-                alert_id=alert.id,
+                alert_id=alert_id,
             )
             assert deleted is True
