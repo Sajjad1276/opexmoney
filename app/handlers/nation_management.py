@@ -28,6 +28,7 @@ from app.database.models import (
     User,
 )
 from app.database.session import async_session
+from app.services.mission_service import increment_mission
 from app.services.user_service import sync_user_balance
 
 logger = logging.getLogger(__name__)
@@ -488,6 +489,7 @@ async def _join_user(
 ) -> tuple[str, Nation | None]:
     pending_admin_ids: list[int] = []
     joined_user: User | None = None
+    joined_confirmed = False
     nation: Nation | None = None
     result_message = ""
 
@@ -600,8 +602,24 @@ async def _join_user(
                     },
                 )
                 joined_user = user
+                joined_confirmed = True
                 result_message = f"🎉 به «{nation.name}» پیوستی!"
     
+    if joined_confirmed and joined_user is not None:
+        try:
+            async with async_session() as session:
+                async with session.begin():
+                    await increment_mission(
+                        session,
+                        joined_user.user_id,
+                        "JOIN_NATION",
+                    )
+        except Exception:
+            logger.exception(
+                "Mission trigger failed after nation join for user %s",
+                joined_user.user_id,
+            )
+
     if pending_admin_ids and nation is not None and joined_user is not None:
         for admin_id in pending_admin_ids:
             try:
