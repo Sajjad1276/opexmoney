@@ -50,9 +50,12 @@ def confirm_trade_keyboard() -> InlineKeyboardMarkup:
 
 
 def nation_panel_keyboard(
-    is_manager: bool = False,
+    is_founder: bool = False,
     nation_id: int | None = None,
+    *,
+    is_manager: bool | None = None,
 ) -> InlineKeyboardMarkup:
+    can_manage = is_founder if is_manager is None else is_manager
     buttons = [
         [InlineKeyboardButton(text="🌍 ملت‌های من", callback_data="my_nations")],
         [InlineKeyboardButton(text="🔍 کاوش ملت‌ها", callback_data="explore_nations")],
@@ -72,7 +75,7 @@ def nation_panel_keyboard(
                 ),
             ]
         )
-        if is_manager:
+        if can_manage:
             buttons.append(
                 [
                     InlineKeyboardButton(
