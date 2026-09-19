@@ -691,21 +691,6 @@ async def confirm_withdraw(
             f"{_amount_text(amount)} ΩXR از خزانه برداشت شد."
         )
         if callback.message is not None:
-            try:
-                await callback.message.edit_text(
-                    success_text,
-                    parse_mode="HTML",
-                )
-            except Exception:
-                logger.exception(
-                    "Could not edit withdrawal success message user=%s",
-                    callback.from_user.id,
-                )
-                await callback.message.answer(
-                    success_text,
-                    parse_mode="HTML",
-                )
-
             async with async_session() as session:
                 async with session.begin():
                     role = await get_member_role(
@@ -713,11 +698,13 @@ async def confirm_withdraw(
                         callback.from_user.id,
                         nation_id,
                     )
-            await callback.message.answer(
-                refreshed_text,
-                reply_markup=treasury_keyboard(nation_id, role),
-                parse_mode="HTML",
-            )
+            if role is not None:
+                await callback.message.edit_text(
+                    refreshed_text,
+                    reply_markup=treasury_keyboard(nation_id, role),
+                    parse_mode="HTML",
+                )
+
         await callback.answer("✅ برداشت انجام شد.")
     except Exception:
         logger.exception(
