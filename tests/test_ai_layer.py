@@ -128,7 +128,7 @@ def test_prompt_and_cache_key_are_deterministic() -> None:
         user_message="وضعیتم چطوره؟",
     )
     key_two = build_cache_key(
-        model="gemini-3.8-flash",
+        model=settings.ai_model,
         context=context,
         user_message="وضعیتم چطوره؟",
     )
