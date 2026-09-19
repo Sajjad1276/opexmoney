@@ -14,18 +14,8 @@ down_revision = "0004_onboarding_username_length"
 branch_labels = None
 depends_on = None
 
-nation_member_role = postgresql.ENUM(
-    "founder",
-    "minister",
-    "trader",
-    "citizen",
-    name="nation_member_role",
-)
-
 
 def upgrade() -> None:
-    nation_member_role.create(op.get_bind(), checkfirst=True)
-
     op.add_column(
         "nations",
         sa.Column("join_policy", sa.String(20), nullable=True, server_default=sa.text("'OPEN'")),
@@ -73,7 +63,20 @@ def upgrade() -> None:
             sa.ForeignKey("users.user_id", ondelete="CASCADE"),
             nullable=False,
         ),
-        sa.Column("role", nation_member_role, nullable=False, server_default=sa.text("'citizen'")),
+        sa.Column(
+            "role",
+            sa.Enum(
+                "founder",
+                "minister",
+                "trader",
+                "citizen",
+                name="nation_member_role",
+                native_enum=False,
+                create_constraint=True,
+            ),
+            nullable=False,
+            server_default=sa.text("'citizen'"),
+        ),
         sa.Column("joined_at", sa.DateTime(), nullable=False, server_default=sa.func.current_timestamp()),
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
         sa.UniqueConstraint("nation_id", "user_id", name="uq_nation_member_nation_user"),
@@ -237,5 +240,3 @@ def downgrade() -> None:
     op.drop_column("nations", "invite_code")
     op.drop_column("nations", "personality")
     op.drop_column("nations", "join_policy")
-
-    nation_member_role.drop(op.get_bind(), checkfirst=True)
