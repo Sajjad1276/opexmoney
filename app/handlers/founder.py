@@ -8,10 +8,10 @@ from aiogram import Bot, Dispatcher, F, Router
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from aiogram.filters.state import StateFilter
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, ChatMemberUpdated, Message
+from aiogram.types import CallbackQuery, ChatMemberUpdated, Message, ReplyKeyboardRemove
 from sqlalchemy import select
 
-from app.database.models import BotGroup, Nation
+from app.database.models import BotGroup, Nation, User
 from app.database.session import async_session
 from app.keyboards.inline import (
     add_to_group_keyboard,
@@ -20,6 +20,7 @@ from app.keyboards.inline import (
 )
 from app.keyboards.reply import main_menu_keyboard
 from app.services.nation_service import create_nation
+from app.handlers.start import show_dashboard
 from app.services.user_service import get_user
 from app.states.founder import FounderStates
 from app.states.onboarding import OnboardingStates
@@ -85,7 +86,8 @@ async def start_founder(
 
     await call.answer()
     if call.message:
-        await call.message.answer(
+        await call.message.answer("\u2060", reply_markup=ReplyKeyboardRemove())
+        await call.message.edit_text(
             "🏛 <b>تأسیس ملت · مرحله 1</b>\n"
             "اول ربات رو به گروهی که می‌خوای پایتخت ملتت باشه اضافه کن.\n"
             "در فرم تلگرام، ربات رو به‌عنوان ادمین اضافه کن.\n"
@@ -383,20 +385,25 @@ async def _send_founder_success(
     group_id: int,
     founder_name: str,
 ) -> None:
-    flag = html.escape(nation.flag_emoji or DEFAULT_NATION_FLAG)
+    try:
+        await target_message.delete()
+    except Exception:
+        logger.debug("Could not delete founder inline panel", exc_info=True)
 
-    await target_message.answer(
-        "🎉 <b>ملت تأسیس شد!</b>\n"
-        f"{flag} <b>{html.escape(nation.name)}</b>\n"
-        f"💱 ارز رسمی: <b>{html.escape(nation.currency_code)}</b>\n"
-        "👑 تو بنیان‌گذار این ملتی.\n"
-        "💰 موجودی اولیه: 1000 واحد\n"
-        "🌐 منوی اصلی آماده‌ست.",
-        reply_markup=main_menu_keyboard(),
-        parse_mode="HTML",
-    )
+    async with async_session() as session:
+        async with session.begin():
+            user = await session.get(NationMember, nation.founder_user_id) if False else await session.get(User, nation.founder_user_id)
+
+    if user is not None:
+        await show_dashboard(
+            target_message,
+            user,
+            replace_inline=True,
+            bot=bot,
+        )
 
     try:
+        flag = html.escape(nation.flag_emoji or DEFAULT_NATION_FLAG)
         await bot.send_message(
             group_id,
             "🎉 <b>ملت جدید تأسیس شد!</b>\n"
@@ -412,6 +419,7 @@ async def _send_founder_success(
             nation.nation_id,
             group_id,
         )
+
 
 
 @founder_router.callback_query(
@@ -530,11 +538,24 @@ async def receive_founder_flag_fallback(
         FounderStates.SELECT_FLAG,
     ),
 )
-async def cancel_founder(call: CallbackQuery, state: FSMContext) -> None:
+async def cancel_founder(call: CallbackQuery, state: FSMContext, bot: Bot) -> None:
     await state.clear()
-    await call.answer()
     if call.message:
-        await call.message.answer(
-            "❌ تأسیس ملت لغو شد.",
-            reply_markup=main_menu_keyboard(),
-        )
+        try:
+            await call.message.delete()
+        except Exception:
+            logger.debug("Could not delete founder inline panel", exc_info=True)
+
+        async with async_session() as session:
+            async with session.begin():
+                user = await session.get(User, call.from_user.id)
+
+        if user is not None:
+            await show_dashboard(
+                call.message,
+                user,
+                replace_inline=True,
+                bot=bot,
+                display_user=call.from_user,
+            )
+    await call.answer("❌ تأسیس ملت لغو شد.")
