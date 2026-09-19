@@ -176,8 +176,8 @@ async def test_ai_success_path_parses_and_caches(monkeypatch) -> None:
     class FakeModels:
         async def generate_content(self, **kwargs):
             assert kwargs["model"] == settings.ai_model
-            assert kwargs["config"].response_mime_type == "application/json"
-            return SimpleNamespace(text='{"reply":"<b>سلام</b>، معامله‌گر."}')
+            assert kwargs["config"].system_instruction
+            return SimpleNamespace(text='<b>سلام</b>، معامله‌گر.')
 
     class FakeAsyncClient:
         models = FakeModels()
@@ -202,6 +202,32 @@ async def test_ai_success_path_parses_and_caches(monkeypatch) -> None:
 
     assert result == "<b>سلام</b>، معامله‌گر."
     assert events == ["cache", "remember"]
+
+
+@pytest.mark.asyncio
+async def test_ai_health_check_uses_gemini_model(monkeypatch) -> None:
+    companion = AICompanion()
+
+    class FakeModels:
+        async def get(self, **kwargs):
+            assert kwargs["model"] == settings.ai_model
+            return SimpleNamespace(name=f"models/{settings.ai_model}")
+
+    class FakeAsyncClient:
+        models = FakeModels()
+
+        async def aclose(self):
+            return None
+
+    class FakeClient:
+        def __init__(self, **_kwargs):
+            self.aio = FakeAsyncClient()
+
+    monkeypatch.setattr("ai.genai.Client", FakeClient)
+    monkeypatch.setattr(settings, "gemini_api_key", "test-key")
+    monkeypatch.setattr(settings, "ai_enabled", True)
+
+    assert await companion.health_check() is True
 
 
 def test_main_wires_ai_router() -> None:
