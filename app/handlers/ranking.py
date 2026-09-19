@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 
 from aiogram import F, Router
-from aiogram.enums import ParseMode
+from aiogram.enums import ButtonStyle, ParseMode
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import (
     CallbackQuery,
@@ -46,6 +46,7 @@ def ranking_keyboard(active_tab: str) -> InlineKeyboardMarkup:
             InlineKeyboardButton(
                 text=label,
                 callback_data=f"ranking:{tab}",
+                style=ButtonStyle.PRIMARY,
             )
         )
 
@@ -56,6 +57,7 @@ def ranking_keyboard(active_tab: str) -> InlineKeyboardMarkup:
                 InlineKeyboardButton(
                     text="🔄 بروزرسانی",
                     callback_data=f"ranking:refresh:{active_tab}",
+                    style=ButtonStyle.PRIMARY,
                 ),
                 InlineKeyboardButton(
                     text="↩️ بازگشت",
