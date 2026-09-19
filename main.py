@@ -47,6 +47,7 @@ from app.services.economic_engine import (
     update_nation_ranks,
 )
 from app.services.governance_service import governance_cycle
+from app.services.war_service import resolve_expired_wars
 from app.schedulers.alert_checker import register_price_alert_job
 from config import settings
 
@@ -172,6 +173,14 @@ async def run_governance_job(bot: Bot) -> None:
 
 
 
+async def run_war_resolution(bot: Bot) -> None:
+    try:
+        resolved = await resolve_expired_wars(bot)
+        logger.info("Nation war resolution completed | resolved=%s", resolved)
+    except Exception:
+        logger.exception("Nation war resolution failed")
+
+
 async def run_nation_join_expiration(bot: Bot) -> None:
     try:
         expired = await expire_join_requests(bot)
@@ -219,6 +228,15 @@ def build_scheduler(bot: Bot) -> AsyncIOScheduler:
         run_daily_reset,
         CronTrigger(hour=0, minute=0),
         id="daily_market_reset",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+    scheduler.add_job(
+        run_war_resolution,
+        CronTrigger(minute="*/15"),
+        args=[bot],
+        id="nation_war_resolution_15m",
         replace_existing=True,
         max_instances=1,
         coalesce=True,
