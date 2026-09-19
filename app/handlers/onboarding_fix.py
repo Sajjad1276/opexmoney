@@ -250,17 +250,3 @@ async def onboarding_back_name(call: CallbackQuery, state: FSMContext) -> None:
                 parse_mode="HTML",
             )
 
-
-@router.callback_query(F.data == "cancel_start", StateFilter(OnboardingStates.SET_USERNAME_PLAYER))
-async def cancel_start_fix(call: CallbackQuery, state: FSMContext) -> None:
-    await state.clear()
-    user_name = html.escape(call.from_user.first_name or "معامله‌گر")
-    text = CANCEL_TEXT.format(user_name=user_name)
-    try:
-        if call.message and getattr(call.message, "photo", None):
-            await _safe_edit_caption(call, text)
-        else:
-            await _safe_edit_text(call, text)
-        await call.answer()
-    except TelegramBadRequest:
-        await call.answer(rtl_text("ثبت‌نام لغو شد."), show_alert=False)
