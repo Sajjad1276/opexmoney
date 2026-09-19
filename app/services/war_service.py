@@ -380,6 +380,8 @@ async def resolve_war(
             "loser_id": loser_id,
             "loser_name": loser_name,
             "reparation_amount": reparation,
+            "declaring_nation_id": declaring_nation.nation_id,
+            "opponent_nation_id": opponent_nation.nation_id,
             "declaring_name": declaring_nation.name,
             "opponent_name": opponent_nation.name,
             "declaring_rate": declaring_rate,
@@ -398,25 +400,17 @@ async def resolve_war(
             "💰 هیچ غرامتی منتقل نشد."
         )
     else:
-        message = (
-            "🏆 <b>نتیجه جنگ</b>\n\n"
-            f"🥇 برنده: <b>{html.escape(result['winner_name'])}</b>\n"
-            f"💱 نرخ برنده: <b>{result['declaring_rate'] if result['winner_id'] == result['declaring_group_id'] else ''}</b>"
+        winner_rate = (
+            result["declaring_rate"]
+            if result["winner_id"] == result["declaring_nation_id"]
+            else result["opponent_rate"]
         )
-        if result["winner_id"] == result["declaring_nation_id"] if "declaring_nation_id" in result else False:
-            message = (
-                "🏆 <b>نتیجه جنگ</b>\n\n"
-                f"🥇 برنده: <b>{html.escape(result['winner_name'])}</b>\n"
-                f"💱 نرخ برنده: <b>{result['declaring_rate']}</b>\n"
-                f"💸 غرامت منتقل‌شده: <b>{result['reparation_amount']}</b> ΩXR"
-            )
-        else:
-            message = (
-                "🏆 <b>نتیجه جنگ</b>\n\n"
-                f"🥇 برنده: <b>{html.escape(result['winner_name'])}</b>\n"
-                f"💱 نرخ برنده: <b>{result['opponent_rate']}</b>\n"
-                f"💸 غرامت منتقل‌شده: <b>{result['reparation_amount']}</b> ΩXR"
-            )
+        message = (
+            "🏆 <b>نتیجه جنگ</b>\\n\\n"
+            f"🥇 برنده: <b>{html.escape(result['winner_name'])}</b>\\n"
+            f"💱 نرخ برنده: <b>{winner_rate}</b> ΩXR\\n"
+            f"💸 غرامت منتقل‌شده: <b>{result['reparation_amount']}</b> ΩXR"
+        )
 
     await _send_to_groups(
         bot,
@@ -448,7 +442,7 @@ async def _append_war_log(
 async def resolve_expired_wars(bot: Bot | None = None) -> int:
     now = _now()
 
-    async with AsyncSessionSessionContext() as session:
+    async with async_session() as session:
         war_ids = list(
             (
                 await session.execute(
@@ -465,7 +459,7 @@ async def resolve_expired_wars(bot: Bot | None = None) -> int:
 
     resolved = 0
     for war_id in war_ids:
-        async with AsyncSessionSessionContext() as session:
+        async with async_session() as session:
             try:
                 result = await resolve_war(war_id, session, bot=bot)
                 if result is not None:
@@ -474,14 +468,3 @@ async def resolve_expired_wars(bot: Bot | None = None) -> int:
                 logger.exception("War resolution failed for war %s", war_id)
 
     return resolved
-
-
-class AsyncSessionSessionContext:
-    async def __aenter__(self) -> AsyncSession:
-        from app.database.session import async_session
-        self._session_context = async_session()
-        self._session = await self._session_context.__aenter__()
-        return self._session
-
-    async def __aexit__(self, exc_type, exc, tb):
-        return await self._session_context.__aexit__(exc_type, exc, tb)
