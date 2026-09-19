@@ -1007,11 +1007,11 @@ async def market_history(call):
                 )
             ).all()
 
-    market_markup = (
-        market_keyboard_for_nation(user.home_nation_id)
-        if user and user.home_nation_id is not None
-        else market_keyboard()
-    )
+    if not user or user.home_nation_id is None:
+        await call.answer("🔴 حساب یا ملت فعال پیدا نشد. /start بزن.", show_alert=True)
+        return
+
+    market_markup = market_keyboard_for_nation(user.home_nation_id)
 
     lines = [
         "📜 <b>تاریخچه</b>",
