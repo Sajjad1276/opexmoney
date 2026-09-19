@@ -71,6 +71,18 @@ EXPECTED_JOB_IDS = {
     "nation_weekly_ai_report",
 }
 
+EXPECTED_ROUTER_NAMES = {
+    "onboarding_fix",
+    "start",
+    "market",
+    "founder",
+    "nation_management",
+    "nation",
+    "governance",
+    "sections",
+    "ai",
+}
+
 
 async def _table_exists(table_name: str) -> bool:
     async with engine.connect() as connection:
@@ -270,6 +282,20 @@ async def run_startup_smoke_test(
     except Exception:
         logger.exception("SELFTEST|FAIL|route-contracts")
         ok = False
+
+    expected_routers = {getattr(router, "name", "") for router in dp.sub_routers}
+    missing_routers = sorted(EXPECTED_ROUTER_NAMES - expected_routers)
+    if missing_routers:
+        logger.error(
+            "SELFTEST|FAIL|routers|missing=%s",
+            ",".join(missing_routers),
+        )
+        ok = False
+    else:
+        logger.info(
+            "SELFTEST|PASS|routers|count=%d",
+            len(EXPECTED_ROUTER_NAMES),
+        )
 
     if scheduler is not None:
         missing_jobs = [
