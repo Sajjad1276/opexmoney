@@ -131,11 +131,11 @@ def _nation_page_keyboard(
         rows.append(
             [
                 InlineKeyboardButton(
-                    text="🏴 {0} | 💰 نرخ: {1} ΩXR | 👥 {2} نفر".format(
+                    text="{0} {1} | 💰 نرخ: {2} ΩXR | 👥 {3} نفر".format(
+                        html.escape(nation.flag_emoji or "🏴"),
                         html.escape(nation.name),
                         fmt_rate(nation.exchange_rate),
                         to_fa(nation.member_count),
-                    ),
                     callback_data="select_nation:{0}".format(nation.nation_id),
                 )
             ]
@@ -284,7 +284,7 @@ async def show_dashboard(message: Message, user: User) -> None:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 """.format(
         user_mention(message.from_user),
-        html.escape(nation.name),
+        f"{html.escape(nation.flag_emoji or '🏴')} <b>{html.escape(nation.name)}</b>",
         html.escape(nation.currency_code),
         fmt_amount(balance),
         fmt_amount(user.xr_balance),
@@ -558,7 +558,7 @@ async def render_nation_profile(nation: Nation) -> str:
 ▸ معاملات امروز: {9}
 ▸ روند: {10} {11}
 """.format(
-        html.escape(nation.name),
+        f"{html.escape(nation.flag_emoji or '🏴')} <b>{html.escape(nation.name)}</b>",
         html.escape(nation.currency_code),
         fmt_rate(nation.exchange_rate),
         to_fa(update_minutes),
