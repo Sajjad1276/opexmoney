@@ -15,7 +15,7 @@ depends_on = None
 
 
 STARTER_NATIONS = (
-    ("پارِس", "PRS"),
+    ("پارس", "PRS"),
     ("آریا", "ARY"),
     ("سپهر", "SPH"),
 )
