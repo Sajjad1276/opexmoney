@@ -23,6 +23,8 @@ from app.utils.name_filter import is_blocked_trader_name, is_valid_trader_name
 
 router = Router(name="onboarding_fix")
 
+# Compatibility fallback for older onboarding state; validation is shared with the primary flow.
+
 # Telegram does not expose a text-align control for bot messages. RLM markers
 # keep mixed Persian/Latin/emoji lines in an RTL paragraph direction and reduce
 # the visual jump to the left caused by mentions, numbers and symbols.
@@ -147,7 +149,7 @@ async def reject_blocked_name(message: Message, state: FSMContext) -> None:
 
 
 @router.message(OnboardingStates.SET_USERNAME_PLAYER, F.text.func(lambda value: not is_valid_trader_name(value or "")))
-async def reject_non_english_name(message: Message, state: FSMContext) -> None:
+async def reject_invalid_trader_name(message: Message, state: FSMContext) -> None:
     await message.answer(INVALID_NAME, parse_mode="HTML")
 
 
@@ -258,7 +260,3 @@ async def cancel_start_fix(call: CallbackQuery, state: FSMContext) -> None:
         if call.message and getattr(call.message, "photo", None):
             await _safe_edit_caption(call, text)
         else:
-            await _safe_edit_text(call, text)
-        await call.answer()
-    except TelegramBadRequest:
-        await call.answer(rtl_text("ثبت‌نام لغو شد."), show_alert=False)
