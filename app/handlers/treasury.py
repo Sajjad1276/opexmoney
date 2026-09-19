@@ -20,7 +20,7 @@ from aiogram.types import (
 
 from app.database.models import NationMember, NationMemberRole, User
 from app.database.session import async_session
-from app.services.nation_service import get_user_active_nation
+from app.services.nation_service import get_user_active_nation_context
 from app.services.treasury_service import (
     MIN_DEPOSIT,
     deposit_to_treasury,
@@ -293,31 +293,30 @@ async def open_treasury_from_main_menu(
     try:
         async with async_session() as session:
             async with session.begin():
-                nation = await get_user_active_nation(
+                context = await get_user_active_nation_context(
                     session,
                     message.from_user.id,
-                    repair_founder_membership=True,
+                    repair=True,
                 )
 
-                if nation is None:
+                if context is None:
+                    logger.warning(
+                        "TREASURY|resolve_failed|registered_user_without_active_nation"
+                    )
                     await message.answer(
-                        "⚠️ عضویت فعال ملت پیدا نشد.\n"
-                        "از بخش «🌍 ملت‌ها» یک ملت را انتخاب کن یا دوباره /start را بزن."
+                        "⚠️ هنوز ملت فعالی برای حسابت پیدا نشد.\n"
+                        "از «🌍 ملت‌ها» ملت فعال خودت را باز کن."
                     )
                     return
 
+                nation, role, source = context
                 nation_id = nation.nation_id
-                role = await get_member_role(
-                    session,
-                    message.from_user.id,
+                logger.info(
+                    "TREASURY|resolved|nation=%s|role=%s|source=%s",
                     nation_id,
+                    role,
+                    source,
                 )
-                if role is None:
-                    await message.answer(
-                        "⚠️ عضویت ملت پیدا نشد.\n"
-                        "اطلاعات عضویت با وضعیت حساب هماهنگ نبود؛ دوباره از «🌍 ملت‌ها» وارد شو."
-                    )
-                    return
 
                 treasury = await get_treasury(session, nation_id)
                 if treasury is None:
