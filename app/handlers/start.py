@@ -28,6 +28,7 @@ from app.utils.name_filter import TRADER_NAME_RE
 from app.keyboards.inline import cancel_keyboard, first_trade_keyboard, nation_selection_keyboard, trade_confirmation_keyboard, welcome_keyboard
 from app.keyboards.reply import main_menu_keyboard
 from app.services.nation_service import get_active_nations, get_nation_rank
+from app.services.mission_service import check_permanent_missions, increment_mission
 from app.services.user_service import get_registration_status, get_user, is_fully_registered, sync_user_balance, username_exists
 from app.states.onboarding import OnboardingStates
 from config import settings
@@ -221,6 +222,15 @@ def nation_list_text(user, trader_name: str, nations: list[Nation]) -> str:
 async def show_dashboard(message: Message, user: User) -> None:
     async with async_session() as session:
         async with session.begin():
+            try:
+                await increment_mission(session, user.user_id, "DAILY_LOGIN")
+                await check_permanent_missions(session, user.user_id)
+            except Exception:
+                logger.exception(
+                    "Mission trigger failed while loading dashboard for user %s",
+                    user.user_id,
+                )
+
             nation = await session.get(Nation, user.home_nation_id) if user.home_nation_id else None
             if nation is None:
                 await message.answer(
