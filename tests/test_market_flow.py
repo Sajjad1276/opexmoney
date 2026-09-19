@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 from types import SimpleNamespace
+import secrets
 
 import pytest
 from sqlalchemy import delete, select
