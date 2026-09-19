@@ -36,12 +36,12 @@ def rtl_text(text: str) -> str:
 USERNAME_CAPTION = rtl_text("""<b>👤 نام معامله‌گرت رو انتخاب کن</b>
 
 نام نمایش داده می‌شه و بقیه بازیکن‌ها تو رو با همین نام می‌بینن.
-۳ تا ۲۰ کاراکتر: فارسی، انگلیسی، عدد و خط تیره.
+3 تا 20 کاراکتر: فارسی، انگلیسی، عدد و خط تیره.
 <u>فاصله و علامت‌های دیگر مجاز نیست.</u>""")
 
 INVALID_NAME = rtl_text("""<b>🔴 نام قابل قبول نیست</b>
 
-طول نام باید بین ۳ تا ۲۰ کاراکتر باشه.
+طول نام باید بین 3 تا 20 کاراکتر باشه.
 <u>فقط فارسی، انگلیسی، عدد و خط تیره مجازه.</u>""")
 
 BLOCKED_NAME = rtl_text("""<b>🔴 نام قابل قبول نیست</b>
@@ -111,7 +111,7 @@ def clean_nation_list_text(user, trader_name: str, nations) -> str:
     """Render the onboarding nation list as a compact RTL message."""
     lines = [
         "🌍 <b>ملت خودت رو انتخاب کن</b>",
-        f"«{html.escape(trader_name)}»، یک ملت انتخاب کن. <u>نرخ‌ها هر ۱۵ دقیقه آپدیت می‌شن.</u>",
+        f"«{html.escape(trader_name)}»، یک ملت انتخاب کن. <u>نرخ‌ها هر 15 دقیقه آپدیت می‌شن.</u>",
     ]
 
     for nation in nations[:4]:
