@@ -27,19 +27,19 @@ def chart_keyboard(
     nation_id: int,
     active_window: str,
 ) -> InlineKeyboardMarkup:
-    rows = []
+    window_row = []
     for key in ("24h", "72h", "7d"):
         label = WINDOWS[key]["label"]
         if key == active_window:
             label = f"{label} ✓"
-        rows.append([
+        window_row.append(
             InlineKeyboardButton(
                 text=label,
                 callback_data=f"chart:{nation_id}:{key}",
             )
-        ])
+        )
 
-    rows.append([
+    rows = [window_row, [
         InlineKeyboardButton(
             text="↩️ بازگشت به بازار",
             callback_data="back_to_market",
