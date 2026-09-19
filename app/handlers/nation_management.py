@@ -28,6 +28,7 @@ from app.database.models import (
     User,
 )
 from app.database.session import async_session
+from app.keyboards.reply import main_menu_keyboard
 from app.services.mission_service import increment_mission
 from app.services.nation_service import convert_holding_to_xr
 from app.services.war_service import declare_war
