@@ -283,7 +283,7 @@ def governance_main_keyboard(is_founder: bool = False) -> InlineKeyboardMarkup:
 
 def governance_rule_keyboard(rules: list[tuple[str, str]]) -> InlineKeyboardMarkup:
     rows = [
-        [InlineKeyboardButton(text=title, callback_data=f"gov_rule:{key}")]
+        [InlineKeyboardButton(text=title, callback_data=f"gov_rule:{key}", style=ButtonStyle.PRIMARY)]
         for key, title in rules
     ]
     rows.append([InlineKeyboardButton(text="❌ انصراف", callback_data="gov_cancel")])
@@ -314,20 +314,21 @@ def governance_proposal_list_keyboard(proposals) -> InlineKeyboardMarkup:
         [InlineKeyboardButton(
             text=f"🗳 {RULE_REGISTRY.get(proposal.rule_key).title_fa if proposal.rule_key in RULE_REGISTRY else proposal.rule_key} · #{proposal.id}",
             callback_data=f"gov_proposal:{proposal.id}",
+            style=ButtonStyle.PRIMARY,
         )]
         for proposal in proposals
     ]
-    rows.append([InlineKeyboardButton(text="↩️ قوانین", callback_data="governance_main")])
+    rows.append([InlineKeyboardButton(text="↩️ قوانین", callback_data="governance_main", style=ButtonStyle.PRIMARY)])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def governance_history_keyboard(offset: int, has_next: bool) -> InlineKeyboardMarkup:
     rows = []
     if offset > 0:
-        rows.append([InlineKeyboardButton(text="⬅️ قبلی", callback_data=f"gov_history:{max(0, offset - 8)}")])
+        rows.append([InlineKeyboardButton(text="⬅️ قبلی", callback_data=f"gov_history:{max(0, offset - 8)}", style=ButtonStyle.PRIMARY)])
     if has_next:
-        rows.append([InlineKeyboardButton(text="بعدی ➡️", callback_data=f"gov_history:{offset + 8}")])
-    rows.append([InlineKeyboardButton(text="↩️ قوانین", callback_data="governance_main")])
+        rows.append([InlineKeyboardButton(text="بعدی ➡️", callback_data=f"gov_history:{offset + 8}", style=ButtonStyle.PRIMARY)])
+    rows.append([InlineKeyboardButton(text="↩️ قوانین", callback_data="governance_main", style=ButtonStyle.PRIMARY)])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -336,6 +337,7 @@ def governance_revoke_keyboard(overrides) -> InlineKeyboardMarkup:
         [InlineKeyboardButton(
             text=f"لغو {override.rule_key} #{override.id}",
             callback_data=f"gov_revoke:{override.id}",
+            style=ButtonStyle.DANGER,
             style=ButtonStyle.DANGER,
         )]
         for override in overrides
