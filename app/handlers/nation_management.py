@@ -709,7 +709,15 @@ async def join_from_explore(call: CallbackQuery, bot: Bot) -> None:
         return
 
     if call.message:
-        await call.message.answer(message)
+        try:
+            await call.message.delete()
+        except Exception:
+            logger.debug("Could not delete nation explore panel", exc_info=True)
+        await bot.send_message(
+            call.from_user.id,
+            message,
+            reply_markup=main_menu_keyboard(),
+        )
     await call.answer()
 
 
@@ -1367,9 +1375,19 @@ async def start_announcement(call: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(NationManagementStates.announcement)
     await call.answer()
     if call.message:
-        await call.message.answer(
-            "📢 متن اطلاعیه را بفرست. این پیام در گروه/پایتخت ملت منتشر می‌شود.\n"
-            "برای لغو: /cancel"
+        await call.message.edit_text(
+            "📢 <b>اطلاعیه ملت</b>\n\n"
+            "متن اطلاعیه را بفرست. این پیام در گروه/پایتخت ملت منتشر می‌شود.\n"
+            "برای لغو: /cancel",
+            reply_markup=InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [InlineKeyboardButton(
+                        text="❌ انصراف",
+                        callback_data=f"nm:panel:{nation_id}",
+                    )]
+                ]
+            ),
+            parse_mode="HTML",
         )
 
 
