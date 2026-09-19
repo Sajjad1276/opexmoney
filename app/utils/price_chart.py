@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from bidi.algorithm import get_display
 from matplotlib.font_manager import FontProperties, findSystemFonts
-from matplotlib.patches import FancyBboxPatch
+from matplotlib.patches import Circle, FancyBboxPatch
 
 
 _RENDER_LOCK = threading.RLock()
@@ -111,10 +111,10 @@ def classify_risk(rates: list[float]) -> tuple[str, str, str]:
     volatility = calculate_volatility(rates)
 
     if volatility < 0.02:
-        return "کم‌ریسک", "🟢", "#16A34A"
+        return "کم‌ریسک", "low", "#16A34A"
     if volatility < 0.06:
-        return "پرنوسان", "🟡", "#CA8A04"
-    return "سقوط آزاد", "🔴", "#DC2626"
+        return "پرنوسان", "medium", "#CA8A04"
+    return "سقوط آزاد", "high", "#DC2626"
 
 
 def detect_three_day_downtrend(
@@ -415,20 +415,31 @@ def _render_currency_chart(
     )
     fig.patches.append(risk_badge)
 
+    # Matplotlib stays emoji-free: use a real colored patch for risk status.
+    risk_marker = Circle(
+        (0.092, 0.829),
+        0.008,
+        transform=fig.transFigure,
+        facecolor=risk_color,
+        edgecolor="none",
+        zorder=5,
+    )
+    fig.patches.append(risk_marker)
+
     fig.text(
-        0.185,
+        0.105,
         0.829,
-        _fa_text(f"{risk_icon} {risk_label}"),
-        ha="center",
+        _fa_text(risk_label),
+        ha="left",
         va="center",
         fontproperties=_FONT_BOLD,
         fontsize=8.5,
         color=risk_color,
     )
 
-    # Nation title.
+    # Nation identity stays emoji-free in the chart. Telegram can still show the flag.
     nation_title = _fa_text(
-        f"{nation_name} {nation_flag}".strip()
+        f"{nation_name} · {currency_code}".strip(" ·")
     )
     fig.text(
         0.925,
