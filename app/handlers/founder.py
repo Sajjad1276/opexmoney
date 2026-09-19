@@ -48,6 +48,7 @@ def founder_cancel_keyboard():
             InlineKeyboardButton(
                 text="❌ انصراف",
                 callback_data="cancel_founder",
+                style=__import__("aiogram.enums", fromlist=["ButtonStyle"]).ButtonStyle.DANGER,
             )
         ]]
     )
@@ -468,6 +469,7 @@ async def _send_founder_success(
     nation: Nation,
     group_id: int,
     founder_name: str,
+    display_user=None,
 ) -> None:
     try:
         await target_message.delete()
@@ -484,6 +486,7 @@ async def _send_founder_success(
             user,
             replace_inline=True,
             bot=bot,
+            display_user=display_user,
         )
 
     try:
@@ -581,6 +584,7 @@ async def select_founder_flag(
             nation=nation,
             group_id=group_id,
             founder_name=call.from_user.first_name or "بنیان‌گذار",
+            display_user=call.from_user,
         )
 
 
@@ -610,6 +614,7 @@ async def receive_founder_flag_fallback(
         nation=nation,
         group_id=group_id,
         founder_name=message.from_user.first_name or "بنیان‌گذار",
+        display_user=message.from_user,
     )
 
 
