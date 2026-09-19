@@ -4,7 +4,7 @@ import html
 import logging
 
 from aiogram import F, Router
-from aiogram.enums import ParseMode
+from aiogram.enums import ButtonStyle, ParseMode
 from aiogram.exceptions import TelegramBadRequest
 from sqlalchemy import select
 
@@ -40,6 +40,7 @@ def missions_keyboard(has_claimable: bool) -> InlineKeyboardMarkup:
                 InlineKeyboardButton(
                     text="🎁 دریافت جوایز",
                     callback_data="missions_claim_all",
+                    style=ButtonStyle.SUCCESS,
                 )
             ]
         )
