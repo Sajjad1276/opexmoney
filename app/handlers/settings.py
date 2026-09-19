@@ -51,6 +51,7 @@ def settings_keyboard() -> InlineKeyboardMarkup:
                     callback_data="settings:change_username",
                     style=ButtonStyle.PRIMARY,
                     style=ButtonStyle.PRIMARY,
+                    style=ButtonStyle.PRIMARY,
                 )
             ],
             [
@@ -58,12 +59,14 @@ def settings_keyboard() -> InlineKeyboardMarkup:
                     text="🏛 تغییر ملت اصلی",
                     callback_data="settings:change_nation",
                     style=ButtonStyle.PRIMARY,
+                    style=ButtonStyle.PRIMARY,
                 )
             ],
             [
                 InlineKeyboardButton(
                     text="📊 آمار کامل من",
                     callback_data="settings:stats",
+                    style=ButtonStyle.PRIMARY,
                     style=ButtonStyle.PRIMARY,
                 )
             ],
@@ -269,6 +272,7 @@ async def receive_new_username(
             )
             return
 
+        await close_inline_panel(state, message.bot)
         await close_inline_panel(state, message.bot)
         await state.clear()
         await message.answer(
