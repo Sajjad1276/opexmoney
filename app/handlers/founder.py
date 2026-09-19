@@ -93,7 +93,7 @@ async def start_founder(
             "اول ربات رو به گروهی که می‌خوای پایتخت ملتت باشه اضافه کن.\n"
             "در فرم تلگرام، ربات رو به‌عنوان ادمین اضافه کن.\n"
             "دسترسی‌های لازم از قبل پیشنهاد می‌شن.\n"
-            "بعد از ادمین شدن، ربات خودش گروه رو تشخیص می‌ده.",
+            "بعد از ادمین شدن، روی «بررسی و دریافت اطلاعات» بزن تا مشخصات گروه ثبت بشه.",
             reply_markup=add_to_group_keyboard(group_link),
             parse_mode="HTML",
         )
@@ -284,11 +284,37 @@ async def bot_group_status_changed(
     if event.chat.type not in {"group", "supergroup"}:
         return
 
-    new_status = getattr(event.new_chat_member.status, "value", event.new_chat_member.status)
+    new_status = getattr(
+        event.new_chat_member.status,
+        "value",
+        event.new_chat_member.status,
+    )
     if new_status not in {"administrator", "creator"}:
         return
 
     actor = event.from_user
+    group_title = event.chat.title or "گروه بدون نام"
+    group_username = getattr(event.chat, "username", None)
+
+    # Always persist the observed group first. The founder can then press
+    # «بررسی و دریافت اطلاعات» to explicitly continue onboarding.
+    async with async_session() as session:
+        async with session.begin():
+            bot_group = await session.get(BotGroup, event.chat.id)
+            if bot_group is None:
+                session.add(
+                    BotGroup(
+                        group_id=event.chat.id,
+                        title=group_title,
+                        username=group_username,
+                        is_active=True,
+                    )
+                )
+            else:
+                bot_group.title = group_title
+                bot_group.username = group_username
+                bot_group.is_active = True
+
     if actor is None:
         return
 
@@ -297,8 +323,8 @@ async def bot_group_status_changed(
         dispatcher=dispatcher,
         founder_user_id=actor.id,
         group_id=event.chat.id,
-        group_title=event.chat.title or "گروه بدون نام",
-        group_username=getattr(event.chat, "username", None),
+        group_title=group_title,
+        group_username=group_username,
         group_type=event.chat.type,
     )
 
