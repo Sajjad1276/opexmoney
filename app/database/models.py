@@ -114,7 +114,7 @@ class Transaction(Base):
 class UserActivity(Base):
     __tablename__ = "user_activities"
     __table_args__ = (Index("ix_user_activities_nation_created", "nation_id", "created_at"),)
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.user_id"), nullable=False)
     nation_id: Mapped[int] = mapped_column(ForeignKey("nations.nation_id"), nullable=False)
     activity_type: Mapped[ActivityType] = mapped_column(
@@ -136,7 +136,7 @@ class NationMemberHistory(Base):
 class RateHistory(Base):
     __tablename__ = "rate_history"
     __table_args__ = (Index("ix_rate_history_nation_calculated", "nation_id", "calculated_at"),)
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     nation_id: Mapped[int] = mapped_column(ForeignKey("nations.nation_id", ondelete="CASCADE"), nullable=False)
     rate: Mapped[Decimal] = mapped_column(Numeric(10, 4), nullable=False)
     volume: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False)
