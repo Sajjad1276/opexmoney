@@ -61,7 +61,7 @@ def nation_panel_keyboard(
             [
                 InlineKeyboardButton(
                     text="🏦 خزانه",
-                    callback_data=f"treasury:show:{nation_id}",
+                    callback_data=f"treasury:show:{nation_id}:nations",
                     style=ButtonStyle.SUCCESS,
                 ),
                 InlineKeyboardButton(
