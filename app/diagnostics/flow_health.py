@@ -203,8 +203,19 @@ def _regex_matches(pattern: str, value: str) -> bool:
 
 
 def _dynamic_candidates(template: str) -> list[str]:
-    candidates = [template + "1"]
-    return candidates
+    """Expand known callback f-string variables into concrete candidates."""
+    placeholders = re.findall(r"\{([^{}]+)\}", template)
+    candidates = [template]
+    for expression in placeholders:
+        key = expression.strip().split(".")[-1]
+        options = _DYNAMIC_VALUE_HINTS.get(key, ("1",))
+        token = "{" + expression + "}"
+        expanded: list[str] = []
+        for candidate in candidates:
+            for option in options:
+                expanded.append(candidate.replace(token, str(option), 1))
+        candidates = expanded
+    return candidates or [template]
 
 
 def run_flow_health_test() -> FlowHealthReport:
@@ -266,30 +277,23 @@ def run_flow_health_test() -> FlowHealthReport:
                 )
         else:
             dynamic_buttons += 1
-            literal_prefix = value.split("{", 1)[0]
-            # Collapse a concrete f-string variant onto its handler family.
-            # Examples: buyq_100_ -> buyq_, buyq_all_ -> buyq_.
-            prefix_candidates = [literal_prefix]
-            cut_positions = [
-                index + 1
-                for index, char in enumerate(literal_prefix)
-                if char in "_:"
-            ]
-            for position in reversed(cut_positions):
-                candidate = literal_prefix[:position]
-                if candidate not in prefix_candidates:
-                    prefix_candidates.append(candidate)
-            family_prefix = ""
-            for candidate in prefix_candidates:
-                if any(
-                    (handler_kind == "startswith" and pattern.startswith(candidate))
-                    or (handler_kind == "regexp" and candidate in pattern)
-                    or (handler_kind == "exact" and pattern.startswith(candidate))
-                    for handler_kind, pattern, _ in handler_specs
-                ):
-                    family_prefix = candidate
-                    break
-            if not family_prefix:
+            candidates = _dynamic_candidates(value)
+
+            def _covered(candidate: str) -> bool:
+                if candidate in exact_handlers:
+                    return True
+                for handler_kind, pattern in regex_handlers:
+                    if handler_kind == "startswith" and candidate.startswith(pattern):
+                        return True
+                    if handler_kind == "regexp":
+                        try:
+                            if re.fullmatch(pattern, candidate):
+                                return True
+                        except re.error:
+                            continue
+                return False
+
+            if not any(_covered(candidate) for candidate in candidates):
                 orphan_buttons.append(
                     f"{path.relative_to(ROOT)} -> dynamic:{value}"
                 )
