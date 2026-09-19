@@ -112,6 +112,9 @@ async def _build_photo(chart_data: dict) -> BufferedInputFile:
             if chart_data.get("change_7d") is not None
             else None
         ),
+        three_day_downtrend=bool(
+            chart_data.get("three_day_downtrend")
+        ),
     )
 
     return BufferedInputFile(
