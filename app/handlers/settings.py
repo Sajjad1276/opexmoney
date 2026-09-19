@@ -83,10 +83,12 @@ def confirm_nation_change_keyboard() -> InlineKeyboardMarkup:
                 InlineKeyboardButton(
                     text="✅ مطمئنم",
                     callback_data="settings:nation_confirm",
+                    style=ButtonStyle.SUCCESS,
                 ),
                 InlineKeyboardButton(
                     text="❌ انصراف",
                     callback_data="settings:nation_cancel",
+                    style=ButtonStyle.DANGER,
                 ),
             ]
         ]
@@ -99,6 +101,7 @@ def nation_select_keyboard(nations: list[dict]) -> InlineKeyboardMarkup:
             InlineKeyboardButton(
                 text=f"{nation['name']} ({nation['currency_code']})",
                 callback_data=f"settings:nation_select:{nation['id']}",
+                style=ButtonStyle.PRIMARY,
             )
         ]
         for nation in nations[:20]
