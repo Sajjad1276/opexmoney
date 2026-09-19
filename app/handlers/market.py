@@ -27,6 +27,7 @@ from app.keyboards.inline import (
     trade_preview_keyboard,
 )
 from app.services.economic_engine import get_active_members
+from app.services.user_service import sync_user_balance
 from app.services.rules.resolver import resolve
 from app.services.temporal_service import get_peak_multiplier
 from app.states.market import MarketStates
@@ -918,6 +919,7 @@ async def confirm_sell(call, state=None):
                     activity_type="trade",
                 )
             )
+            await sync_user_balance(session, user.user_id)
             await session.delete(preview)
 
             peak_signal = (
