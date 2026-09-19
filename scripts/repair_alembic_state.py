@@ -12,6 +12,7 @@ REVISION_CHAIN = [
     "0003_living_economy_protocol",
     "0004_onboarding_username_length",
     "0005_nation_management",
+    "0006_bigint_history_identities",
 ]
 
 BASE_TABLES = {
@@ -71,6 +72,28 @@ async def index_exists(conn: asyncpg.Connection, index_name: str) -> bool:
         await conn.fetchval(
             "SELECT to_regclass($1) IS NOT NULL",
             f"public.{index_name}",
+        )
+    )
+
+
+async def column_is_identity(
+    conn: asyncpg.Connection,
+    table_name: str,
+    column_name: str,
+) -> bool:
+    return bool(
+        await conn.fetchval(
+            """
+            SELECT EXISTS (
+                SELECT 1
+                FROM pg_attribute
+                WHERE attrelid = $1::regclass
+                  AND attname = $2
+                  AND attidentity IN ('a', 'd')
+            )
+            """,
+            f"public.{table_name}",
+            column_name,
         )
     )
 
@@ -139,6 +162,11 @@ async def detect_revision(conn: asyncpg.Connection) -> str | None:
         conn, NATION_MANAGEMENT_TABLES
     ):
         highest = "0005_nation_management"
+        if (
+            await column_is_identity(conn, "user_activities", "id")
+            and await column_is_identity(conn, "rate_history", "id")
+        ):
+            highest = "0006_bigint_history_identities"
 
     return highest
 
