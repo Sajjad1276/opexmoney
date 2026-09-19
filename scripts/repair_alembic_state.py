@@ -19,6 +19,7 @@ REVISION_CHAIN = [
     "0010_academy",
     "0011_price_alerts",
     "0012_academy_seed",
+    "0013_nation_flag",
 ]
 
 BASE_TABLES = {
@@ -108,6 +109,19 @@ async def academy_seed_complete(conn: asyncpg.Connection) -> bool:
     return len(rows) == 6
 
 
+async def column_exists(
+    conn: asyncpg.Connection, table_name: str, column_name: str
+) -> bool:
+    return bool(await conn.fetchval("""
+        SELECT EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = $1
+              AND column_name = $2
+        )
+    """, table_name, column_name))
+
+
 async def column_has_generated_id(
     conn: asyncpg.Connection, table_name: str, column_name: str
 ) -> bool:
@@ -195,6 +209,9 @@ async def detect_revision(conn: asyncpg.Connection) -> str | None:
 
     if await table_exists(conn, "lessons") and await academy_seed_complete(conn):
         highest = "0012_academy_seed"
+
+    if await column_exists(conn, "nations", "flag_emoji"):
+        highest = "0013_nation_flag"
 
     return highest
 
