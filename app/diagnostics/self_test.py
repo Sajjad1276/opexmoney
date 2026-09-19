@@ -104,6 +104,20 @@ async def run_startup_smoke_test(
         ok = False
 
     try:
+        async with async_session() as session:
+            active_nations = await session.scalar(
+                text("SELECT COUNT(*) FROM nations WHERE is_active = TRUE")
+            )
+        if not active_nations:
+            logger.error("SELFTEST|FAIL|active-nations|count=0")
+            ok = False
+        else:
+            logger.info("SELFTEST|PASS|active-nations|count=%d", active_nations)
+    except Exception:
+        logger.exception("SELFTEST|FAIL|active-nations")
+        ok = False
+
+    try:
         phase2_tables = ("proposals", "votes", "rule_overrides", "governance_ledger",
                          "player_temporal_profiles", "behavior_snapshots")
         nation_tables = ("nation_members", "nation_logs", "nation_join_requests", "nation_wars")
