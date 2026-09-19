@@ -132,7 +132,7 @@ async def test_registration_to_first_trade_journey():
         )
         nation = await session.get(Nation, nation_id)
 
-        assert user is not None
+        assert user is not None, f"confirm_nation returned early: {call.answers!r}"
         assert user.username == "OnboardingTester"
         assert user.home_nation_id == nation_id
         assert user.balance == Decimal("500")
