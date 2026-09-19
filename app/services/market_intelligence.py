@@ -35,6 +35,15 @@ def _rounded_percent(value: float | Decimal) -> int:
     )
 
 
+def format_percent_value(value: float | Decimal) -> str:
+    return f"{_fa(_rounded_percent(value))}٪"
+
+
+def format_volume(value: Decimal | float | int) -> str:
+    number = Decimal(str(value)).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+    return f"{int(number):,}".translate(_FA_DIGITS)
+
+
 def format_change_text(change_pct: float, window: str = "24h") -> str:
     rounded = _rounded_percent(change_pct)
     if rounded == 0:
