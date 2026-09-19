@@ -212,7 +212,8 @@ USERNAME_CAPTION = """💹 <b>اسم معامله‌گرت رو انتخاب ک�
 def nation_list_text(user, trader_name: str, nations: list[Nation]) -> str:
     lines = [f"✅ <b>«{html.escape(trader_name)}»</b> ثبت شد.", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", f"{user_mention(user)}، حالا باید به یه ملت بپیوندی.", "", "ارز اون ملت، پول اصلی حسابت میشه.", "هر معامله‌ات مستقیم روی نرخ اون ارز اثر میذاره.", "", "<b>🌍 ملت‌های فعال:</b>", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"]
     for index, nation in enumerate(nations, start=1):
-        change = get_rate_change(nation)
+        mention_user = display_user or message.from_user
+    change = get_rate_change(nation)
         lines.extend([f"{html.escape(nation.flag_emoji or '🏴')} <b>{html.escape(nation.name)} · {html.escape(nation.currency_code)}</b>", f"{get_rate_emoji(change)} <b>{fmt_rate(nation.exchange_rate)} ΩXR</b> · <i>{fmt_pct(change)} امروز</i>", f"👥 {to_fa(nation.active_members_24h)} عضو · 🏆 رتبه #{to_fa(nation.nation_rank or 0)}"])
         if index != len(nations):
             lines.append("─────────────────")
@@ -220,7 +221,14 @@ def nation_list_text(user, trader_name: str, nations: list[Nation]) -> str:
     return "\n".join(lines)
 
 
-async def show_dashboard(message: Message, user: User) -> None:
+async def show_dashboard(
+    message: Message,
+    user: User,
+    *,
+    replace_inline: bool = False,
+    bot: Bot | None = None,
+    display_user=None,
+) -> None:
     async with async_session() as session:
         async with session.begin():
             try:
@@ -284,7 +292,7 @@ async def show_dashboard(message: Message, user: User) -> None:
 ⏱ <i>{10} دقیقه پیش</i>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 """.format(
-        user_mention(message.from_user),
+        user_mention(mention_user),
         f"{html.escape(nation.flag_emoji or '🏴')} <b>{html.escape(nation.name)}</b>",
         html.escape(nation.currency_code),
         fmt_amount(balance),
@@ -297,11 +305,23 @@ async def show_dashboard(message: Message, user: User) -> None:
         to_fa(minutes),
     )
 
-    await message.answer(
-        rtl_html(text),
-        reply_markup=main_menu_keyboard(),
-        parse_mode=ParseMode.HTML,
-    )
+    if replace_inline and bot is not None:
+        try:
+            await message.delete()
+        except Exception:
+            logger.debug("Could not delete previous inline panel", exc_info=True)
+        await bot.send_message(
+            user.user_id,
+            rtl_html(text),
+            reply_markup=main_menu_keyboard(),
+            parse_mode=ParseMode.HTML,
+        )
+    else:
+        await message.answer(
+            rtl_html(text),
+            reply_markup=main_menu_keyboard(),
+            parse_mode=ParseMode.HTML,
+        )
 
 
 async def continue_registration(
