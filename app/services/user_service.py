@@ -1,7 +1,36 @@
+from decimal import Decimal
+
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import CurrencyHolding, User
+
+
+async def sync_user_balance(session: AsyncSession, user_id: int) -> Decimal:
+    """
+    Synchronize User.balance with the user's home-nation CurrencyHolding.
+
+    XR is a separate liquid cash ledger with no CurrencyHolding source, so it
+    is preserved and normalized rather than derived from currency holdings.
+    """
+    user = await session.get(User, user_id, with_for_update=True)
+    if user is None:
+        raise ValueError(f"User {user_id} not found")
+
+    new_balance = Decimal("0")
+    if user.home_nation_id is not None:
+        holding_amount = await session.scalar(
+            select(CurrencyHolding.amount).where(
+                CurrencyHolding.user_id == user_id,
+                CurrencyHolding.nation_id == user.home_nation_id,
+            )
+        )
+        if holding_amount is not None:
+            new_balance = Decimal(str(holding_amount))
+
+    user.balance = new_balance
+    user.xr_balance = Decimal(str(user.xr_balance or Decimal("0")))
+    return new_balance
 
 
 async def get_user(session: AsyncSession, user_id: int) -> User | None:
