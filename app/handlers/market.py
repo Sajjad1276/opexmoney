@@ -256,6 +256,8 @@ async def make_buy_preview(
     state: FSMContext,
     nation_id: int,
     raw: str,
+    *,
+    user_id: int | None = None,
 ):
     try:
         spend = Decimal(
@@ -265,19 +267,21 @@ async def make_buy_preview(
             .replace("٫", ".")
         )
     except InvalidOperation:
-        await message.answer("🔴 فقط عدد بنویس — مثلاً: ۲۵۰", parse_mode="HTML")
+        await message.answer("🔴 فقط عدد بنویس — مثلاً: 250", parse_mode="HTML")
         return
 
     if spend < 10:
         await message.answer(
-            "🔴 حداقل مقدار خرید ۱۰ ΩXR است.",
+            "🔴 حداقل مقدار خرید 10 ΩXR است.",
             parse_mode="HTML",
         )
         return
 
+    actor_user_id = user_id if user_id is not None else message.from_user.id
+
     async with async_session() as session:
         async with session.begin():
-            user = await session.get(User, message.from_user.id)
+            user = await session.get(User, actor_user_id)
             nation = await session.get(Nation, nation_id)
 
             if not user or not nation:
@@ -339,7 +343,7 @@ async def make_buy_preview(
                 f"📥 دریافت:   <b>{fmt_amount(calc['receive'])} "
                 f"{html.escape(nation.currency_code)}</b>\n\n"
                 "─────────────────\n"
-                f"💹 نرخ: <code>۱ {html.escape(nation.currency_code)} = "
+                f"💹 نرخ: <code>1 {html.escape(nation.currency_code)} = "
                 f"{fmt_rate(nation.exchange_rate)} ΩXR</code>\n"
                 f"📋 کارمزد: <b>{fmt_amount(calc['fee'])} ΩXR</b> "
                 f"({_fmt_rule_percent(fee_rate)})\n"
@@ -379,7 +383,7 @@ async def buy_currency(call, state):
             f"{fmt_rate(nation.exchange_rate)} ΩXR</code>\n"
             f"💰 موجودی: <b>{fmt_amount(user.xr_balance)} ΩXR</b>\n\n"
             "<b>چقدر ΩXR خرج می‌کنی؟</b>\n"
-            "<i>حداقل ۱۰ ΩXR</i>"
+            "<i>حداقل 10 ΩXR</i>"
         )
 
     await state.set_state(MarketStates.WAITING_BUY_AMOUNT)
@@ -396,7 +400,13 @@ async def buy_quick(call, state):
             user = await session.get(User, call.from_user.id)
 
     spend = user.xr_balance if amount == "all" and user else Decimal(amount)
-    await make_buy_preview(call.message, state, int(nation_id), str(spend))
+    await make_buy_preview(
+        call.message,
+        state,
+        int(nation_id),
+        str(spend),
+        user_id=call.from_user.id,
+    )
     await call.answer()
 
 
@@ -636,7 +646,14 @@ async def sell_currency(call, state):
     await call.answer()
 
 
-async def make_sell_preview(message, state, nation_id: int, raw: str):
+async def make_sell_preview(
+    message,
+    state,
+    nation_id: int,
+    raw: str,
+    *,
+    user_id: int | None = None,
+):
     try:
         amount = Decimal(
             raw.strip()
@@ -645,7 +662,7 @@ async def make_sell_preview(message, state, nation_id: int, raw: str):
             .replace("٫", ".")
         )
     except InvalidOperation:
-        await message.answer("🔴 فقط عدد بنویس — مثلاً: ۵۰", parse_mode="HTML")
+        await message.answer("🔴 فقط عدد بنویس — مثلاً: 50", parse_mode="HTML")
         return
 
     if amount <= 0:
@@ -655,13 +672,15 @@ async def make_sell_preview(message, state, nation_id: int, raw: str):
         )
         return
 
+    actor_user_id = user_id if user_id is not None else message.from_user.id
+
     async with async_session() as session:
         async with session.begin():
             nation = await session.get(Nation, nation_id)
-            user = await session.get(User, message.from_user.id)
+            user = await session.get(User, actor_user_id)
             holding = await session.scalar(
                 select(CurrencyHolding).where(
-                    CurrencyHolding.user_id == message.from_user.id,
+                    CurrencyHolding.user_id == actor_user_id,
                     CurrencyHolding.nation_id == nation_id,
                 )
             )
@@ -769,6 +788,7 @@ async def sell_quick(call, state):
         state,
         nation.nation_id,
         str(holding.amount * Decimal(pct) / Decimal("100")),
+        user_id=call.from_user.id,
     )
     await call.answer()
 
