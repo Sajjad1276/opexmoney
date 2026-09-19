@@ -314,7 +314,7 @@ class NationLog(Base):
         Index("ix_nation_logs_nation_created", "nation_id", "created_at"),
         Index("ix_nation_logs_nation_action", "nation_id", "action_type"),
     )
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     nation_id: Mapped[int] = mapped_column(
         ForeignKey("nations.nation_id", ondelete="CASCADE"),
         nullable=False,
