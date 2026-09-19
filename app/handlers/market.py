@@ -6,7 +6,7 @@ from decimal import Decimal, InvalidOperation
 from aiogram import F, Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, Message, ReplyKeyboardRemove
 from sqlalchemy import select
 
 from app.database.models import (
@@ -148,6 +148,7 @@ async def render_market(message: Message, edit_call=None):
     if edit_call:
         await safe_edit(edit_call, text, market_keyboard())
     else:
+        await message.answer(" ", reply_markup=ReplyKeyboardRemove())
         await message.answer(
             text,
             reply_markup=market_keyboard(),
