@@ -114,7 +114,7 @@ def buy_amount_keyboard(nation_id: int) -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="500", callback_data=f"buyq_500_{nation_id}", style=ButtonStyle.PRIMARY),
         ],
         [
-            InlineKeyboardButton(text="100۰", callback_data=f"buyq_1000_{nation_id}", style=ButtonStyle.PRIMARY),
+            InlineKeyboardButton(text="1000", callback_data=f"buyq_1000_{nation_id}", style=ButtonStyle.PRIMARY),
             InlineKeyboardButton(text="همه", callback_data=f"buyq_all_{nation_id}", style=ButtonStyle.PRIMARY),
         ],
         [InlineKeyboardButton(text="❌ انصراف", callback_data="market_buy", style=ButtonStyle.DANGER)],
