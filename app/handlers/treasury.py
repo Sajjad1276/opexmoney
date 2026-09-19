@@ -16,6 +16,7 @@ from aiogram.types import (
     Message,
 )
 
+from app.database.models import User
 from app.database.session import async_session
 from app.services.treasury_service import (
     MIN_DEPOSIT,
@@ -279,11 +280,21 @@ async def _render_treasury(
 
 @router.callback_query(F.data.regexp(r"^treasury:show:\d+$"))
 async def show_treasury(callback: CallbackQuery, state: FSMContext) -> None:
-    await _render_treasury(
-        callback,
-        state=state,
-        clear_state=True,
-    )
+    try:
+        await _render_treasury(
+            callback,
+            state=state,
+            clear_state=True,
+        )
+    except Exception:
+        logger.exception(
+            "Treasury show handler failed user=%s",
+            callback.from_user.id,
+        )
+        await callback.answer(
+            "⚠️ نمایش خزانه انجام نشد.",
+            show_alert=True,
+        )
 
 
 @router.callback_query(F.data.regexp(r"^treasury:deposit:\d+$"))
@@ -787,12 +798,18 @@ async def cancel_treasury(
     callback: CallbackQuery,
     state: FSMContext,
 ) -> None:
-    await _render_treasury(
-        callback,
-        state=state,
-        clear_state=True,
-    )
-
-
-# Imported late to keep the handler module's public import surface focused.
-from app.database.models import User
+    try:
+        await _render_treasury(
+            callback,
+            state=state,
+            clear_state=True,
+        )
+    except Exception:
+        logger.exception(
+            "Treasury cancel handler failed user=%s",
+            callback.from_user.id,
+        )
+        await callback.answer(
+            "⚠️ لغو عملیات انجام نشد.",
+            show_alert=True,
+        )
