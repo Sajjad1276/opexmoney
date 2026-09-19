@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import sys
+from pathlib import Path
 
 from aiogram import Bot, Dispatcher
 from aiogram.types.error_event import ErrorEvent
@@ -44,6 +46,34 @@ logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
 )
 logger = logging.getLogger("opexmoney")
+
+
+async def ensure_database_schema() -> None:
+    """Repair legacy Alembic state and apply all pending migrations before startup."""
+    root = Path(__file__).resolve().parent
+
+    repair = await asyncio.create_subprocess_exec(
+        sys.executable,
+        str(root / "scripts" / "repair_alembic_state.py"),
+        cwd=str(root),
+    )
+    repair_code = await repair.wait()
+    if repair_code != 0:
+        raise RuntimeError(f"Alembic state repair failed with exit code {repair_code}")
+
+    upgrade = await asyncio.create_subprocess_exec(
+        sys.executable,
+        "-m",
+        "alembic",
+        "upgrade",
+        "head",
+        cwd=str(root),
+    )
+    upgrade_code = await upgrade.wait()
+    if upgrade_code != 0:
+        raise RuntimeError(f"Alembic upgrade failed with exit code {upgrade_code}")
+
+    logger.info("DATABASE|schema ready|alembic=head")
 
 
 def build_storage():
@@ -211,6 +241,7 @@ def build_scheduler(bot: Bot) -> AsyncIOScheduler:
 
 
 async def main() -> None:
+    await ensure_database_schema()
     bot = Bot(
         token=settings.bot_token,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
