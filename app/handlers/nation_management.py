@@ -553,7 +553,7 @@ async def _join_user(
                         )
                     ).scalars().all()
                     pending_admin_ids = list(admin_rows)
-                    result_message = "✅ درخواست عضویت ارسال شد. تا ۴۸ ساعت فرصت بررسی دارد."
+                    result_message = "✅ درخواست عضویت ارسال شد. تا 48 ساعت فرصت بررسی دارد."
                     joined_user = user
             else:
                 user.home_nation_id = nation_id
@@ -591,7 +591,7 @@ async def _join_user(
                         f"📝 <b>درخواست عضویت جدید</b>\n"
                         f"🏛 ملت: <b>{html.escape(nation.name)}</b>\n"
                         f"👤 کاربر: <b>{_safe_name(joined_user, joined_user.user_id)}</b>\n"
-                        "⏳ اعتبار درخواست: ۴۸ ساعت"
+                        "⏳ اعتبار درخواست: 48 ساعت"
                     ),
                     reply_markup=InlineKeyboardMarkup(
                         inline_keyboard=[
@@ -1046,7 +1046,7 @@ async def show_logs(call: CallbackQuery) -> None:
         await call.answer(str(exc), show_alert=True)
         return
 
-    text = "📋 <b>لاگ فعالیت ملت · ۲۰ رویداد آخر</b>\n━━━━━━━━━━━━━━━━━━━━\n"
+    text = "📋 <b>لاگ فعالیت ملت · 20 رویداد آخر</b>\n━━━━━━━━━━━━━━━━━━━━\n"
     text += "\n\n".join(feed) if feed else "هنوز رویدادی ثبت نشده."
     markup = InlineKeyboardMarkup(
         inline_keyboard=[[InlineKeyboardButton(text="↩️ مدیریت ملت", callback_data=f"nm:panel:{nation_id}")]]
@@ -1627,7 +1627,7 @@ async def expire_join_requests(bot: Bot) -> int:
         try:
             await bot.send_message(
                 user_id,
-                f"⌛ درخواست عضویتت در «{html.escape(nation_name)}» به‌دلیل پایان مهلت ۴۸ ساعته رد شد.",
+                f"⌛ درخواست عضویتت در «{html.escape(nation_name)}» به‌دلیل پایان مهلت 48 ساعته رد شد.",
                 parse_mode="HTML",
             )
         except Exception:
@@ -1727,10 +1727,10 @@ async def send_weekly_nation_reports(bot: Bot) -> int:
                 (
                     "گزارش هفتگی مدیریتی ملت تهیه کن. "
                     f"اعضا: {current_members}; "
-                    f"تعداد رویدادهای ۷ روز اخیر: {total_events}; "
+                    f"تعداد رویدادهای 7 روز اخیر: {total_events}; "
                     f"معاملات بزرگ ثبت‌شده: {large_trades}; "
                     f"نرخ ارز فعلی: {nation.exchange_rate}; "
-                    f"حجم معاملات ۲۴ساعته: {nation.trade_volume_24h}. "
+                    f"حجم معاملات 24ساعته: {nation.trade_volume_24h}. "
                     "سه نکته تحلیلی کوتاه، یک ریسک احتمالی و یک اقدام پیشنهادی غیرقطعی ارائه کن."
                 ),
             )
