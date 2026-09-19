@@ -49,20 +49,50 @@ def confirm_trade_keyboard() -> InlineKeyboardMarkup:
     ]])
 
 
-def nation_panel_keyboard(is_founder: bool = False) -> InlineKeyboardMarkup:
+def nation_panel_keyboard(
+    is_manager: bool = False,
+    nation_id: int | None = None,
+) -> InlineKeyboardMarkup:
     buttons = [
         [InlineKeyboardButton(text="🌍 ملت‌های من", callback_data="my_nations")],
         [InlineKeyboardButton(text="🔍 کاوش ملت‌ها", callback_data="explore_nations")],
         [InlineKeyboardButton(text="🏛 تأسیس ملت", callback_data="found_nation")],
-        [InlineKeyboardButton(text="📜 قانون اساسی", callback_data="governance_main")],
     ]
-    if is_founder:
-        buttons.insert(0, [
-            InlineKeyboardButton(text="👑 پنل مدیریت", callback_data="founder_panel")
-        ])
-    buttons.append([
-        InlineKeyboardButton(text="↩️ بازگشت", callback_data="back_to_dashboard")
-    ])
+
+    if nation_id is not None:
+        buttons.append(
+            [
+                InlineKeyboardButton(
+                    text="🏦 خزانه",
+                    callback_data=f"treasury:show:{nation_id}",
+                ),
+                InlineKeyboardButton(
+                    text="📜 قانون اساسی",
+                    callback_data="governance_main",
+                ),
+            ]
+        )
+        if is_manager:
+            buttons.append(
+                [
+                    InlineKeyboardButton(
+                        text="👑 پنل مدیریت",
+                        callback_data=f"nm:panel:{nation_id}",
+                    ),
+                    InlineKeyboardButton(
+                        text="⚔️ جنگ",
+                        callback_data=f"nm:wars:{nation_id}",
+                    ),
+                ]
+            )
+    else:
+        buttons.append(
+            [InlineKeyboardButton(text="📜 قانون اساسی", callback_data="governance_main")]
+        )
+
+    buttons.append(
+        [InlineKeyboardButton(text="↩️ بازگشت", callback_data="back_to_dashboard")]
+    )
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
