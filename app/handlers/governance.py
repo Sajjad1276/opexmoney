@@ -244,6 +244,8 @@ async def governance_receive_value(message: Message, state: FSMContext):
     )
     await state.set_state(GovernanceStates.CONFIRM_PROPOSAL)
 
+    await close_inline_panel(state, message.bot)
+
     preview_message = await message.answer(
         "📋 <b>پیش‌نمایش طرح</b>\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
