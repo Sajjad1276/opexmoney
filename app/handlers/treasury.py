@@ -618,8 +618,7 @@ async def receive_withdraw_amount(
 
         await close_inline_panel(state, message.bot)
         confirm_message = await message.answer(
-            "⚠️ <b>تأیید برداشت</b>
-n"
+            "⚠️ <b>تأیید برداشت</b>\n"
             "━━━━━━━━━━━━━━━━━━\n"
             f"مقدار: <code>{_amount_text(amount)}</code> ΩXR\n"
             "این مبلغ به موجودی ΩXR شما اضافه می‌شود.\n\n"
@@ -631,7 +630,7 @@ n"
             parse_mode="HTML",
         )
         await remember_inline_panel(state, confirm_message)
-   except Exception:
+    except Exception:
         logger.exception(
             "Failed to prepare treasury withdrawal user=%s",
             message.from_user.id,
