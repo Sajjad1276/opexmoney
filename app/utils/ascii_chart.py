@@ -3,7 +3,7 @@ from __future__ import annotations
 from math import isfinite
 
 
-_FA_DIGITS = str.maketrans("0123456789.-", "۰۱۲۳۴۵۶۷۸۹٫−")
+_FA_DIGITS = str.maketrans("0123456789.", "۰۱۲۳۴۵۶۷۸۹٫")
 
 
 def _to_fa(value: str) -> str:
@@ -119,11 +119,8 @@ def draw_ascii_chart(
         age_label = f"-{estimated_hours}h"
     age_label = _to_fa(age_label)
 
-    label_line = (
-        f"{age_label}"
-        f"{' ' * max(1, label_width + 4 + width - len(age_label) - 3)}"
-        "الان"
-    )
+    total_line_width = label_width + width + 7
+    label_line = f"{age_label:<{total_line_width - 3}}الان"
     chart_lines.append(label_line)
 
     return "\n".join(chart_lines)
