@@ -95,7 +95,7 @@ async def my_nations(call: CallbackQuery) -> None:
         nation = nations[0]
         text = (
             "🌍 <b>ملت‌های من</b>\n"
-            f"🏛 {nation.name} · {nation.currency_code}\n"
+            f"{nation.flag_emoji or '🏴'} {nation.name} · {nation.currency_code}\n"
             f"👥 {nation.member_count} نفر\n"
             "برای جزئیات بیشتر، این بخش در حال توسعه است."
         )
@@ -137,7 +137,7 @@ async def explore_nations(call: CallbackQuery) -> None:
 
     rows = [
         [InlineKeyboardButton(
-            text=f"🏴 {nation.name} · {nation.currency_code} · {nation.member_count} نفر",
+            text=f"{nation.flag_emoji or '🏴'} {nation.name} · {nation.currency_code} · {nation.member_count} نفر",
             callback_data=f"join_nation:{nation.nation_id}",
         )]
         for nation in nations
