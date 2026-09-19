@@ -182,6 +182,37 @@ async def run_startup_smoke_test(
 
     try:
         async with engine.connect() as connection:
+            identity_ok = await connection.run_sync(
+                lambda sync_connection: all(
+                    bool(
+                        sync_connection.execute(
+                            text(
+                                """
+                                SELECT attidentity IN ('a', 'd')
+                                FROM pg_attribute
+                                WHERE attrelid = CAST(:table_name AS regclass)
+                                  AND attname = 'id'
+                                """
+                            ),
+                            {"table_name": table_name},
+                        ).scalar()
+                    )
+                    for table_name in ("public.user_activities", "public.rate_history")
+                )
+            )
+        if not identity_ok:
+            logger.error(
+                "SELFTEST|FAIL|bigint-identities|user_activities/rate_history id is not generated"
+            )
+            ok = False
+        else:
+            logger.info("SELFTEST|PASS|bigint-identities")
+    except Exception:
+        logger.exception("SELFTEST|FAIL|bigint-identities")
+        ok = False
+
+    try:
+        async with engine.connect() as connection:
             columns = await connection.run_sync(
                 lambda sync_connection: {
                     column["name"]
