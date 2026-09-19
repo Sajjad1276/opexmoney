@@ -23,6 +23,7 @@ from app.diagnostics.self_test import run_startup_smoke_test
 from app.handlers.founder import founder_router
 from app.handlers.governance import governance_router
 from app.handlers.market import router as market_router
+from app.handlers.missions import router as missions_router
 from app.handlers.portfolio import router as portfolio_router
 from app.handlers.nation import nation_router
 from app.handlers.nation_management import (
@@ -280,6 +281,7 @@ async def main() -> None:
     dp.include_router(onboarding_fix_router)
     dp.include_router(start_router)
     dp.include_router(market_router)
+    dp.include_router(missions_router)
     dp.include_router(portfolio_router)
     dp.include_router(founder_router)
     dp.include_router(nation_management_router)
