@@ -67,7 +67,7 @@ async def get_portfolio_data(session: AsyncSession, user_id: int) -> dict:
         value_in_xr = amount * exchange_rate
 
         if yesterday_rate is None or Decimal(str(yesterday_rate)) == 0:
-            rate_change_pct = Decimal("0")
+            rate_change_pct = Decimal("0.0")
         else:
             yesterday_rate = Decimal(str(yesterday_rate))
             rate_change_pct = (
