@@ -411,6 +411,7 @@ class NationWar(Base):
     )
     status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)
     declared_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    ends_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     ended_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
