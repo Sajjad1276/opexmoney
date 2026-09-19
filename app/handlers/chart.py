@@ -149,7 +149,8 @@ async def _send_chart_message(
         )
         return
 
-    await callback.message.answer_photo(
+    await callback.bot.send_photo(
+        chat_id=callback.from_user.id,
         photo=await _build_photo(chart_data),
         caption=caption,
         reply_markup=chart_keyboard(nation_id, window),
