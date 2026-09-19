@@ -362,9 +362,18 @@ async def alert_set_callback(call: CallbackQuery, state: FSMContext):
     await state.set_state(MarketStates.WAITING_ALERT_PRICE)
     await state.update_data(alert_currency=code)
     if call.message:
-        await call.message.answer(
-            f"🔔 قیمت هدف برای <b>{html.escape(code)}</b> را بنویس.\n"
+        await call.message.edit_text(
+            f"🔔 <b>هشدار قیمت</b>\n\n"
+            f"قیمت هدف برای <b>{html.escape(code)}</b> را بنویس.\n"
             "مثال: <code>1.5</code> یا <code>1.5 below</code>",
+            reply_markup=InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [InlineKeyboardButton(
+                        text="❌ انصراف",
+                        callback_data="market_main",
+                    )]
+                ]
+            ),
             parse_mode="HTML",
         )
     await call.answer()
