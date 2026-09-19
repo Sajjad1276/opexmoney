@@ -24,116 +24,205 @@ from app.database.models import (
 )
 
 
+async def _repair_membership(
+    session: AsyncSession,
+    user: User,
+    nation: Nation,
+    *,
+    role: NationMemberRole,
+) -> str:
+    member = await session.scalar(
+        select(NationMember)
+        .where(
+            NationMember.nation_id == nation.nation_id,
+            NationMember.user_id == user.user_id,
+        )
+        .with_for_update()
+        .limit(1)
+    )
+
+    if member is None:
+        member = NationMember(
+            nation_id=nation.nation_id,
+            user_id=user.user_id,
+            role=role,
+            is_active=True,
+        )
+        session.add(member)
+    else:
+        member.role = role
+        member.is_active = True
+
+    user.home_nation_id = nation.nation_id
+    if role == NationMemberRole.FOUNDER:
+        user.role = NationMemberRole.FOUNDER.value
+    await session.flush()
+    return role.value
+
+
+async def get_user_active_nation_context(
+    session: AsyncSession,
+    user_id: int,
+    *,
+    repair: bool = True,
+) -> tuple[Nation, str, str] | None:
+    """Resolve the canonical active nation and membership role."""
+
+    user = await session.get(User, user_id, with_for_update=True)
+    if user is None:
+        return None
+
+    if user.home_nation_id is not None:
+        home_nation = await session.scalar(
+            select(Nation)
+            .where(
+                Nation.nation_id == user.home_nation_id,
+                Nation.is_active.is_(True),
+            )
+            .with_for_update()
+        )
+
+        if home_nation is not None:
+            member = await session.scalar(
+                select(NationMember)
+                .where(
+                    NationMember.user_id == user_id,
+                    NationMember.nation_id == home_nation.nation_id,
+                    NationMember.is_active.is_(True),
+                )
+                .with_for_update()
+                .limit(1)
+            )
+            if member is not None:
+                return (
+                    home_nation,
+                    member.role.value
+                    if isinstance(member.role, NationMemberRole)
+                    else str(member.role),
+                    "home_membership",
+                )
+
+            if repair and home_nation.founder_user_id == user_id:
+                role = await _repair_membership(
+                    session,
+                    user,
+                    home_nation,
+                    role=NationMemberRole.FOUNDER,
+                )
+                return home_nation, role, "repaired_founder"
+
+            holding = await session.scalar(
+                select(CurrencyHolding)
+                .where(
+                    CurrencyHolding.user_id == user_id,
+                    CurrencyHolding.nation_id == home_nation.nation_id,
+                )
+                .with_for_update()
+                .limit(1)
+            )
+            if repair and holding is not None:
+                role = await _repair_membership(
+                    session,
+                    user,
+                    home_nation,
+                    role=NationMemberRole.CITIZEN,
+                )
+                return home_nation, role, "repaired_holding"
+
+    row = (
+        await session.execute(
+            select(NationMember, Nation)
+            .join(Nation, Nation.nation_id == NationMember.nation_id)
+            .where(
+                NationMember.user_id == user_id,
+                NationMember.is_active.is_(True),
+                Nation.is_active.is_(True),
+            )
+            .order_by(NationMember.joined_at.desc(), Nation.nation_id.asc())
+            .with_for_update()
+        )
+    ).first()
+    if row is not None:
+        member, nation = row
+        user.home_nation_id = nation.nation_id
+        return (
+            nation,
+            member.role.value
+            if isinstance(member.role, NationMemberRole)
+            else str(member.role),
+            "membership_fallback",
+        )
+
+    founder_nation = await session.scalar(
+        select(Nation)
+        .where(
+            Nation.founder_user_id == user_id,
+            Nation.is_active.is_(True),
+        )
+        .order_by(Nation.nation_id.asc())
+        .with_for_update()
+        .limit(1)
+    )
+    if founder_nation is not None:
+        if repair:
+            role = await _repair_membership(
+                session,
+                user,
+                founder_nation,
+                role=NationMemberRole.FOUNDER,
+            )
+            return founder_nation, role, "founder_fallback_repaired"
+        return (
+            founder_nation,
+            NationMemberRole.FOUNDER.value,
+            "founder_fallback",
+        )
+
+    holding_row = (
+        await session.execute(
+            select(CurrencyHolding, Nation)
+            .join(Nation, Nation.nation_id == CurrencyHolding.nation_id)
+            .where(
+                CurrencyHolding.user_id == user_id,
+                Nation.is_active.is_(True),
+            )
+            .order_by(CurrencyHolding.created_at.desc(), Nation.nation_id.asc())
+            .with_for_update()
+        )
+    ).first()
+    if holding_row is not None:
+        _, nation = holding_row
+        if repair:
+            role = await _repair_membership(
+                session,
+                user,
+                nation,
+                role=NationMemberRole.CITIZEN,
+            )
+            return nation, role, "holding_fallback_repaired"
+        user.home_nation_id = nation.nation_id
+        return (
+            nation,
+            NationMemberRole.CITIZEN.value,
+            "holding_fallback",
+        )
+
+    return None
+
+
 async def get_user_active_nation(
     session: AsyncSession,
     user_id: int,
     *,
     repair_founder_membership: bool = False,
 ) -> Nation | None:
-    """Resolve the user's active nation from NationMember, with legacy repair."""
-    user = await session.get(User, user_id, with_for_update=True)
-    if user is None:
-        return None
-
-    member = None
-    nation = None
-
-    if user.home_nation_id is not None:
-        row = (
-            await session.execute(
-                select(NationMember, Nation)
-                .join(Nation, Nation.nation_id == NationMember.nation_id)
-                .where(
-                    NationMember.user_id == user_id,
-                    NationMember.nation_id == user.home_nation_id,
-                    NationMember.is_active.is_(True),
-                    Nation.is_active.is_(True),
-                )
-                .with_for_update()
-            )
-        ).first()
-        if row is not None:
-            member, nation = row
-
-    if nation is None:
-        row = (
-            await session.execute(
-                select(NationMember, Nation)
-                .join(Nation, Nation.nation_id == NationMember.nation_id)
-                .where(
-                    NationMember.user_id == user_id,
-                    NationMember.is_active.is_(True),
-                    Nation.is_active.is_(True),
-                )
-                .order_by(NationMember.joined_at.desc(), Nation.nation_id.asc())
-                .with_for_update()
-            )
-        ).first()
-        if row is not None:
-            member, nation = row
-            user.home_nation_id = nation.nation_id
-
-    if nation is None and repair_founder_membership:
-        # Legacy-safe founder repair:
-        # the authoritative relationship is Nation.founder_user_id.
-        # Do not rely only on User.role because older rows can be stale.
-        founder_nation = None
-
-        if user.home_nation_id is not None:
-            candidate = await session.scalar(
-                select(Nation)
-                .where(
-                    Nation.nation_id == user.home_nation_id,
-                    Nation.founder_user_id == user_id,
-                    Nation.is_active.is_(True),
-                )
-                .with_for_update()
-            )
-            if candidate is not None:
-                founder_nation = candidate
-
-        if founder_nation is None and user.role == NationMemberRole.FOUNDER:
-            founder_nation = await session.scalar(
-                select(Nation)
-                .where(
-                    Nation.founder_user_id == user_id,
-                    Nation.is_active.is_(True),
-                )
-                .order_by(Nation.nation_id.asc())
-                .with_for_update()
-                .limit(1)
-            )
-
-        nation = founder_nation
-
-        if nation is not None:
-            member = await session.scalar(
-                select(NationMember)
-                .where(
-                    NationMember.nation_id == nation.nation_id,
-                    NationMember.user_id == user_id,
-                )
-                .with_for_update()
-                .limit(1)
-            )
-            if member is None:
-                member = NationMember(
-                    nation_id=nation.nation_id,
-                    user_id=user_id,
-                    role=NationMemberRole.FOUNDER,
-                    is_active=True,
-                )
-                session.add(member)
-            else:
-                member.role = NationMemberRole.FOUNDER
-                member.is_active = True
-
-            user.role = NationMemberRole.FOUNDER.value
-            user.home_nation_id = nation.nation_id
-            await session.flush()
-
-    return nation
-
+    """Backward-compatible wrapper around the canonical nation resolver."""
+    context = await get_user_active_nation_context(
+        session,
+        user_id,
+        repair=repair_founder_membership,
+    )
+    return context[0] if context is not None else None
 
 async def get_active_nations(session: AsyncSession, limit: int = 3) -> list[Nation]:
     result = await session.execute(
