@@ -52,6 +52,7 @@ async def test_context_builder_reads_real_database(monkeypatch) -> None:
                 role="player",
             )
             session.add_all([nation, user])
+            await session.flush()
             for index in range(2):
                 session.add(
                     Transaction(
