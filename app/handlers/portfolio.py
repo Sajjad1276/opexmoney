@@ -46,7 +46,6 @@ def _format_amount(value) -> str:
 
 
 def _format_rate_change(value) -> str:
-    value = value
     formatted = _format_amount(value)
     if value > 0:
         formatted = f"+{formatted}"
