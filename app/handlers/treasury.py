@@ -289,45 +289,56 @@ async def open_treasury_from_main_menu(
 ) -> None:
     await state.clear()
 
-    async with async_session() as session:
-        async with session.begin():
-            nation = await get_user_active_nation(
-                session,
-                message.from_user.id,
-                repair_founder_membership=True,
-            )
-            if nation is None:
-                await message.answer(
-                    "⚠️ اول عضو یک ملت شو تا بتوانی خزانه را باز کنی."
+    try:
+        async with async_session() as session:
+            async with session.begin():
+                nation = await get_user_active_nation(
+                    session,
+                    message.from_user.id,
+                    repair_founder_membership=True,
                 )
-                return
 
-            role = await get_member_role(
-                session,
-                message.from_user.id,
-                nation.nation_id,
-            )
-            if role is None:
-                await message.answer(
-                    "⚠️ عضویت ملت پیدا نشد. دوباره از بخش «ملت‌ها» وارد شو."
+                if nation is None:
+                    await message.answer(
+                        "⚠️ عضویت فعال ملت پیدا نشد.\n"
+                        "از بخش «🌍 ملت‌ها» یک ملت را انتخاب کن یا دوباره /start را بزن."
+                    )
+                    return
+
+                nation_id = nation.nation_id
+                role = await get_member_role(
+                    session,
+                    message.from_user.id,
+                    nation_id,
                 )
-                return
+                if role is None:
+                    await message.answer(
+                        "⚠️ عضویت ملت پیدا نشد.\n"
+                        "اطلاعات عضویت با وضعیت حساب هماهنگ نبود؛ دوباره از «🌍 ملت‌ها» وارد شو."
+                    )
+                    return
 
-            treasury = await get_treasury(session, nation.nation_id)
-            if treasury is None:
-                await message.answer("⚠️ خزانه هنوز راه‌اندازی نشده.")
-                return
+                treasury = await get_treasury(session, nation_id)
+                if treasury is None:
+                    await message.answer("⚠️ خزانه هنوز راه‌اندازی نشده.")
+                    return
 
-            logs = await get_treasury_logs(session, nation.nation_id, limit=5)
-            text = build_treasury_msg(treasury, logs)
-            markup = treasury_keyboard(nation.nation_id, role)
+                logs = await get_treasury_logs(session, nation_id, limit=5)
+                text = build_treasury_msg(treasury, logs)
+                markup = treasury_keyboard(nation_id, role)
 
-    await message.answer("\u2060", reply_markup=ReplyKeyboardRemove())
-    await message.answer(
-        text,
-        reply_markup=markup,
-        parse_mode="HTML",
-    )
+        await message.answer("\u2060", reply_markup=ReplyKeyboardRemove())
+        await message.answer(
+            text,
+            reply_markup=markup,
+            parse_mode="HTML",
+        )
+    except Exception:
+        logger.exception(
+            "Failed to open treasury from main menu for user=%s",
+            message.from_user.id,
+        )
+        await message.answer("⚠️ نمایش خزانه انجام نشد. دوباره تلاش کن.")
 
 
 @router.callback_query(F.data.regexp(r"^treasury:show:\d+$"))
