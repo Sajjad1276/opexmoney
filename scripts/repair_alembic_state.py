@@ -15,6 +15,8 @@ REVISION_CHAIN = [
     "0006_bigint_history_identities",
     "0007_seed_starter_nations",
     "0008_missions",
+    "0009_treasury",
+    "0010_academy",
 ]
 
 BASE_TABLES = {
@@ -41,6 +43,17 @@ GOVERNANCE_TABLES = {
 MISSION_TABLES = {
     "missions",
     "user_mission_progress",
+}
+
+TREASURY_TABLES = {
+    "nation_treasury",
+    "treasury_logs",
+}
+
+ACADEMY_TABLES = {
+    "lessons",
+    "user_lesson_progress",
+    "user_xp",
 }
 
 NATION_MANAGEMENT_TABLES = {
@@ -148,6 +161,12 @@ async def detect_revision(conn: asyncpg.Connection) -> str | None:
 
     if await all_tables_exist(conn, MISSION_TABLES):
         highest = "0008_missions"
+
+    if await all_tables_exist(conn, TREASURY_TABLES):
+        highest = "0009_treasury"
+
+    if await all_tables_exist(conn, ACADEMY_TABLES):
+        highest = "0010_academy"
 
     return highest
 
