@@ -174,7 +174,7 @@ def cancel_keyboard(
             [
                 InlineKeyboardButton(
                     text="❌ انصراف",
-                    callback_data=f"treasury:cancel:{nation_id}",
+                    callback_data=f"treasury:cancel:{nation_id}:{return_target}",
                     style=ButtonStyle.DANGER,
                 )
             ]
@@ -663,6 +663,7 @@ async def receive_withdraw_amount(
             reply_markup=confirm_withdraw_keyboard(
                 int(nation_id),
                 amount_str,
+                data.get("treasury_return", "dashboard"),
             ),
             parse_mode="HTML",
         )
