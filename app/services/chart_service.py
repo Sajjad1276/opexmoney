@@ -42,7 +42,7 @@ def _empty_chart_data(
         "rate_emoji": "➡️",
         "currency_code": str(nation.currency_code),
         "nation_name": str(nation.name),
-        "nation_flag": "",
+        "nation_flag": "🌍",
         "window_hours": window_hours,
         "enough_data": False,
         "market_status": market_status,
