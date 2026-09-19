@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import secrets
+
 from datetime import datetime
 from decimal import Decimal
 
@@ -7,7 +9,16 @@ from sqlalchemy import desc, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database.models import ActivityType, CurrencyHolding, Nation, User, UserActivity
+from app.database.models import (
+    ActivityType,
+    CurrencyHolding,
+    Nation,
+    NationLog,
+    NationMember,
+    NationMemberRole,
+    User,
+    UserActivity,
+)
 
 
 async def get_active_nations(session: AsyncSession, limit: int = 3) -> list[Nation]:
@@ -91,6 +102,10 @@ async def create_nation(
             last_rate_update=datetime.utcnow(),
             member_count=1,
             is_active=True,
+            join_policy="OPEN",
+            personality="neutral",
+            invite_code=f"OPX-{secrets.token_urlsafe(12)}",
+            treasury=Decimal("0.00"),
         )
         session.add(nation)
         try:
@@ -114,6 +129,26 @@ async def create_nation(
                 user_id=founder_user_id,
                 nation_id=nation.nation_id,
                 amount=Decimal("1000.0000"),
+            )
+        )
+        session.add(
+            NationMember(
+                nation_id=nation.nation_id,
+                user_id=founder_user_id,
+                role=NationMemberRole.FOUNDER,
+                is_active=True,
+            )
+        )
+        session.add(
+            NationLog(
+                nation_id=nation.nation_id,
+                actor_id=founder_user_id,
+                action_type="MEMBER_JOIN",
+                target_id=founder_user_id,
+                event_metadata={
+                    "role": NationMemberRole.FOUNDER.value,
+                    "source": "nation_creation",
+                },
             )
         )
         session.add(
