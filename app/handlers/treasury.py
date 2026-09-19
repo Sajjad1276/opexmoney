@@ -14,6 +14,7 @@ from aiogram.types import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     Message,
+    ReplyKeyboardRemove,
 )
 
 from app.database.models import User
@@ -272,6 +273,50 @@ async def _render_treasury(
             show_alert=True,
         )
         return False
+
+
+@router.message(F.text == "🏦 خزانه")
+async def open_treasury_from_main_menu(
+    message: Message,
+    state: FSMContext,
+) -> None:
+    await state.clear()
+    async with async_session() as session:
+        async with session.begin():
+            user = await session.get(User, message.from_user.id)
+            if user is None or user.home_nation_id is None:
+                await message.answer(
+                    "⚠️ اول عضو یک ملت شو تا بتوانی خزانه را باز کنی."
+                )
+                return
+
+            nation_id = int(user.home_nation_id)
+            role = await get_member_role(
+                session,
+                message.from_user.id,
+                nation_id,
+            )
+            if role is None:
+                await message.answer(
+                    "⚠️ عضویت ملت پیدا نشد. دوباره از بخش «ملت‌ها» وارد شو."
+                )
+                return
+
+            treasury = await get_treasury(session, nation_id)
+            if treasury is None:
+                await message.answer("⚠️ خزانه هنوز راه‌اندازی نشده.")
+                return
+
+            logs = await get_treasury_logs(session, nation_id, limit=5)
+            text = build_treasury_msg(treasury, logs)
+            markup = treasury_keyboard(nation_id, role)
+
+    await message.answer("⁠", reply_markup=ReplyKeyboardRemove())
+    await message.answer(
+        text,
+        reply_markup=markup,
+        parse_mode="HTML",
+    )
 
 
 @router.callback_query(F.data.regexp(r"^treasury:show:\d+$"))
