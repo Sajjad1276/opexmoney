@@ -54,6 +54,7 @@ from app.services.user_service import sync_user_balance
 from app.services.rules.resolver import resolve
 from app.services.temporal_service import get_peak_multiplier
 from app.states.market import MarketStates
+from app.utils.ui import close_inline_panel, remember_inline_panel
 from app.utils.formatting import (
     calc_trade,
     fmt_amount,
@@ -376,6 +377,8 @@ async def alert_set_callback(call: CallbackQuery, state: FSMContext):
             ),
             parse_mode="HTML",
         )
+    if call.message:
+        await remember_inline_panel(state, call.message)
     await call.answer()
 
 
@@ -416,6 +419,7 @@ async def alert_price_message(message: Message, state: FSMContext):
                     target_price=target,
                     direction=direction,
                 )
+        await close_inline_panel(state, message.bot)
         await state.clear()
         arrow = "▲" if alert.direction == "above" else "▼"
         await message.answer(
@@ -645,6 +649,7 @@ async def make_buy_preview(
                 "━━━━━━━━━━━━━━━━━━━━"
             )
 
+    await close_inline_panel(state, message.bot)
     await state.clear()
     await message.answer(
         text,
@@ -678,6 +683,7 @@ async def buy_currency(call, state):
     await state.set_state(MarketStates.WAITING_BUY_AMOUNT)
     await state.update_data(nation_id=nation_id)
     await safe_edit(call, text, buy_amount_keyboard(nation_id))
+    await remember_inline_panel(state, call.message)
     await call.answer()
 
 
@@ -947,6 +953,7 @@ async def sell_currency(call, state):
 
     await state.set_state(MarketStates.WAITING_SELL_AMOUNT)
     await state.update_data(nation_id=nation.nation_id)
+    await remember_inline_panel(state, call.message)
     text = (
         f"📉 <b>فروش <code>{html.escape(nation.currency_code)}</code></b>\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
@@ -1063,6 +1070,7 @@ async def make_sell_preview(
                 "━━━━━━━━━━━━━━━━━━━━"
             )
 
+    await close_inline_panel(state, message.bot)
     await state.clear()
     await message.answer(
         text,
