@@ -73,16 +73,39 @@ async def get_user_active_nation(
             member, nation = row
             user.home_nation_id = nation.nation_id
 
-    if nation is None and repair_founder_membership and user.role == NationMemberRole.FOUNDER:
-        nation = await session.scalar(
-            select(Nation)
-            .where(
-                Nation.founder_user_id == user_id,
-                Nation.is_active.is_(True),
+    if nation is None and repair_founder_membership:
+        # Legacy-safe founder repair:
+        # the authoritative relationship is Nation.founder_user_id.
+        # Do not rely only on User.role because older rows can be stale.
+        founder_nation = None
+
+        if user.home_nation_id is not None:
+            candidate = await session.scalar(
+                select(Nation)
+                .where(
+                    Nation.nation_id == user.home_nation_id,
+                    Nation.founder_user_id == user_id,
+                    Nation.is_active.is_(True),
+                )
+                .with_for_update()
             )
-            .with_for_update()
-            .limit(1)
-        )
+            if candidate is not None:
+                founder_nation = candidate
+
+        if founder_nation is None and user.role == NationMemberRole.FOUNDER:
+            founder_nation = await session.scalar(
+                select(Nation)
+                .where(
+                    Nation.founder_user_id == user_id,
+                    Nation.is_active.is_(True),
+                )
+                .order_by(Nation.nation_id.asc())
+                .with_for_update()
+                .limit(1)
+            )
+
+        nation = founder_nation
+
         if nation is not None:
             member = await session.scalar(
                 select(NationMember)
@@ -104,6 +127,8 @@ async def get_user_active_nation(
             else:
                 member.role = NationMemberRole.FOUNDER
                 member.is_active = True
+
+            user.role = NationMemberRole.FOUNDER.value
             user.home_nation_id = nation.nation_id
             await session.flush()
 
