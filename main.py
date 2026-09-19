@@ -241,6 +241,7 @@ def build_scheduler(bot: Bot) -> AsyncIOScheduler:
 
 
 async def main() -> None:
+    # Intentional: Railway currently has no pre-deploy hook configured, so migrations stay here until one is properly configured.
     await ensure_database_schema()
     bot = Bot(
         token=settings.bot_token,
