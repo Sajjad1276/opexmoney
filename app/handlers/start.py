@@ -326,7 +326,7 @@ async def show_dashboard(
 ⏱ <i>{10} دقیقه پیش</i>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 """.format(
-        user_mention(mention_user),
+        user_mention(display_user or message.from_user),
         f"{html.escape(nation.flag_emoji or '🏴')} <b>{html.escape(nation.name)}</b>",
         html.escape(nation.currency_code),
         fmt_amount(balance),
