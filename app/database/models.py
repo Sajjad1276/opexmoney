@@ -468,4 +468,4 @@ class TreasuryLog(Base):
     created_at: Mapped[datetime] = mapped_column(
         default=lambda: datetime.utcnow(), nullable=False
     )
-\n
+
