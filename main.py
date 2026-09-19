@@ -11,6 +11,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.storage.redis import RedisStorage
+from redis.asyncio import Redis
 from sqlalchemy import select
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -25,6 +26,7 @@ from app.handlers.governance import governance_router
 from app.handlers.market import router as market_router
 from app.handlers.missions import router as missions_router
 from app.handlers.portfolio import router as portfolio_router
+from app.handlers.ranking import router as ranking_router
 from app.handlers.nation import nation_router
 from app.handlers.nation_management import (
     expire_join_requests,
@@ -250,6 +252,8 @@ async def main() -> None:
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
     dp = Dispatcher(storage=build_storage())
+    ranking_redis = Redis.from_url(settings.redis_url, decode_responses=True) if settings.redis_url else None
+    dp["redis"] = ranking_redis
     flow_trace = FlowTraceMiddleware()
     dp.message.middleware(flow_trace)
     dp.callback_query.middleware(flow_trace)
@@ -283,6 +287,7 @@ async def main() -> None:
     dp.include_router(market_router)
     dp.include_router(missions_router)
     dp.include_router(portfolio_router)
+    dp.include_router(ranking_router)
     dp.include_router(founder_router)
     dp.include_router(nation_management_router)
     dp.include_router(nation_router)
@@ -306,6 +311,8 @@ async def main() -> None:
         )
     finally:
         scheduler.shutdown(wait=False)
+        if ranking_redis is not None:
+            await ranking_redis.aclose()
         await companion.close()
         await bot.session.close()
         await engine.dispose()
