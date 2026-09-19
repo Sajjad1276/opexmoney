@@ -27,6 +27,7 @@ from app.keyboards.inline import (
     trade_preview_keyboard,
 )
 from app.services.economic_engine import get_active_members
+from app.services.market_service import get_user_sell_holdings
 from app.services.user_service import sync_user_balance
 from app.services.rules.resolver import resolve
 from app.services.temporal_service import get_peak_multiplier
