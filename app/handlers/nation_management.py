@@ -340,7 +340,7 @@ async def nation_admin_panel(
             [
                 InlineKeyboardButton(
                     text=f"💰 خزانه ({treasury})",
-                    callback_data=f"nm:treasury:{nation_id}",
+                    callback_data=f"treasury:show:{nation_id}",
                 ),
                 InlineKeyboardButton(
                     text=f"⚔️ جنگ‌های فعال ({active_wars})",
@@ -1091,40 +1091,6 @@ async def show_logs(call: CallbackQuery) -> None:
     )
     if call.message:
         await call.message.edit_text(text, reply_markup=markup, parse_mode="HTML")
-    await call.answer()
-
-
-@nation_management_router.callback_query(F.data.regexp(r"^nm:treasury:\d+$"))
-async def show_treasury(call: CallbackQuery) -> None:
-    nation_id = int(call.data.split(":")[2])
-    async with async_session() as session:
-        try:
-            async with session.begin():
-                await _require_admin(session, nation_id, call.from_user.id)
-                nation = await session.get(Nation, nation_id)
-                if nation is None:
-                    raise ValueError("ملت پیدا نشد.")
-                text = (
-                    f"💰 <b>خزانه {html.escape(nation.name)}</b>\n"
-                    "━━━━━━━━━━━━━━━━━━━━\n"
-                    f"موجودی: <b>{_fmt_amount(nation.treasury)} ΩXR</b>\n\n"
-                    "واریز/برداشت خزانه از مسیر سیستم مالی ملت انجام می‌شود و "
-                    "تمام عملیات باید در لاگ ثبت شوند."
-                )
-        except ValueError as exc:
-            await call.answer(str(exc), show_alert=True)
-            return
-
-    if call.message:
-        await call.message.edit_text(
-            text,
-            reply_markup=InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [InlineKeyboardButton(text="↩️ مدیریت ملت", callback_data=f"nm:panel:{nation_id}")]
-                ]
-            ),
-            parse_mode="HTML",
-        )
     await call.answer()
 
 
