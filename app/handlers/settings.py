@@ -5,7 +5,7 @@ import html
 import logging
 
 from aiogram import F, Router
-from aiogram.enums import ParseMode
+from aiogram.enums import ButtonStyle, ParseMode
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message, ReplyKeyboardRemove
@@ -48,18 +48,21 @@ def settings_keyboard() -> InlineKeyboardMarkup:
                 InlineKeyboardButton(
                     text="✏️ تغییر نام معامله‌گر",
                     callback_data="settings:change_username",
+                    style=ButtonStyle.PRIMARY,
                 )
             ],
             [
                 InlineKeyboardButton(
                     text="🏛 تغییر ملت اصلی",
                     callback_data="settings:change_nation",
+                    style=ButtonStyle.PRIMARY,
                 )
             ],
             [
                 InlineKeyboardButton(
                     text="📊 آمار کامل من",
                     callback_data="settings:stats",
+                    style=ButtonStyle.PRIMARY,
                 )
             ],
             [
