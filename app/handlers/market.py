@@ -557,51 +557,57 @@ async def market_sell(call, state):
     async with async_session() as session:
         async with session.begin():
             user = await session.get(User, call.from_user.id)
-            rows = (
-                await session.execute(
-                    select(CurrencyHolding, Nation.currency_code)
-                    .join(Nation, Nation.nation_id == CurrencyHolding.nation_id)
-                    .where(
-                        CurrencyHolding.user_id == call.from_user.id,
-                        CurrencyHolding.amount > 0,
-                    )
-                    .order_by(CurrencyHolding.amount.desc())
-                )
-            ).all()
+            active_holdings, inactive_holdings = await get_user_sell_holdings(
+                session,
+                call.from_user.id,
+            )
 
         if not user:
             await call.answer("🔴 حساب پیدا نشد. /start بزن.", show_alert=True)
             return
 
-        if not rows:
-            await safe_edit(
-                call,
-                "📉 <b>فروش ارز</b>\n"
-                "─────────────────\n"
-                "هنوز ارزی برای فروش نداری.\n\n"
-                "از 📈 خرید ارز شروع کن.",
-                sell_currency_keyboard([]),
-            )
-            await call.answer()
-            return
-
-        holdings = [
-            type("Holding", (), {"currency_code": code, "amount": holding.amount})
-            for holding, code in rows
-        ]
-        text = (
+    if not active_holdings and not inactive_holdings:
+        await safe_edit(
+            call,
             "📉 <b>فروش ارز</b>\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "<b>کدوم ارز می‌فروشی؟</b>"
-            + "".join(
-                f"\n💱 <code>{html.escape(holding.currency_code)}</code> "
-                f"· موجودی: <b>{fmt_amount(holding.amount)}</b>"
-                for holding in holdings
-            )
+            "─────────────────\n"
+            "هنوز ارزی برای فروش نداری.\n\n"
+            "از 📈 خرید ارز شروع کن.",
+            sell_currency_keyboard([]),
         )
+        await call.answer()
+        return
+
+    text_lines = [
+        "📉 <b>فروش ارز</b>",
+        "━━━━━━━━━━━━━━━━━━━━",
+    ]
+    if active_holdings:
+        text_lines.append("<b>ارزهای قابل فروش:</b>")
+        for holding in active_holdings:
+            text_lines.append(
+                f"💱 <code>{html.escape(holding.currency_code)}</code> "
+                f"· موجودی: <b>{fmt_amount(holding.amount)}</b>"
+            )
+
+    if inactive_holdings:
+        text_lines.extend([
+            "",
+            "🚫 <b>ارزهای غیرقابل فروش:</b>",
+        ])
+        for holding in inactive_holdings:
+            text_lines.append(
+                f"• <code>{html.escape(holding.currency_code)}</code> "
+                f"({html.escape(holding.nation_name)}) · "
+                "ملت این ارز منحل شده - قابل فروش نیست"
+            )
 
     await state.clear()
-    await safe_edit(call, text, sell_currency_keyboard(holdings))
+    await safe_edit(
+        call,
+        "\n".join(text_lines),
+        sell_currency_keyboard(active_holdings),
+    )
     await call.answer()
 
 
@@ -627,6 +633,9 @@ async def sell_currency(call, state):
                 else None
             )
 
+    if nation is not None and not nation.is_active:
+        await call.answer("🚫 ملت این ارز منحل شده - قابل فروش نیست.", show_alert=True)
+        return
     if not nation or not holding or holding.amount <= 0:
         await call.answer("🔴 موجودی این ارز صفر است.", show_alert=True)
         return
