@@ -79,7 +79,7 @@ async def start_founder(
     await call.answer()
     if call.message:
         await call.message.answer(
-            "🏛 <b>تأسیس ملت · مرحله ۱</b>\n"
+            "🏛 <b>تأسیس ملت · مرحله 1</b>\n"
             "اول ربات رو به گروهی که می‌خوای پایتخت ملتت باشه اضافه کن.\n"
             "در فرم تلگرام، ربات رو به‌عنوان ادمین اضافه کن.\n"
             "دسترسی‌های لازم از قبل پیشنهاد می‌شن.\n"
@@ -350,7 +350,7 @@ async def confirm_founder(
             f"🏛 {html.escape(nation.name)}\n"
             f"💱 ارز رسمی: <b>{html.escape(nation.currency_code)}</b>\n"
             "👑 تو بنیان‌گذار این ملتی.\n"
-            "💰 موجودی اولیه: ۱۰۰۰ واحد\n"
+            "💰 موجودی اولیه: 1000 واحد\n"
             "🌐 منوی اصلی آماده‌ست.",
             reply_markup=main_menu_keyboard(),
             parse_mode="HTML",
