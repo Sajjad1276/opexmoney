@@ -15,7 +15,7 @@ class Settings(BaseSettings):
         default=None,
         validation_alias=AliasChoices("GEMINI_API_KEY", "GOOGLE_API_KEY"),
     )
-    ai_model: str = "gemini-2.5-flash-lite"
+    ai_model: str = "gemini-3.1-flash-lite"
     ai_timeout_seconds: float = 12.0
     ai_cache_ttl_seconds: int = 120
     ai_last_message_ttl_seconds: int = 1800
