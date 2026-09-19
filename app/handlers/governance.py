@@ -41,7 +41,7 @@ governance_router = Router(name="governance")
 
 def _format_value(rule, value) -> str:
     if rule.value_type == "percent":
-        return f"{to_fa(str(value))}٪"
+        return f"{to_fa(str(value))}%"
     if rule.value_type == "bool":
         return "روشن" if value else "خاموش"
     return to_fa(str(value))
