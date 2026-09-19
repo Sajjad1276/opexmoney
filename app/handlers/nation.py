@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from aiogram import F, Router
-from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
+from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message, ReplyKeyboardRemove
 from sqlalchemy import select
 
 from app.database.models import Nation, User
@@ -34,6 +34,7 @@ async def open_nations(message: Message) -> None:
         )
         return
 
+    await message.answer(" ", reply_markup=ReplyKeyboardRemove())
     await message.answer(
         "🌍 <b>ملت‌ها</b>\n"
         "اینجا می‌تونی ملت‌ها رو بررسی کنی.\n"
@@ -53,6 +54,24 @@ async def back_to_dashboard(call: CallbackQuery) -> None:
                 return
     if call.message:
         await show_dashboard(call.message, user)
+    await call.answer()
+
+
+@nation_router.callback_query(F.data == "back_to_nations_panel")
+async def back_to_nations_panel(call: CallbackQuery) -> None:
+    async with async_session() as session:
+        async with session.begin():
+            user = await session.get(User, call.from_user.id)
+            if user is None or not await is_fully_registered(session, call.from_user.id):
+                await call.answer("⚠️ اول باید وارد بازی بشی.", show_alert=True)
+                return
+            is_founder = user.role == "founder"
+    if call.message:
+        await call.message.edit_text(
+            "🌍 <b>ملت‌ها</b>\nاینجا می‌تونی ملت‌ها رو بررسی کنی.\nاز گزینه‌ها برای ادامه استفاده کن.",
+            reply_markup=nation_panel_keyboard(is_founder),
+            parse_mode="HTML",
+        )
     await call.answer()
 
 
@@ -123,7 +142,7 @@ async def explore_nations(call: CallbackQuery) -> None:
         )]
         for nation in nations
     ]
-    rows.append([InlineKeyboardButton(text="↩️ بازگشت", callback_data="back_to_dashboard")])
+    rows.append([InlineKeyboardButton(text="↩️ بازگشت", callback_data="back_to_nations_panel")])
     if call.message:
         await call.message.edit_text(
             "🔍 <b>کاوش ملت‌ها</b>\n"
