@@ -11,6 +11,7 @@ from aiogram.types import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     Message,
+    ReplyKeyboardRemove,
 )
 
 from app.database.session import async_session
@@ -120,6 +121,7 @@ async def show_portfolio(message: Message) -> None:
         )
         return
 
+    await message.answer("⁠", reply_markup=ReplyKeyboardRemove())
     await message.answer(
         build_portfolio_text(data),
         reply_markup=portfolio_keyboard(),
