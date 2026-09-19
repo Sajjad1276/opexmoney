@@ -16,7 +16,7 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import CommandStart
 from aiogram.filters.state import StateFilter
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
+from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message, ReplyKeyboardRemove
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
@@ -424,6 +424,9 @@ async def start(message: Message, state: FSMContext) -> None:
         await show_dashboard(message, user)
         return
 
+    await message.answer("\u2060", reply_markup=ReplyKeyboardRemove())
+
+    text = """
     text = """
 👋 <b>به OPEX MONEY خوش اومدی</b>
 
