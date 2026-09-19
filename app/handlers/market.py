@@ -6,7 +6,7 @@ from decimal import Decimal, InvalidOperation
 from aiogram import F, Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message, ReplyKeyboardRemove
+from aiogram.types import (\n    CallbackQuery,\n    InlineKeyboardButton,\n    InlineKeyboardMarkup,\n    Message,\n    ReplyKeyboardRemove,\n)
 from sqlalchemy import select
 
 from app.database.models import (
@@ -44,6 +44,20 @@ from app.utils.formatting import (
 )
 
 router = Router(name="market")
+
+def market_keyboard_for_nation(nation_id: int) -> InlineKeyboardMarkup:
+    keyboard = market_keyboard()
+    rows = [list(row) for row in keyboard.inline_keyboard]
+    rows.insert(
+        1,
+        [
+            InlineKeyboardButton(
+                text="📈 نمودار",
+                callback_data=f"market_chart:{nation_id}",
+            )
+        ],
+    )
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 async def safe_edit(call, text, markup=None):
@@ -149,12 +163,12 @@ async def render_market(message: Message, edit_call=None):
             text = market_text(user, nation, others, active)
 
     if edit_call:
-        await safe_edit(edit_call, text, market_keyboard())
+        await safe_edit(edit_call, text, market_keyboard_for_nation(nation.nation_id))
     else:
         await message.answer("\u2060", reply_markup=ReplyKeyboardRemove())
         await message.answer(
             text,
-            reply_markup=market_keyboard(),
+            reply_markup=market_keyboard_for_nation(nation.nation_id),
             parse_mode="HTML",
         )
 
@@ -567,7 +581,7 @@ async def confirm_buy(call, state=None):
                     user.user_id,
                 )
 
-    await safe_edit(call, text, market_keyboard())
+    await safe_edit(call, text, market_keyboard_for_nation(nation_id))
     await call.answer("✅ خرید انجام شد")
 
 
@@ -978,20 +992,11 @@ async def confirm_sell(call, state=None):
     await call.answer("✅ فروش انجام شد")
 
 
-@router.callback_query(F.data == "market_chart")
-async def market_chart(call):
-    await safe_edit(
-        call,
-        "📊 <b>نمودار نرخ</b>\n━━━━━━━━━━━━━━━━━━━━\nاین قابلیت هنوز فعال نیست.",
-        market_keyboard(),
-    )
-    await call.answer()
-
-
 @router.callback_query(F.data == "market_history")
 async def market_history(call):
     async with async_session() as session:
         async with session.begin():
+            user = await session.get(User, call.from_user.id)
             rows = (
                 await session.execute(
                     select(Transaction, Nation.currency_code)
@@ -1001,6 +1006,12 @@ async def market_history(call):
                     .limit(5)
                 )
             ).all()
+
+    market_markup = (
+        market_keyboard_for_nation(user.home_nation_id)
+        if user and user.home_nation_id is not None
+        else market_keyboard()
+    )
 
     lines = [
         "📜 <b>تاریخچه</b>",
@@ -1017,5 +1028,5 @@ async def market_history(call):
             f"{fmt_rate(transaction.rate)} ΩXR"
         )
 
-    await safe_edit(call, "\n".join(lines), market_keyboard())
+    await safe_edit(call, "\n".join(lines), market_markup)
     await call.answer()
