@@ -264,7 +264,10 @@ async def open_academy(message: Message) -> None:
         await message.answer(ACADEMY_ERROR, parse_mode=ParseMode.HTML)
 
 
-async def back_to_academy_main(callback: CallbackQuery) -> None:
+async def back_to_academy_main(
+    callback: CallbackQuery,
+    state: FSMContext,
+) -> None:
     try:
         async with async_session() as session:
             async with session.begin():
@@ -284,6 +287,7 @@ async def back_to_academy_main(callback: CallbackQuery) -> None:
             reply_markup=academy_keyboard(modules),
             parse_mode=ParseMode.HTML,
         )
+        await state.clear()
         await callback.answer()
     except Exception:
         logger.exception(
@@ -293,7 +297,10 @@ async def back_to_academy_main(callback: CallbackQuery) -> None:
         await callback.answer(ACADEMY_ERROR, show_alert=True)
 
 
-async def show_module(callback: CallbackQuery) -> None:
+async def show_module(
+    callback: CallbackQuery,
+    state: FSMContext,
+) -> None:
     try:
         parts = (callback.data or "").split(":")
         if len(parts) != 3:
@@ -338,6 +345,7 @@ async def show_module(callback: CallbackQuery) -> None:
             reply_markup=module_keyboard(module_id, lessons),
             parse_mode=ParseMode.HTML,
         )
+        await state.clear()
         await callback.answer()
     except Exception:
         logger.exception(
@@ -348,7 +356,10 @@ async def show_module(callback: CallbackQuery) -> None:
         await callback.answer(ACADEMY_ERROR, show_alert=True)
 
 
-async def show_lesson_handler(callback: CallbackQuery) -> None:
+async def show_lesson_handler(
+    callback: CallbackQuery,
+    state: FSMContext,
+) -> None:
     try:
         parts = (callback.data or "").split(":")
         if len(parts) != 3:
@@ -411,6 +422,7 @@ async def show_lesson_handler(callback: CallbackQuery) -> None:
             ),
             parse_mode=ParseMode.HTML,
         )
+        await state.clear()
         await callback.answer()
     except Exception:
         logger.exception(
