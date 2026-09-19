@@ -391,3 +391,40 @@ class NationWar(Base):
     status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)
     declared_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     ended_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class Mission(Base):
+    __tablename__ = "missions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    key: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    title_fa: Mapped[str] = mapped_column(String(100), nullable=False)
+    description_fa: Mapped[str] = mapped_column(String(255), nullable=False)
+    mission_type: Mapped[str] = mapped_column(String(10), nullable=False)
+    target_count: Mapped[int] = mapped_column(nullable=False)
+    reward_xr: Mapped[Decimal] = mapped_column(
+        Numeric(18, 4), nullable=False, default=Decimal("0")
+    )
+    reward_currency: Mapped[Decimal] = mapped_column(
+        Numeric(18, 4), nullable=False, default=Decimal("0")
+    )
+    is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
+
+
+class UserMissionProgress(Base):
+    __tablename__ = "user_mission_progress"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False
+    )
+    mission_id: Mapped[int] = mapped_column(
+        ForeignKey("missions.id", ondelete="CASCADE"), nullable=False
+    )
+    progress: Mapped[int] = mapped_column(default=0, nullable=False)
+    completed: Mapped[bool] = mapped_column(default=False, nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    claimed: Mapped[bool] = mapped_column(default=False, nullable=False)
+    reset_at: Mapped[datetime | None] = mapped_column(nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "mission_id", name="uq_user_mission"),
+    )
