@@ -13,7 +13,7 @@ from aiogram.filters.state import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai import get_ai_reply
@@ -30,6 +30,7 @@ from app.database.models import (
 from app.database.session import async_session
 from app.services.mission_service import increment_mission
 from app.services.nation_service import convert_holding_to_xr
+from app.services.war_service import declare_war
 from app.services.user_service import sync_user_balance
 
 logger = logging.getLogger(__name__)
@@ -76,6 +77,7 @@ EVENT_EMOJI = {
     "ROLE_DEMOTED": "⬇️",
     "WAR_DECLARED": "⚔️",
     "WAR_ENDED": "🏳️",
+    "DRAW": "🤝",
     "SANCTION_APPLIED": "🚫",
     "SANCTION_LIFTED": "✅",
     "TRADE_LARGE": "💰",
@@ -93,6 +95,7 @@ EVENT_TITLE = {
     "ROLE_DEMOTED": "تنزل نقش",
     "WAR_DECLARED": "اعلام جنگ",
     "WAR_ENDED": "پایان جنگ",
+    "DRAW": "تساوی جنگ",
     "SANCTION_APPLIED": "اعمال تحریم",
     "SANCTION_LIFTED": "رفع تحریم",
     "TRADE_LARGE": "معامله بزرگ",
@@ -271,7 +274,7 @@ async def get_nation_log(
             detail = f"{target or actor} → {meta.get('role', '?')}"
         elif row.action_type == "TRADE_LARGE":
             detail = f"{meta.get('amount', '?')} {meta.get('currency', '')}".strip()
-        elif row.action_type in {"WAR_DECLARED", "WAR_ENDED"}:
+        elif row.action_type in {"WAR_DECLARED", "WAR_ENDED", "DRAW"}:
             detail = str(meta.get("opponent_name", ""))
         elif row.action_type in {"SANCTION_APPLIED", "SANCTION_LIFTED"}:
             detail = str(meta.get("target_nation", ""))
@@ -320,8 +323,11 @@ async def nation_admin_panel(
             active_wars = int(
                 await session.scalar(
                     select(func.count(NationWar.id)).where(
-                        NationWar.nation_id == nation_id,
                         NationWar.status == "active",
+                        or_(
+                            NationWar.nation_id == nation_id,
+                            NationWar.opponent_nation_id == nation_id,
+                        ),
                     )
                 )
                 or 0
@@ -349,6 +355,12 @@ async def nation_admin_panel(
                     text=f"⚔️ جنگ‌های فعال ({active_wars})",
                     callback_data=f"nm:wars:{nation_id}",
                 ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text="⚔️ اعلام جنگ",
+                    callback_data=f"nm:war_targets:{nation_id}",
+                )
             ],
             [
                 InlineKeyboardButton(
@@ -1118,25 +1130,54 @@ async def show_active_wars(call: CallbackQuery) -> None:
                 await _require_admin(session, nation_id, call.from_user.id)
                 wars = (
                     await session.execute(
-                        select(NationWar, Nation.name)
-                        .join(Nation, Nation.nation_id == NationWar.opponent_nation_id)
+                        select(NationWar)
                         .where(
-                            NationWar.nation_id == nation_id,
                             NationWar.status == "active",
+                            or_(
+                                NationWar.nation_id == nation_id,
+                                NationWar.opponent_nation_id == nation_id,
+                            ),
                         )
                         .order_by(NationWar.declared_at.desc())
                         .limit(20)
                     )
-                ).all()
+                ).scalars().all()
+
+                opponent_ids = [
+                    war.opponent_nation_id
+                    if war.nation_id == nation_id
+                    else war.nation_id
+                    for war in wars
+                ]
+                names = {}
+                if opponent_ids:
+                    names = {
+                        nation.nation_id: nation.name
+                        for nation in (
+                            await session.execute(
+                                select(Nation).where(Nation.nation_id.in_(opponent_ids))
+                            )
+                        ).scalars().all()
+                    }
     except ValueError as exc:
         await call.answer(str(exc), show_alert=True)
         return
 
     lines = ["⚔️ <b>جنگ‌های فعال</b>"]
     if wars:
-        for war, opponent_name in wars:
+        for war in wars:
+            opponent_id = (
+                war.opponent_nation_id
+                if war.nation_id == nation_id
+                else war.nation_id
+            )
+            opponent_name = names.get(opponent_id, "ملت ناشناخته")
             declared = war.declared_at.strftime("%Y-%m-%d %H:%M") if war.declared_at else "---"
-            lines.append(f"⚔️ <b>{html.escape(opponent_name)}</b> · از {declared}")
+            ends = war.ends_at.strftime("%Y-%m-%d %H:%M") if war.ends_at else "---"
+            lines.append(
+                f"⚔️ <b>{html.escape(opponent_name)}</b> · "
+                f"شروع: {declared} · پایان: {ends} UTC"
+            )
     else:
         lines.append("🕊 در حال حاضر جنگ فعالی ثبت نشده.")
 
@@ -1151,6 +1192,164 @@ async def show_active_wars(call: CallbackQuery) -> None:
             parse_mode="HTML",
         )
     await call.answer()
+
+
+@nation_management_router.callback_query(F.data.regexp(r"^nm:war_targets:\d+$"))
+async def show_war_targets(call: CallbackQuery) -> None:
+    nation_id = int(call.data.split(":")[2])
+    try:
+        async with async_session() as session:
+            async with session.begin():
+                await _require_admin(session, nation_id, call.from_user.id)
+                active_war = select(NationWar.id).where(
+                    NationWar.status == "active",
+                    or_(
+                        and_(
+                            NationWar.nation_id == nation_id,
+                            NationWar.opponent_nation_id == Nation.nation_id,
+                        ),
+                        and_(
+                            NationWar.nation_id == Nation.nation_id,
+                            NationWar.opponent_nation_id == nation_id,
+                        ),
+                    ),
+                ).exists()
+
+                targets = (
+                    await session.execute(
+                        select(Nation)
+                        .where(
+                            Nation.is_active.is_(True),
+                            Nation.nation_id != nation_id,
+                            ~active_war,
+                        )
+                        .order_by(Nation.member_count.desc(), Nation.nation_id.asc())
+                        .limit(30)
+                    )
+                ).scalars().all()
+    except ValueError as exc:
+        await call.answer(str(exc), show_alert=True)
+        return
+
+    if not targets:
+        if call.message:
+            await call.message.edit_text(
+                "⚔️ <b>اعلام جنگ</b>\n\nهیچ ملت فعال دیگری برای شروع جنگ در دسترس نیست.",
+                reply_markup=InlineKeyboardMarkup(
+                    inline_keyboard=[
+                        [InlineKeyboardButton(text="↩️ مدیریت ملت", callback_data=f"nm:panel:{nation_id}")]
+                    ]
+                ),
+                parse_mode="HTML",
+            )
+        await call.answer()
+        return
+
+    buttons = [
+        [InlineKeyboardButton(
+            text=f"⚔️ {html.escape(target.name)} · {target.currency_code}",
+            callback_data=f"nm:war_target:{nation_id}:{target.nation_id}",
+        )]
+        for target in targets
+    ]
+    buttons.append([InlineKeyboardButton(text="❌ لغو", callback_data=f"nm:panel:{nation_id}")])
+
+    if call.message:
+        await call.message.edit_text(
+            "⚔️ <b>انتخاب هدف</b>\n\nیک ملت را برای اعلام جنگ انتخاب کن.",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
+            parse_mode="HTML",
+        )
+    await call.answer()
+
+
+@nation_management_router.callback_query(F.data.regexp(r"^nm:war_target:\d+:\d+$"))
+async def confirm_war_target(call: CallbackQuery) -> None:
+    _, _, nation_id, target_id = call.data.split(":")
+    nation_id = int(nation_id)
+    target_id = int(target_id)
+
+    try:
+        async with async_session() as session:
+            async with session.begin():
+                await _require_admin(session, nation_id, call.from_user.id)
+                nation = await session.get(Nation, nation_id)
+                target = await session.get(Nation, target_id)
+                if nation is None or target is None or not nation.is_active or not target.is_active:
+                    raise ValueError("⚠️ ملت هدف دیگر فعال نیست.")
+
+                active_war = await session.scalar(
+                    select(NationWar.id).where(
+                        NationWar.status == "active",
+                        or_(
+                            and_(NationWar.nation_id == nation_id, NationWar.opponent_nation_id == target_id),
+                            and_(NationWar.nation_id == target_id, NationWar.opponent_nation_id == nation_id),
+                        ),
+                    ).limit(1)
+                )
+                if active_war is not None:
+                    raise ValueError("⚔️ این دو ملت همین حالا در حال جنگ هستند.")
+    except ValueError as exc:
+        await call.answer(str(exc), show_alert=True)
+        return
+
+    if call.message:
+        await call.message.edit_text(
+            "⚠️ <b>تأیید اعلام جنگ</b>\n\n"
+            f"🏴 ملت تو: <b>{html.escape(nation.name)}</b>\n"
+            f"🎯 هدف: <b>{html.escape(target.name)}</b>\n\n"
+            "⏳ جنگ 48 ساعت طول می‌کشد.\n"
+            "📈 در پایان، نرخ ارز بالاتر برنده است.\n"
+            "💸 ملت بازنده 10٪ از خزانه خود را، تا سقف موجودی، به برنده می‌دهد.\n\n"
+            "این عملیات را تأیید می‌کنی؟",
+            reply_markup=InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(text="⚔️ تأیید جنگ", callback_data=f"nm:war_confirm:{nation_id}:{target_id}"),
+                        InlineKeyboardButton(text="❌ لغو", callback_data=f"nm:war_targets:{nation_id}"),
+                    ]
+                ]
+            ),
+            parse_mode="HTML",
+        )
+    await call.answer()
+
+
+@nation_management_router.callback_query(F.data.regexp(r"^nm:war_confirm:\d+:\d+$"))
+async def execute_war_declaration(call: CallbackQuery, bot: Bot) -> None:
+    _, _, nation_id, target_id = call.data.split(":")
+    nation_id = int(nation_id)
+    target_id = int(target_id)
+
+    async with async_session() as session:
+        try:
+            result = await declare_war(
+                declaring_nation_id=nation_id,
+                target_nation_id=target_id,
+                session=session,
+                actor_user_id=call.from_user.id,
+                bot=bot,
+            )
+        except ValueError as exc:
+            await call.answer(str(exc), show_alert=True)
+            return
+
+    await call.answer("⚔️ جنگ اعلام شد.")
+    if call.message:
+        await call.message.edit_text(
+            "⚔️ <b>جنگ اعلام شد</b>\n\n"
+            f"🏴 {html.escape(result['declaring_name'])}\n"
+            f"🎯 هدف: {html.escape(result['target_name'])}\n"
+            "⏳ مدت: 48 ساعت",
+            reply_markup=InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [InlineKeyboardButton(text="⚔️ جنگ‌های فعال", callback_data=f"nm:wars:{nation_id}")],
+                    [InlineKeyboardButton(text="↩️ مدیریت ملت", callback_data=f"nm:panel:{nation_id}")],
+                ]
+            ),
+            parse_mode="HTML",
+        )
+    await call.answer("⚔️ جنگ اعلام شد.")
 
 
 @nation_management_router.callback_query(F.data.regexp(r"^nm:announce:\d+$"))
