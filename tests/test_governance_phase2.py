@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 from decimal import Decimal
+import secrets
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -147,6 +148,7 @@ async def seed_nation_user(
                 trade_volume_24h=Decimal("0"),
                 active_members_24h=1,
                 member_count=1,
+                invite_code=secrets.token_urlsafe(8),
                 is_active=True,
             )
             user = User(
