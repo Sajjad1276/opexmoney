@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 from decimal import Decimal
+import secrets
 from types import SimpleNamespace
 
 import pytest
@@ -40,6 +41,7 @@ async def test_context_builder_reads_real_database(monkeypatch) -> None:
                 trade_volume_24h=Decimal("1000"),
                 active_members_24h=4,
                 member_count=7,
+                invite_code=secrets.token_urlsafe(8),
                 nation_rank=3,
                 is_active=True,
             )
@@ -121,7 +123,7 @@ def test_prompt_and_cache_key_are_deterministic() -> None:
     context = {"user": {"name": "سجاد"}, "active_days": 5}
     prompt = build_dynamic_prompt(context=context, user_message="وضعیتم چطوره؟")
     key_one = build_cache_key(
-        model="gemini-3.8-flash",
+        model=settings.ai_model,
         context=context,
         user_message="وضعیتم چطوره؟",
     )
@@ -173,7 +175,7 @@ async def test_ai_success_path_parses_and_caches(monkeypatch) -> None:
 
     class FakeModels:
         async def generate_content(self, **kwargs):
-            assert kwargs["model"] == "gemini-3.8-flash"
+            assert kwargs["model"] == settings.ai_model
             assert kwargs["config"].response_mime_type == "application/json"
             return SimpleNamespace(text='{"reply":"<b>سلام</b>، معامله‌گر."}')
 
@@ -194,7 +196,7 @@ async def test_ai_success_path_parses_and_caches(monkeypatch) -> None:
     monkeypatch.setattr("ai.genai.Client", FakeClient)
     monkeypatch.setattr(settings, "gemini_api_key", "test-key")
     monkeypatch.setattr(settings, "ai_enabled", True)
-    monkeypatch.setattr(settings, "ai_model", "gemini-3.8-flash")
+    monkeypatch.setattr(settings, "ai_model", "gemini-2.5-flash-lite")
 
     result = await companion.reply(123, "سلام اوپکس", SimpleNamespace())
 
