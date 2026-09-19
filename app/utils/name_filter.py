@@ -21,7 +21,7 @@ BLOCKED_TERMS = frozenset({
 
 SHORT_EXACT = frozenset({"kos", "kir", "sex", "cum", "goh"})
 
-ASCII_NAME_RE = re.compile(r"^[A-Za-z0-9]{3,15}$")
+TRADER_NAME_RE = re.compile(r"^[A-Za-z0-9\u06f0-\u06f9\u0660-\u0669\u0621-\u063a\u0641-\u064a\u06a9\u06cc\u067e\u0686\u0698\u06af-]{3,20}$")
 NON_ALNUM_RE = re.compile(r"[^a-z0-9]+")
 DIGIT_RE = re.compile(r"[0-9]")
 
@@ -49,8 +49,8 @@ def _raw_letters_only(value: str) -> str:
 
 
 def is_valid_trader_name(value: str) -> bool:
-    """Accept only 3-15 ASCII English letters/digits, no spaces or symbols."""
-    return bool(ASCII_NAME_RE.fullmatch(value.strip()))
+    """Accept the canonical 3-20 character OPEX trader-name format."""
+    return bool(TRADER_NAME_RE.fullmatch(value.strip()))
 
 
 def is_blocked_trader_name(value: str) -> bool:
