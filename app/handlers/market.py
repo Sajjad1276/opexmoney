@@ -158,10 +158,10 @@ def _risk_title(label: str) -> str:
     return label.split(" ", 1)[1] if " " in label else label
 
 
-def _format_mover(code: str | None, pct: float, positive: bool) -> str:
+def _format_mover(code: str | None, pct: float) -> str:
     if not code:
         return "—"
-    arrow = "▲" if positive else "▼"
+    arrow = "▲" if pct > 0 else "▼" if pct < 0 else "➡️"
     return f"{html.escape(code)} {arrow} {format_percent_value(pct)}"
 
 
@@ -181,11 +181,11 @@ def market_text(user, overview: dict, active: int) -> str:
     loser_code, loser_pct = overview["top_mover"]["loser"]
     if winner_code:
         lines.append(
-            f"🏆 بهترین: {_format_mover(winner_code, winner_pct, True)}"
+            f"🏆 بهترین: {_format_mover(winner_code, winner_pct)}"
         )
     if loser_code:
         lines.append(
-            f"💀 بدترین: {_format_mover(loser_code, loser_pct, False)}"
+            f"💀 بدترین: {_format_mover(loser_code, loser_pct)}"
         )
     lines.append("")
 
@@ -208,7 +208,7 @@ def market_text(user, overview: dict, active: int) -> str:
             ]
         )
 
-        if sum(len(line) + 1 for line in lines) > 3600:
+        if sum(len(line) + 1 for line in lines) > 3300:
             lines.append("… فقط بخشی از ارزها در این صفحه نمایش داده شد.")
             break
 
@@ -423,7 +423,11 @@ async def alert_price_message(message: Message, state: FSMContext):
 
 
 @router.callback_query(F.data == "alert:list")
-async def alert_list_callback(call: CallbackQuery):
+async def alert_list_callback(
+    call: CallbackQuery,
+    *,
+    acknowledge: bool = True,
+):
     async with async_session() as session:
         async with session.begin():
             alerts = await list_price_alerts(session, call.from_user.id)
@@ -463,7 +467,8 @@ async def alert_list_callback(call: CallbackQuery):
             reply_markup=InlineKeyboardMarkup(inline_keyboard=rows),
             parse_mode="HTML",
         )
-    await call.answer()
+    if acknowledge:
+        await call.answer()
 
 
 @router.callback_query(F.data.startswith("alert:delete:"))
@@ -482,12 +487,12 @@ async def alert_delete_callback(call: CallbackQuery):
                 alert_id=alert_id,
             )
 
+    if call.message:
+        await alert_list_callback(call, acknowledge=False)
     await call.answer(
         "✅ هشدار حذف شد." if deleted else "⚠️ هشدار پیدا نشد.",
         show_alert=not deleted,
     )
-    if call.message:
-        await alert_list_callback(call)
 
 
 @router.callback_query(F.data == "market_buy")
