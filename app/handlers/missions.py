@@ -6,6 +6,8 @@ import logging
 from aiogram import F, Router
 from aiogram.enums import ParseMode
 from aiogram.exceptions import TelegramBadRequest
+from sqlalchemy import select
+
 from aiogram.types import (
     CallbackQuery,
     InlineKeyboardButton,
@@ -217,8 +219,7 @@ async def claim_all_rewards(callback: CallbackQuery) -> None:
             async with session.begin():
                 rows = (
                     await session.execute(
-                        __import__("sqlalchemy", fromlist=["select"])
-                        .select(UserMissionProgress.mission_id)
+                        select(UserMissionProgress.mission_id)
                         .join(
                             Mission,
                             Mission.id == UserMissionProgress.mission_id,
