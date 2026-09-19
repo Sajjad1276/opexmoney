@@ -134,14 +134,6 @@ async def explore_nations(call: CallbackQuery) -> None:
     await call.answer()
 
 
-@nation_router.callback_query(F.data.in_({"founder_panel", "create_nation"}))
-async def unavailable_nation_panel(call: CallbackQuery) -> None:
-    await call.answer(
-        "ℹ️ این بخش هنوز فعال نشده.",
-        show_alert=True,
-    )
-
-
 @nation_router.callback_query(F.data.in_({"confirm_trade", "cancel_trade"}))
 async def unavailable_trade_confirmation(call: CallbackQuery) -> None:
     await call.answer(
