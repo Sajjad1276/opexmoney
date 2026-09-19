@@ -28,6 +28,7 @@ from app.keyboards.inline import (
 )
 from app.services.economic_engine import get_active_members
 from app.services.market_service import get_user_sell_holdings
+from app.services.mission_service import increment_mission
 from app.services.user_service import sync_user_balance
 from app.services.rules.resolver import resolve
 from app.services.temporal_service import get_peak_multiplier
@@ -550,6 +551,22 @@ async def confirm_buy(call, state=None):
                 f"<b>{fmt_amount(holding.amount)}</b>"
             )
 
+            try:
+                await increment_mission(session, user.user_id, "DAILY_TRADE_1")
+                await increment_mission(session, user.user_id, "WEEKLY_BUY_5")
+                await increment_mission(
+                    session,
+                    user.user_id,
+                    "WEEKLY_TRADE_VOLUME",
+                    amount=int(calc["receive"]),
+                )
+                await increment_mission(session, user.user_id, "FIRST_TRADE")
+            except Exception:
+                logger.exception(
+                    "Mission trigger failed after buy for user %s",
+                    user.user_id,
+                )
+
     await safe_edit(call, text, market_keyboard())
     await call.answer("✅ خرید انجام شد")
 
@@ -941,6 +958,21 @@ async def confirm_sell(call, state=None):
                 f"{html.escape(nation.currency_code)}: "
                 f"<b>{fmt_amount(holding.amount)}</b>"
             )
+
+            try:
+                await increment_mission(session, user.user_id, "DAILY_TRADE_1")
+                await increment_mission(
+                    session,
+                    user.user_id,
+                    "WEEKLY_TRADE_VOLUME",
+                    amount=int(amount),
+                )
+                await increment_mission(session, user.user_id, "FIRST_TRADE")
+            except Exception:
+                logger.exception(
+                    "Mission trigger failed after sell for user %s",
+                    user.user_id,
+                )
 
     await safe_edit(call, text, market_keyboard())
     await call.answer("✅ فروش انجام شد")
