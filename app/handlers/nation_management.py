@@ -8,6 +8,7 @@ from decimal import Decimal
 from typing import Any
 
 from aiogram import Bot, F, Router
+from aiogram.enums import ButtonStyle
 from aiogram.filters import Command
 from aiogram.filters.state import StateFilter
 from aiogram.fsm.context import FSMContext
@@ -345,32 +346,38 @@ async def nation_admin_panel(
                 InlineKeyboardButton(
                     text="📋 لاگ فعالیت",
                     callback_data=f"nm:logs:{nation_id}",
+                    style=ButtonStyle.PRIMARY,
                 ),
             ],
             [
                 InlineKeyboardButton(
                     text=f"💰 خزانه ({treasury})",
                     callback_data=f"treasury:show:{nation_id}",
+                    style=ButtonStyle.SUCCESS,
                 ),
                 InlineKeyboardButton(
                     text=f"⚔️ جنگ‌های فعال ({active_wars})",
                     callback_data=f"nm:wars:{nation_id}",
+                    style=ButtonStyle.DANGER,
                 ),
             ],
             [
                 InlineKeyboardButton(
                     text="⚔️ اعلام جنگ",
                     callback_data=f"nm:war_targets:{nation_id}",
+                    style=ButtonStyle.DANGER,
                 )
             ],
             [
                 InlineKeyboardButton(
                     text="📢 اطلاعیه",
                     callback_data=f"nm:announce:{nation_id}",
+                    style=ButtonStyle.PRIMARY,
                 ),
                 InlineKeyboardButton(
                     text="⚙️ تنظیمات ملت",
                     callback_data=f"nm:settings:{nation_id}",
+                    style=ButtonStyle.PRIMARY,
                 ),
             ],
             [
