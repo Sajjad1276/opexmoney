@@ -90,8 +90,22 @@ class AICompanion:
             )
         return self._client
 
+    def _candidate_models(self) -> list[str]:
+        """Return the configured model first, then known current fallbacks."""
+        candidates = [
+            settings.ai_model,
+            "gemini-3.1-flash-lite",
+            "gemini-3.5-flash-lite",
+            "gemini-3.5-flash",
+        ]
+        unique: list[str] = []
+        for model in candidates:
+            if model and model not in unique:
+                unique.append(model)
+        return unique
+
     async def health_check(self) -> bool:
-        """Verify that the configured Gemini key can access the configured model."""
+        """Verify the API key by making a real, tiny Gemini generation call."""
         if not settings.ai_enabled:
             logger.warning("health_check status=disabled reason=AI_ENABLED=false")
             return False
@@ -108,20 +122,42 @@ class AICompanion:
             logger.error("health_check status=failed reason=client_not_created")
             return False
 
-        try:
-            model = await client.aio.models.get(model=settings.ai_model)
-            model_name = getattr(model, "name", None) or settings.ai_model
-            logger.info(
-                "health_check status=success provider=gemini model=%s",
-                model_name,
-            )
-            return True
-        except Exception:
-            logger.exception(
-                "health_check status=failed provider=gemini model=%s",
-                settings.ai_model,
-            )
-            return False
+        for model_name in self._candidate_models():
+            try:
+                response = await client.aio.models.generate_content(
+                    model=model_name,
+                    contents="پاسخ فقط با کلمه «فعال» بده.",
+                    config=types.GenerateContentConfig(
+                        temperature=0,
+                        max_output_tokens=8,
+                    ),
+                )
+                if response.text:
+                    if model_name != settings.ai_model:
+                        logger.warning(
+                            "health_check fallback_model=%s configured_model=%s",
+                            model_name,
+                            settings.ai_model,
+                        )
+                    else:
+                        logger.info(
+                            "health_check status=success provider=gemini model=%s",
+                            model_name,
+                        )
+                    return True
+            except Exception as exc:
+                logger.warning(
+                    "health_check model_failed model=%s error_type=%s",
+                    model_name,
+                    type(exc).__name__,
+                )
+                continue
+
+        logger.error(
+            "health_check status=failed provider=gemini models=%s",
+            ",".join(self._candidate_models()),
+        )
+        return False
 
     async def reply(
         self,
@@ -178,10 +214,44 @@ class AICompanion:
                 user_message=clean_message,
             )
 
-            response = await client.aio.models.generate_content(
-                model=settings.ai_model,
-                contents=prompt,
-                config=types.GenerateContentConfig(
+            last_error: Exception | None = None
+            response = None
+            used_model = settings.ai_model
+            for model_name in self._candidate_models():
+                try:
+                    response = await client.aio.models.generate_content(
+                        model=model_name,
+                        contents=prompt,
+                        config=types.GenerateContentConfig(
+                            system_instruction=SYSTEM_PERSONALITY,
+                            temperature=0.7,
+                            max_output_tokens=300,
+                        ),
+                    )
+                    used_model = model_name
+                    if model_name != settings.ai_model:
+                        logger.warning(
+                            "call user_id=%s model_fallback from=%s to=%s",
+                            user_id,
+                            settings.ai_model,
+                            model_name,
+                        )
+                    break
+                except Exception as exc:
+                    last_error = exc
+                    logger.warning(
+                        "call user_id=%s model_failed model=%s error_type=%s",
+                        user_id,
+                        model_name,
+                        type(exc).__name__,
+                    )
+
+            if response is None:
+                if last_error is not None:
+                    raise last_error
+                raise RuntimeError("No Gemini model produced a response")
+
+                            config=types.GenerateContentConfig(
                     system_instruction=SYSTEM_PERSONALITY,
                     temperature=0.7,
                     max_output_tokens=300,
@@ -196,7 +266,7 @@ class AICompanion:
             logger.info(
                 "call user_id=%s status=success provider=gemini model=%s latency_ms=%.1f",
                 user_id,
-                settings.ai_model,
+                used_model,
                 (time.perf_counter() - started) * 1000,
             )
             return parsed.reply
