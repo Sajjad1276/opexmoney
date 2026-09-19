@@ -445,6 +445,7 @@ async def start(message: Message, state: FSMContext) -> None:
 
 
 async def _begin_registration(message: Message, state: FSMContext) -> None:
+    await message.answer("\u2060", reply_markup=ReplyKeyboardRemove())
     async with async_session() as session:
         async with session.begin():
             registered = await is_fully_registered(session, message.from_user.id)
