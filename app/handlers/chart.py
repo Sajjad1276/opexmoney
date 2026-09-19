@@ -6,15 +6,17 @@ import logging
 from aiogram import F, Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import (
+    BufferedInputFile,
     CallbackQuery,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
+    InputMediaPhoto,
 )
 
 from app.database.session import async_session
 from app.services.chart_service import WINDOWS, get_chart_data
-from app.utils.ascii_chart import draw_ascii_chart
 from app.utils.formatting import fmt_amount, to_fa
+from app.utils.price_chart import render_price_chart
 
 
 router = Router(name="chart")
@@ -39,16 +41,17 @@ def chart_keyboard(
             )
         )
 
-    rows = [
-        window_row,
-        [
-            InlineKeyboardButton(
-                text="↩️ بازگشت به بازار",
-                callback_data="back_to_market",
-            )
-        ],
-    ]
-    return InlineKeyboardMarkup(inline_keyboard=rows)
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            window_row,
+            [
+                InlineKeyboardButton(
+                    text="↩️ بازگشت به بازار",
+                    callback_data="back_to_market",
+                )
+            ],
+        ]
+    )
 
 
 def _format_change(change_pct) -> str:
@@ -67,15 +70,15 @@ def _window_label(window_hours: int) -> str:
     return f"{to_fa(window_hours)} ساعت"
 
 
-def build_chart_msg(data: dict, ascii_art: str) -> str:
+def build_chart_caption(data: dict) -> str:
     currency_code = html.escape(str(data["currency_code"]))
 
     if not data["enough_data"]:
         return (
-            f"\u200f📈 <b>نمودار {currency_code}</b>\n"
-            "\u200f━━━━━━━━━━━━━━━━━━\n"
-            "\u200f⚠️ داده کافی برای نمودار وجود نداره.\n"
-            "\u200f(حداقل ۳ رکورد تاریخچه نرخ لازمه)"
+            f"📈 <b>نمودار {currency_code}</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "⚠️ داده کافی برای نمودار وجود نداره.\n"
+            "حداقل ۳ رکورد تاریخچه نرخ لازمه."
         )
 
     window_label = _window_label(int(data["window_hours"]))
@@ -84,15 +87,80 @@ def build_chart_msg(data: dict, ascii_art: str) -> str:
     current_rate = to_fa(fmt_amount(data["current_rate"]))
 
     return (
-        f"\u200f📈 <b>نمودار {currency_code} — {window_label}</b>\n"
-        "\u200f━━━━━━━━━━━━━━━━━━\n"
-        f"<pre>{ascii_art}</pre>\n"
-        "\u200f━━━━━━━━━━━━━━━━━━\n"
-        "\u200f📊 <b>خلاصه:</b>\n"
-        f"\u200f   بالاترین: <code>{max_rate}</code> ΩXR\n"
-        f"\u200f   پایین‌ترین: <code>{min_rate}</code> ΩXR\n"
-        f"\u200f   الان: <code>{current_rate}</code> ΩXR\n"
-        f"\u200f   تغییر: {data['rate_emoji']} {_format_change(data['change_pct'])}"
+        f"📈 <b>{currency_code} · {window_label}</b>\n"
+        f"بیشترین <code>{max_rate}</code> ΩXR  ·  "
+        f"کمترین <code>{min_rate}</code> ΩXR\n"
+        f"الان <code>{current_rate}</code> ΩXR  ·  "
+        f"{data['rate_emoji']} <b>{_format_change(data['change_pct'])}</b>"
+    )
+
+
+def _build_photo(chart_data: dict) -> BufferedInputFile:
+    image = render_price_chart(
+        [float(rate) for rate in chart_data["rates"]],
+    )
+    return BufferedInputFile(
+        image.getvalue(),
+        filename="opex-market-chart.png",
+    )
+
+
+async def _send_chart_message(
+    callback: CallbackQuery,
+    chart_data: dict,
+    nation_id: int,
+    window: str,
+) -> None:
+    if callback.message is None:
+        await callback.answer()
+        return
+
+    caption = build_chart_caption(chart_data)
+
+    if not chart_data["enough_data"]:
+        await callback.message.answer(
+            caption,
+            reply_markup=chart_keyboard(nation_id, window),
+            parse_mode="HTML",
+        )
+        return
+
+    await callback.message.answer_photo(
+        photo=_build_photo(chart_data),
+        caption=caption,
+        reply_markup=chart_keyboard(nation_id, window),
+        parse_mode="HTML",
+    )
+
+
+async def _edit_chart_message(
+    callback: CallbackQuery,
+    chart_data: dict,
+    nation_id: int,
+    window: str,
+) -> None:
+    if callback.message is None:
+        await callback.answer()
+        return
+
+    caption = build_chart_caption(chart_data)
+
+    if not chart_data["enough_data"]:
+        await callback.message.edit_text(
+            caption,
+            reply_markup=chart_keyboard(nation_id, window),
+            parse_mode="HTML",
+        )
+        return
+
+    media = InputMediaPhoto(
+        media=_build_photo(chart_data),
+        caption=caption,
+        parse_mode="HTML",
+    )
+    await callback.message.edit_media(
+        media=media,
+        reply_markup=chart_keyboard(nation_id, window),
     )
 
 
@@ -111,21 +179,11 @@ async def show_chart(callback: CallbackQuery) -> None:
             async with session.begin():
                 chart_data = await get_chart_data(session, nation_id, window)
 
-        ascii_art = ""
-        if chart_data["enough_data"]:
-            ascii_art = draw_ascii_chart(
-                [float(rate) for rate in chart_data["rates"]],
-                age_label="-72h",
-            )
-
-        if callback.message is None:
-            await callback.answer()
-            return
-
-        await callback.message.answer(
-            build_chart_msg(chart_data, ascii_art),
-            reply_markup=chart_keyboard(nation_id, window),
-            parse_mode="HTML",
+        await _send_chart_message(
+            callback,
+            chart_data,
+            nation_id,
+            window,
         )
         await callback.answer()
     except (TypeError, ValueError) as exc:
@@ -154,34 +212,19 @@ async def switch_chart_window(callback: CallbackQuery) -> None:
         nation_id = int(parts[1])
         window = parts[2]
         if window not in WINDOWS:
-            await callback.answer("نامعتبر", show_alert=True)
+            await callback.answer("⚠️ بازه نمودار نامعتبر است.", show_alert=True)
             return
 
         async with async_session() as session:
             async with session.begin():
                 chart_data = await get_chart_data(session, nation_id, window)
 
-        ascii_art = ""
-        if chart_data["enough_data"]:
-            age_label = "-72h"
-            if window == "24h":
-                age_label = "-24h"
-            elif window == "7d":
-                age_label = "-7d"
-            ascii_art = draw_ascii_chart(
-                [float(rate) for rate in chart_data["rates"]],
-                age_label=age_label,
-            )
-
-        if callback.message is None:
-            await callback.answer()
-            return
-
         try:
-            await callback.message.edit_text(
-                build_chart_msg(chart_data, ascii_art),
-                reply_markup=chart_keyboard(nation_id, window),
-                parse_mode="HTML",
+            await _edit_chart_message(
+                callback,
+                chart_data,
+                nation_id,
+                window,
             )
             await callback.answer()
         except TelegramBadRequest as exc:
@@ -214,7 +257,10 @@ async def back_to_market(callback: CallbackQuery) -> None:
             "Failed to delete chart message for user %s",
             callback.from_user.id,
         )
-        await callback.answer("⚠️ بازگشت به بازار انجام نشد.", show_alert=True)
+        await callback.answer(
+            "⚠️ بازگشت به بازار انجام نشد.",
+            show_alert=True,
+        )
 
 
 router.callback_query.register(
