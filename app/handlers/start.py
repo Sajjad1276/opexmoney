@@ -211,14 +211,34 @@ USERNAME_CAPTION = """💹 <b>اسم معامله‌گرت رو انتخاب ک�
 · فارسی، انگلیسی، عدد و خط تیره مجاز؛ فاصله و علامت دیگر مجاز نیست"""
 
 def nation_list_text(user, trader_name: str, nations: list[Nation]) -> str:
-    lines = [f"✅ <b>«{html.escape(trader_name)}»</b> ثبت شد.", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", f"{user_mention(user)}، حالا باید به یه ملت بپیوندی.", "", "ارز اون ملت، پول اصلی حسابت میشه.", "هر معامله‌ات مستقیم روی نرخ اون ارز اثر میذاره.", "", "<b>🌍 ملت‌های فعال:</b>", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"]
+    lines = [
+        f"✅ <b>«{html.escape(trader_name)}»</b> ثبت شد.",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        f"{user_mention(user)}، حالا باید به یه ملت بپیوندی.",
+        "",
+        "ارز اون ملت، پول اصلی حسابت میشه.",
+        "هر معامله‌ات مستقیم روی نرخ اون ارز اثر میذاره.",
+        "",
+        "<b>🌍 ملت‌های فعال:</b>",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+    ]
     for index, nation in enumerate(nations, start=1):
-        mention_user = display_user or message.from_user
-    change = get_rate_change(nation)
-        lines.extend([f"{html.escape(nation.flag_emoji or '🏴')} <b>{html.escape(nation.name)} · {html.escape(nation.currency_code)}</b>", f"{get_rate_emoji(change)} <b>{fmt_rate(nation.exchange_rate)} ΩXR</b> · <i>{fmt_pct(change)} امروز</i>", f"👥 {to_fa(nation.active_members_24h)} عضو · 🏆 رتبه #{to_fa(nation.nation_rank or 0)}"])
+        change = get_rate_change(nation)
+        lines.extend(
+            [
+                f"{html.escape(nation.flag_emoji or '🏴')} <b>{html.escape(nation.name)} · {html.escape(nation.currency_code)}</b>",
+                f"{get_rate_emoji(change)} <b>{fmt_rate(nation.exchange_rate)} ΩXR</b> · <i>{fmt_pct(change)} امروز</i>",
+                f"👥 {to_fa(nation.active_members_24h)} عضو · 🏆 رتبه #{to_fa(nation.nation_rank or 0)}",
+            ]
+        )
         if index != len(nations):
             lines.append("─────────────────")
-    lines.extend(["━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", "نرخ‌ها هر 15 دقیقه آپدیت میشن."])
+    lines.extend(
+        [
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            "نرخ‌ها هر 15 دقیقه آپدیت میشن.",
+        ]
+    )
     return "\n".join(lines)
 
 
