@@ -61,6 +61,7 @@ jobs:
           import json
           import os
           import urllib.request
+          from urllib.parse import quote
 
           from app.diagnostics.flow_health import run_flow_health_test
 
@@ -71,21 +72,43 @@ jobs:
               "warnings": report.warnings,
               "metrics": report.metrics,
           }
-          payload = json.dumps({
-              "title": f"OPEX CI flow-health diagnostics run {os.environ.get('GITHUB_RUN_ID')}",
-              "body": "```json\n" + json.dumps(body, ensure_ascii=False, indent=2) + "\n```"
-          }).encode("utf-8")
-          request = urllib.request.Request(
-              "https://api.github.com/repos/Sajjad1276/opexmoney/issues",
-              data=payload,
-              headers={
-                  "Authorization": f"Bearer {os.environ['GITHUB_TOKEN']}",
-                  "Accept": "application/vnd.github+json",
-                  "X-GitHub-Api-Version": "2022-11-28",
-                  "Content-Type": "application/json",
-              },
-              method="POST",
-          )
+          title = "OPEX CI flow-health diagnostics"
+          body_text = "```json\n" + json.dumps(body, ensure_ascii=False, indent=2) + "\n```"
+          headers = {
+              "Authorization": f"Bearer {os.environ['GITHUB_TOKEN']}",
+              "Accept": "application/vnd.github+json",
+              "X-GitHub-Api-Version": "2022-11-28",
+              "Content-Type": "application/json",
+          }
+          query = quote(f'repo:Sajjad1276/opexmoney is:issue is:open in:title "{title}"')
+          with urllib.request.urlopen(
+              urllib.request.Request(
+                  f"https://api.github.com/search/issues?q={query}",
+                  headers=headers,
+                  method="GET",
+              ),
+              timeout=15,
+          ) as response:
+              matches = json.loads(response.read().decode("utf-8")).get("items", [])
+
+          if matches:
+              issue_number = matches[0]["number"]
+              payload = json.dumps({"body": body_text}).encode("utf-8")
+              request = urllib.request.Request(
+                  f"https://api.github.com/repos/Sajjad1276/opexmoney/issues/{issue_number}",
+                  data=payload,
+                  headers=headers,
+                  method="PATCH",
+              )
+          else:
+              payload = json.dumps({"title": title, "body": body_text}).encode("utf-8")
+              request = urllib.request.Request(
+                  "https://api.github.com/repos/Sajjad1276/opexmoney/issues",
+                  data=payload,
+                  headers=headers,
+                  method="POST",
+              )
+
           with urllib.request.urlopen(request, timeout=15) as response:
               print(response.read().decode("utf-8"))
           PY
@@ -111,29 +134,52 @@ jobs:
         run: |
           set +e
           pytest -q tests/test_onboarding_flow.py -vv --tb=long > onboarding_failure.txt 2>&1
-          STATUS=$?
           python - <<'PY'
           import json
           import os
           import urllib.request
+          from urllib.parse import quote
 
           with open('onboarding_failure.txt', encoding='utf-8') as handle:
               output = handle.read()
-          payload = json.dumps({
-              'title': f"OPEX CI onboarding diagnostics run {os.environ.get('GITHUB_RUN_ID')}",
-              'body': '```text\n' + output[-12000:] + '\n```'
-          }).encode('utf-8')
-          request = urllib.request.Request(
-              'https://api.github.com/repos/Sajjad1276/opexmoney/issues',
-              data=payload,
-              headers={
-                  'Authorization': f"Bearer {os.environ['GITHUB_TOKEN']}",
-                  'Accept': 'application/vnd.github+json',
-                  'X-GitHub-Api-Version': '2022-11-28',
-                  'Content-Type': 'application/json',
-              },
-              method='POST',
-          )
+
+          title = "OPEX CI onboarding diagnostics"
+          body_text = "```text\n" + output[-12000:] + "\n```"
+          headers = {
+              'Authorization': f"Bearer {os.environ['GITHUB_TOKEN']}",
+              'Accept': 'application/vnd.github+json',
+              'X-GitHub-Api-Version': '2022-11-28',
+              'Content-Type': 'application/json',
+          }
+          query = quote(f'repo:Sajjad1276/opexmoney is:issue is:open in:title "{title}"')
+          with urllib.request.urlopen(
+              urllib.request.Request(
+                  f'https://api.github.com/search/issues?q={query}',
+                  headers=headers,
+                  method='GET',
+              ),
+              timeout=15,
+          ) as response:
+              matches = json.loads(response.read().decode('utf-8')).get('items', [])
+
+          if matches:
+              issue_number = matches[0]['number']
+              payload = json.dumps({'body': body_text}).encode('utf-8')
+              request = urllib.request.Request(
+                  f"https://api.github.com/repos/Sajjad1276/opexmoney/issues/{issue_number}",
+                  data=payload,
+                  headers=headers,
+                  method='PATCH',
+              )
+          else:
+              payload = json.dumps({'title': title, 'body': body_text}).encode('utf-8')
+              request = urllib.request.Request(
+                  'https://api.github.com/repos/Sajjad1276/opexmoney/issues',
+                  data=payload,
+                  headers=headers,
+                  method='POST',
+              )
+
           with urllib.request.urlopen(request, timeout=15) as response:
               print(response.read().decode('utf-8'))
           PY
