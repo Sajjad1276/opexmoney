@@ -299,6 +299,13 @@ async def main() -> None:
     dp.include_router(sections_router)
     dp.include_router(ai_router)
 
+    ai_ok = await companion.health_check()
+    if not ai_ok:
+        logger.error(
+            "AI|Gemini health check failed; private-chat AI will use fallback "
+            "until the API configuration is fixed"
+        )
+
     scheduler = build_scheduler(bot)
     smoke_ok = await run_startup_smoke_test(dp, scheduler)
     if not smoke_ok:
