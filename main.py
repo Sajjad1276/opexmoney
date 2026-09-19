@@ -22,6 +22,11 @@ from app.handlers.founder import founder_router
 from app.handlers.governance import governance_router
 from app.handlers.market import router as market_router
 from app.handlers.nation import nation_router
+from app.handlers.nation_management import (
+    expire_join_requests,
+    nation_management_router,
+    send_weekly_nation_reports,
+)
 from app.handlers.onboarding_fix import router as onboarding_fix_router
 from app.handlers.sections import router as sections_router
 from app.handlers.start import router as start_router
@@ -127,6 +132,23 @@ async def run_governance_job(bot: Bot) -> None:
         logger.exception("Governance cycle failed")
 
 
+
+async def run_nation_join_expiration(bot: Bot) -> None:
+    try:
+        expired = await expire_join_requests(bot)
+        logger.info("Nation join-request expiration completed | expired=%s", expired)
+    except Exception:
+        logger.exception("Nation join-request expiration failed")
+
+
+async def run_weekly_nation_reports(bot: Bot) -> None:
+    try:
+        sent = await send_weekly_nation_reports(bot)
+        logger.info("Weekly nation AI reports completed | sent=%s", sent)
+    except Exception:
+        logger.exception("Weekly nation AI reports failed")
+
+
 def build_scheduler(bot: Bot) -> AsyncIOScheduler:
     scheduler = AsyncIOScheduler()
     scheduler.add_job(
@@ -158,6 +180,29 @@ def build_scheduler(bot: Bot) -> AsyncIOScheduler:
         run_daily_reset,
         CronTrigger(hour=0, minute=0),
         id="daily_market_reset",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+    scheduler.add_job(
+        run_nation_join_expiration,
+        CronTrigger(minute="*/15"),
+        args=[bot],
+        id="nation_join_request_expiration",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+    scheduler.add_job(
+        run_weekly_nation_reports,
+        CronTrigger(
+            day_of_week="mon",
+            hour=9,
+            minute=0,
+            timezone=settings.temporal_timezone,
+        ),
+        args=[bot],
+        id="nation_weekly_ai_report",
         replace_existing=True,
         max_instances=1,
         coalesce=True,
@@ -203,6 +248,7 @@ async def main() -> None:
     dp.include_router(start_router)
     dp.include_router(market_router)
     dp.include_router(founder_router)
+    dp.include_router(nation_management_router)
     dp.include_router(nation_router)
     dp.include_router(governance_router)
     dp.include_router(sections_router)
