@@ -14,6 +14,7 @@ from sqlalchemy import (
     Integer,
     Numeric,
     String,
+    Text,
     UniqueConstraint,
     func,
     text,
@@ -469,3 +470,58 @@ class TreasuryLog(Base):
         default=lambda: datetime.utcnow(), nullable=False
     )
 
+
+
+class Lesson(Base):
+    __tablename__ = "lessons"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    module_id: Mapped[int] = mapped_column(nullable=False)
+    order: Mapped[int] = mapped_column(nullable=False)
+    level: Mapped[str] = mapped_column(String(10), nullable=False)
+    title_fa: Mapped[str] = mapped_column(String(100), nullable=False)
+    content_fa: Mapped[str] = mapped_column(String(4000), nullable=False)
+    quiz_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    xp_reward: Mapped[int] = mapped_column(nullable=False, default=10)
+    xr_reward: Mapped[Decimal] = mapped_column(
+        Numeric(10, 2), nullable=False, default=Decimal("0")
+    )
+    is_active: Mapped[bool] = mapped_column(nullable=False, default=True)
+
+    __table_args__ = (
+        UniqueConstraint("module_id", "order", name="uq_lesson_module_order"),
+    )
+
+
+class UserLessonProgress(Base):
+    __tablename__ = "user_lesson_progress"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False
+    )
+    lesson_id: Mapped[int] = mapped_column(
+        ForeignKey("lessons.id", ondelete="CASCADE"), nullable=False
+    )
+    status: Mapped[str] = mapped_column(
+        String(10), nullable=False, default="locked"
+    )
+    quiz_score: Mapped[int | None] = mapped_column(nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    ai_questions_count: Mapped[int] = mapped_column(nullable=False, default=0)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "lesson_id", name="uq_user_lesson"),
+    )
+
+
+class UserXP(Base):
+    __tablename__ = "user_xp"
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.user_id", ondelete="CASCADE"), primary_key=True
+    )
+    total_xp: Mapped[int] = mapped_column(nullable=False, default=0)
+    level: Mapped[str] = mapped_column(
+        String(10), nullable=False, default="beginner"
+    )
+    last_updated: Mapped[datetime] = mapped_column(
+        nullable=False, default=lambda: datetime.utcnow()
+    )
