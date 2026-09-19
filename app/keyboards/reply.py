@@ -17,6 +17,10 @@ def main_menu_keyboard() -> ReplyKeyboardMarkup:
                 KeyboardButton(text="🎓 آکادمی"),
             ],
             [
+                KeyboardButton(text="🏦 خزانه"),
+                KeyboardButton(text="📜 قوانین"),
+            ],
+            [
                 KeyboardButton(text="⚙️ تنظیمات"),
             ],
         ],
