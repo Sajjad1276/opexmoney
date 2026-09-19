@@ -98,6 +98,9 @@ jobs:
       - name: Health contract - reply keyboard
         run: pytest -q tests/test_flow_health.py -k "main_reply_keyboard or required_main_menu_sections"
 
+      - name: Identity sequence journey
+        run: pytest -q tests/test_identity_sequences.py
+
       - name: Onboarding journey
         run: pytest -q tests/test_onboarding_flow.py
 
