@@ -11,9 +11,12 @@ import logging.handlers
 import time
 from pathlib import Path
 
+from aiogram import F, Router
+from aiogram.types import Message
 from openai import AsyncOpenAI
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.database.session import async_session
 from ai.cache import (
     close_cache,
     get_cached_response,
@@ -148,9 +151,34 @@ async def remember_bot_reply(user_id: int, message: str) -> None:
     await remember_bot_message(user_id, message)
 
 
+
+ai_router = Router(name="ai_companion")
+
+
+@ai_router.message(F.text)
+async def ai_companion_message(message: Message) -> None:
+    """Answer unmatched private chat text with the AI companion."""
+    if message.chat.type != "private":
+        return
+
+    text = (message.text or "").strip()
+    if not text or text.startswith("/"):
+        return
+
+    async with async_session() as db:
+        reply = await get_ai_reply(message.from_user.id, text, db)
+
+    sent = await message.answer(reply)
+    await remember_bot_reply(
+        message.from_user.id,
+        sent.html_text if getattr(sent, "html_text", None) else reply,
+    )
+
+
 __all__ = [
     "AICompanion",
     "companion",
+    "ai_router",
     "get_ai_reply",
     "remember_bot_reply",
 ]
