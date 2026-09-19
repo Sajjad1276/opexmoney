@@ -13,6 +13,7 @@ from aiogram.types import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     Message,
+    ReplyKeyboardRemove,
 )
 
 from app.database.models import Mission, UserMissionProgress
@@ -172,6 +173,7 @@ async def show_missions(message: Message) -> None:
         await message.answer(MISSIONS_ERROR, parse_mode=ParseMode.HTML)
         return
 
+    await message.answer("⁠", reply_markup=ReplyKeyboardRemove())
     await message.answer(
         text,
         reply_markup=markup,
