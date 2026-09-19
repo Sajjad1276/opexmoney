@@ -148,7 +148,7 @@ async def render_market(message: Message, edit_call=None):
     if edit_call:
         await safe_edit(edit_call, text, market_keyboard())
     else:
-        await message.answer(" ", reply_markup=ReplyKeyboardRemove())
+        await message.answer("\u2060", reply_markup=ReplyKeyboardRemove())
         await message.answer(
             text,
             reply_markup=market_keyboard(),
