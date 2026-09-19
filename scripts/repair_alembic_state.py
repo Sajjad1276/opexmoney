@@ -13,6 +13,7 @@ REVISION_CHAIN = [
     "0004_onboarding_username_length",
     "0005_nation_management",
     "0006_bigint_history_identities",
+    "0007_seed_starter_nations",
 ]
 
 BASE_TABLES = {
@@ -231,6 +232,13 @@ async def ensure_version_tracking(
         return
 
     current = rows[0]["version_num"]
+    if current == "0007_seed_starter_nations":
+        print(
+            "REPAIR|tracking already aligned|version=0007_seed_starter_nations",
+            flush=True,
+        )
+        return
+
     if current not in REVISION_CHAIN:
         raise RuntimeError(
             f"unknown alembic revision in production: {current}"
