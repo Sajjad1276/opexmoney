@@ -28,6 +28,7 @@ from app.database.models import (
     User,
 )
 from app.database.session import async_session
+from app.services.user_service import sync_user_balance
 
 logger = logging.getLogger(__name__)
 
@@ -577,6 +578,7 @@ async def _join_user(
                     )
                 else:
                     user.balance = holding.amount
+                await sync_user_balance(session, user_id)
                 member = NationMember(
                     nation_id=nation_id,
                     user_id=user_id,
@@ -1516,6 +1518,7 @@ async def approve_join_request(call: CallbackQuery, bot: Bot) -> None:
                     )
                     session.add(holding)
                 user.balance = holding.amount
+                await sync_user_balance(session, user_id)
 
                 session.add(
                     NationMember(
