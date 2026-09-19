@@ -251,13 +251,6 @@ class AICompanion:
                     raise last_error
                 raise RuntimeError("No Gemini model produced a response")
 
-                            config=types.GenerateContentConfig(
-                    system_instruction=SYSTEM_PERSONALITY,
-                    temperature=0.7,
-                    max_output_tokens=300,
-                ),
-            )
-
             raw_output = response.text or ""
             parsed = parse_ai_response(raw_output)
 
