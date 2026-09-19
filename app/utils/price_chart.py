@@ -207,6 +207,17 @@ def _draw_gradient(
         )
 
 
+def _format_chart_price(value: float) -> str:
+    absolute = abs(value)
+    if absolute >= 1000:
+        return f"{value:,.0f}"
+    if absolute >= 100:
+        return f"{value:,.2f}"
+    if absolute >= 1:
+        return f"{value:,.3f}"
+    return f"{value:,.4f}"
+
+
 def _render_currency_chart(
     *,
     currency_code: str,
@@ -242,20 +253,16 @@ def _render_currency_chart(
             values.append(current)
             timestamps = [*timestamps, datetime.utcnow()]
 
-    line_color = (
-        "#16A34A"
-        if values[-1] >= values[0]
-        else "#DC2626"
-    )
-    trend_icon = "▲" if values[-1] >= values[0] else "▼"
-    trend_word = "رشد" if values[-1] >= values[0] else "افت"
+    chart_values = np.asarray(values, dtype=float)
+    x = np.arange(chart_values.size, dtype=float)
 
-    change_pct = _safe_percentage(
-        values[0],
-        values[-1],
-    )
+    start_value = float(chart_values[0])
+    end_value = float(chart_values[-1])
+    change_pct = _safe_percentage(start_value, end_value)
 
-    risk_label, risk_icon, risk_color = classify_risk(values)
+    is_up = change_pct >= 0
+    trend_color = "#18B96A" if is_up else "#E34B4B"
+    trend_fill = "#8DE0B5" if is_up else "#F2A8A8"
 
     insight = build_smart_insight(
         market_status=market_status,
@@ -265,54 +272,193 @@ def _render_currency_chart(
         three_day_downtrend=three_day_downtrend,
     )
 
-    chart_values = np.asarray(values, dtype=float)
-    x = np.arange(len(chart_values), dtype=float)
-
     minimum = float(np.min(chart_values))
     maximum = float(np.max(chart_values))
+    span = maximum - minimum
 
-    if math.isclose(minimum, maximum):
+    if math.isclose(span, 0.0):
         padding = max(abs(maximum) * 0.04, 0.01)
     else:
-        padding = (maximum - minimum) * 0.12
+        padding = span * 0.12
 
     y_min = minimum - padding
     y_max = maximum + padding
+    baseline = y_min
 
     fig = plt.figure(
         figsize=(800 / 150, 450 / 150),
         dpi=150,
-        facecolor="#EEF1F4",
+        facecolor="#E9EEF2",
     )
 
-    card = FancyBboxPatch(
-        (0.02, 0.025),
-        0.96,
-        0.95,
+    # Soft card shadow and clean white surface.
+    shadow = FancyBboxPatch(
+        (0.035, 0.045),
+        0.93,
+        0.89,
         transform=fig.transFigure,
-        boxstyle="round,pad=0.008,rounding_size=0.03",
-        facecolor="#FFFFFF",
+        boxstyle="round,pad=0.012,rounding_size=0.045",
+        facecolor="#A8B2BC",
         edgecolor="none",
-        linewidth=0,
+        alpha=0.18,
         zorder=0,
+    )
+    fig.patches.append(shadow)
+
+    card = FancyBboxPatch(
+        (0.025, 0.055),
+        0.95,
+        0.89,
+        transform=fig.transFigure,
+        boxstyle="round,pad=0.012,rounding_size=0.045",
+        facecolor="#FFFFFF",
+        edgecolor="#D9DEE4",
+        linewidth=0.9,
+        zorder=1,
     )
     fig.patches.append(card)
 
+    # Identity badge, like the reference design.
+    identity_badge = FancyBboxPatch(
+        (0.075, 0.842),
+        0.135,
+        0.065,
+        transform=fig.transFigure,
+        boxstyle="round,pad=0.006,rounding_size=0.025",
+        facecolor="#EEF1F4",
+        edgecolor="#DEE3E8",
+        linewidth=0.6,
+        zorder=2,
+    )
+    fig.patches.append(identity_badge)
+
+    fig.text(
+        0.1425,
+        0.874,
+        _fa_text(str(currency_code)),
+        ha="center",
+        va="center",
+        fontproperties=_FONT_BOLD,
+        fontsize=9.5,
+        color="#6B7280",
+        zorder=3,
+    )
+
+    window_label = _WINDOW_LABELS[window]
+    fig.text(
+        0.078,
+        0.806,
+        _fa_text(window_label),
+        ha="left",
+        va="center",
+        fontproperties=_FONT_NORMAL,
+        fontsize=8.5,
+        color="#A1A8B0",
+        zorder=3,
+    )
+
+    # Header, deliberately emoji-free. The Telegram UI still owns the actual flag.
+    title = _fa_text(str(nation_name))
+    fig.text(
+        0.91,
+        0.882,
+        title,
+        ha="right",
+        va="center",
+        fontproperties=_FONT_BOLD,
+        fontsize=12.5,
+        color="#111827",
+        zorder=3,
+    )
+
+    fig.text(
+        0.91,
+        0.845,
+        _fa_text(f"{currency_code}/{base_currency}"),
+        ha="right",
+        va="center",
+        fontproperties=_FONT_NORMAL,
+        fontsize=8.5,
+        color="#9AA1A9",
+        zorder=3,
+    )
+
+    # Large headline price.
+    price_value = _format_chart_price(end_value)
+    fig.text(
+        0.91,
+        0.778,
+        price_value,
+        ha="right",
+        va="center",
+        fontsize=26,
+        fontweight="bold",
+        color="#0B0F14",
+        zorder=3,
+    )
+
+    fig.text(
+        0.91,
+        0.728,
+        _fa_text(base_currency),
+        ha="right",
+        va="center",
+        fontproperties=_FONT_NORMAL,
+        fontsize=10,
+        color="#9AA1A9",
+        zorder=3,
+    )
+
+    # Change pill.
+    change_badge_width = 0.19
+    change_badge_x = 0.72
+    change_badge_y = 0.675
+    change_badge = FancyBboxPatch(
+        (change_badge_x, change_badge_y),
+        change_badge_width,
+        0.058,
+        transform=fig.transFigure,
+        boxstyle="round,pad=0.006,rounding_size=0.025",
+        facecolor=trend_color,
+        edgecolor="none",
+        alpha=0.10,
+        zorder=2,
+    )
+    fig.patches.append(change_badge)
+
+    arrow = "▲" if is_up else "▼"
+    sign = "+" if change_pct >= 0 else "-"
+    change_text = f"{arrow} {sign}{abs(change_pct):.2f}%"
+    fig.text(
+        change_badge_x + change_badge_width / 2,
+        change_badge_y + 0.029,
+        change_text,
+        ha="center",
+        va="center",
+        fontsize=10.5,
+        fontweight="bold",
+        color=trend_color,
+        zorder=3,
+    )
+
+    # Main chart panel.
     ax = fig.add_axes(
-        [0.095, 0.205, 0.84, 0.43],
+        [0.10, 0.185, 0.82, 0.43],
         facecolor="#FFFFFF",
+        zorder=2,
     )
     ax.set_axisbelow(True)
 
     ticks = np.linspace(y_min, y_max, 5)
     ax.set_yticks(ticks)
     ax.set_yticklabels(
-        [_format_axis_value(float(value)) for value in ticks],
-        fontproperties=_FONT_NORMAL,
-        fontsize=8.5,
-        color="#9CA3AF",
+        [
+            _format_axis_value(float(value))
+            for value in ticks
+        ],
+        fontsize=7.4,
+        color="#B2B8BF",
     )
-
     ax.tick_params(
         axis="y",
         length=0,
@@ -325,32 +471,47 @@ def _render_currency_chart(
 
     ax.grid(
         axis="y",
-        color="#E5E7EB",
-        linewidth=0.7,
-        alpha=0.8,
+        color="#E5E8EB",
+        linewidth=0.75,
+        alpha=0.95,
     )
     ax.grid(
         axis="x",
         visible=False,
     )
 
-    _draw_gradient(
-        ax=ax,
-        x=x,
-        values=chart_values,
-        baseline=y_min,
-        color=line_color,
+    # The reference uses an unmistakable filled area, not a hairline sparkline.
+    ax.fill_between(
+        x,
+        baseline,
+        chart_values,
+        color=trend_fill,
+        alpha=0.24,
+        linewidth=0,
+        zorder=3,
+    )
+    ax.fill_between(
+        x,
+        baseline,
+        chart_values,
+        color=trend_color,
+        alpha=0.07,
+        linewidth=0,
+        zorder=4,
     )
 
     ax.plot(
         x,
         chart_values,
-        color=line_color,
-        linewidth=2.6,
+        color=trend_color,
+        linewidth=2.1,
         solid_capstyle="round",
         solid_joinstyle="round",
-        zorder=5,
+        zorder=6,
     )
+
+    ax.set_xlim(x[0], x[-1] if x.size > 1 else x[-1] + 1.0)
+    ax.set_ylim(y_min, y_max)
 
     last_x = x[-1]
     last_y = chart_values[-1]
@@ -358,154 +519,47 @@ def _render_currency_chart(
     ax.scatter(
         [last_x],
         [last_y],
-        s=130,
-        color=line_color,
-        alpha=0.12,
+        s=115,
+        color=trend_color,
+        alpha=0.13,
         linewidths=0,
-        zorder=6,
+        zorder=7,
     )
     ax.scatter(
         [last_x],
         [last_y],
-        s=48,
-        color=line_color,
+        s=42,
+        color=trend_color,
         edgecolors="#FFFFFF",
-        linewidths=2,
-        zorder=7,
+        linewidths=1.8,
+        zorder=8,
     )
 
-    ax.set_xlim(x[0], x[-1])
-    ax.set_ylim(y_min, y_max)
-
-    # Header badge.
-    badge = FancyBboxPatch(
-        (0.075, 0.87),
-        0.105,
-        0.052,
-        transform=fig.transFigure,
-        boxstyle="round,pad=0.007,rounding_size=0.016",
-        facecolor="#F3F4F6",
-        edgecolor="#E5E7EB",
-        linewidth=0.7,
-    )
-    fig.patches.append(badge)
-
+    # Footer: narrative insight + market pair.
     fig.text(
-        0.1275,
-        0.896,
-        window,
-        ha="center",
-        va="center",
-        fontsize=9,
-        fontweight="bold",
-        color="#374151",
-    )
-
-    # Risk badge.
-    risk_badge = FancyBboxPatch(
-        (0.075, 0.803),
-        0.22,
-        0.052,
-        transform=fig.transFigure,
-        boxstyle="round,pad=0.007,rounding_size=0.016",
-        facecolor=risk_color,
-        edgecolor="none",
-        linewidth=0,
-        alpha=0.10,
-    )
-    fig.patches.append(risk_badge)
-
-    # Matplotlib stays emoji-free: use a real colored patch for risk status.
-    risk_marker = Circle(
-        (0.092, 0.829),
-        0.008,
-        transform=fig.transFigure,
-        facecolor=risk_color,
-        edgecolor="none",
-        zorder=5,
-    )
-    fig.patches.append(risk_marker)
-
-    fig.text(
-        0.105,
-        0.829,
-        _fa_text(risk_label),
-        ha="left",
-        va="center",
-        fontproperties=_FONT_BOLD,
-        fontsize=8.5,
-        color=risk_color,
-    )
-
-    # Nation identity stays emoji-free in the chart. Telegram can still show the flag.
-    nation_title = _fa_text(
-        f"{nation_name} · {currency_code}".strip(" ·")
-    )
-    fig.text(
-        0.925,
-        0.897,
-        nation_title,
-        ha="right",
-        va="center",
-        fontproperties=_FONT_BOLD,
-        fontsize=10.5,
-        color="#111827",
-    )
-
-    # Current price.
-    price_text = (
-        f"{_format_price(values[-1])} {base_currency}"
-    )
-    fig.text(
-        0.925,
-        0.835,
-        price_text,
-        ha="right",
-        va="center",
-        fontsize=22,
-        fontweight="bold",
-        color="#111827",
-    )
-
-    change_text = (
-        f"{trend_icon} {_fa_digits(round(abs(change_pct), 2))}٪ "
-        f"{trend_word} در {_WINDOW_LABELS[window]} گذشته"
-    )
-    fig.text(
-        0.925,
-        0.777,
-        _fa_text(change_text),
-        ha="right",
-        va="center",
-        fontproperties=_FONT_NORMAL,
-        fontsize=9,
-        color=line_color,
-    )
-
-    # Footer insight.
-    fig.text(
-        0.095,
-        0.095,
+        0.10,
+        0.090,
         insight,
         ha="left",
         va="center",
         fontproperties=_FONT_NORMAL,
-        fontsize=9,
+        fontsize=8.8,
         color="#4B5563",
+        zorder=3,
     )
 
     fig.text(
-        0.925,
-        0.095,
+        0.91,
+        0.090,
         f"{currency_code}/{base_currency}",
         ha="right",
         va="center",
-        fontsize=8.5,
-        color="#9CA3AF",
+        fontsize=8.2,
+        color="#A1A8B0",
+        zorder=3,
     )
 
     output = BytesIO()
-
     fig.savefig(
         output,
         format="png",
