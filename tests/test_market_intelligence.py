@@ -14,7 +14,7 @@ from app.services.market_intelligence import (
 
 
 def test_format_change_text_rounds_and_marks_direction():
-    assert format_change_text(6.30) == "▼ ۶ درصد افت در ۲۴ ساعت گذشته"
+    assert format_change_text(6.30) == "▲ ۶ درصد رشد در ۲۴ ساعت گذشته"
     assert format_change_text(12.7) == "▲ ۱۳ درصد رشد در ۲۴ ساعت گذشته"
     assert format_change_text(0) == "➡️ بدون تغییر"
     assert format_change_text(-6.3, "7d") == "▼ ۶ درصد افت در ۷ روز گذشته"
