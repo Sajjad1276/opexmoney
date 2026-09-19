@@ -379,7 +379,7 @@ async def buy_currency(call, state):
         text = (
             f"📈 <b>خرید <code>{html.escape(nation.currency_code)}</code></b>\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            f"💹 نرخ: <code>۱ {html.escape(nation.currency_code)} = "
+            f"💹 نرخ: <code>1 {html.escape(nation.currency_code)} = "
             f"{fmt_rate(nation.exchange_rate)} ΩXR</code>\n"
             f"💰 موجودی: <b>{fmt_amount(user.xr_balance)} ΩXR</b>\n\n"
             "<b>چقدر ΩXR خرج می‌کنی؟</b>\n"
@@ -636,7 +636,7 @@ async def sell_currency(call, state):
     text = (
         f"📉 <b>فروش <code>{html.escape(nation.currency_code)}</code></b>\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
-        f"💹 نرخ: <code>۱ {html.escape(nation.currency_code)} = "
+        f"💹 نرخ: <code>1 {html.escape(nation.currency_code)} = "
         f"{fmt_rate(nation.exchange_rate)} ΩXR</code>\n"
         f"💰 موجودی: <b>{fmt_amount(holding.amount)} "
         f"{html.escape(nation.currency_code)}</b>\n\n"
@@ -736,7 +736,7 @@ async def make_sell_preview(
                 f"{html.escape(nation.currency_code)}</b>\n"
                 f"📥 دریافت:   <b>{fmt_amount(calc['receive'])} ΩXR</b>\n\n"
                 "─────────────────\n"
-                f"💹 نرخ: <code>۱ {html.escape(nation.currency_code)} = "
+                f"💹 نرخ: <code>1 {html.escape(nation.currency_code)} = "
                 f"{fmt_rate(nation.exchange_rate)} ΩXR</code>\n"
                 f"📋 کارمزد: <b>{fmt_amount(calc['fee'])} ΩXR</b> "
                 f"({_fmt_rule_percent(fee_rate)})\n"
