@@ -103,7 +103,7 @@ def _callback_handler_specs() -> list[tuple[str, str, Path]]:
         for node in ast.walk(tree):
             if not isinstance(node, ast.Call):
                 continue
-            if _dotted(node.func) != "router.callback_query":
+            if not _dotted(node.func).endswith(".callback_query"):
                 continue
             for filter_node in node.args:
                 if isinstance(filter_node, ast.Compare) and len(filter_node.ops) == 1:
@@ -180,7 +180,7 @@ def _state_mentions() -> set[str]:
     for path in _files(HANDLERS_DIR):
         text = _read(path)
         for state in _state_names():
-            if re.search(rf"\\b{re.escape(state)}\\b", text):
+            if re.search(rf"\b{re.escape(state)}\b", text):
                 mentions.add(state)
     return mentions
 
