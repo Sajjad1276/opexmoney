@@ -10,6 +10,7 @@ from aiogram.types import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     Message,
+    ReplyKeyboardRemove,
 )
 
 from app.database.session import async_session
@@ -114,6 +115,7 @@ async def show_ranking(message: Message, redis=None) -> None:
         )
         return
 
+    await message.answer("⁠", reply_markup=ReplyKeyboardRemove())
     await message.answer(
         text,
         reply_markup=ranking_keyboard("nations"),
