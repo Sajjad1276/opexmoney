@@ -209,6 +209,63 @@ async def _continue_group_onboarding(
         logger.warning("Could not announce group onboarding in %s", group_id)
 
 
+@founder_router.callback_query(
+    F.data == "founder_check_group",
+    StateFilter(FounderStates.WAITING_GROUP_ADMIN),
+)
+async def check_founder_group(
+    call: CallbackQuery,
+    state: FSMContext,
+    bot: Bot,
+    dispatcher: Dispatcher,
+) -> None:
+    """Re-check groups already observed by Telegram after the user taps Check."""
+    founder_user_id = call.from_user.id
+
+    async with async_session() as session:
+        async with session.begin():
+            groups = (
+                await session.execute(
+                    select(BotGroup)
+                    .where(BotGroup.is_active.is_(True))
+                    .order_by(BotGroup.updated_at.desc(), BotGroup.group_id.desc())
+                    .limit(20)
+                )
+            ).scalars().all()
+
+    for group in groups:
+        try:
+            bot_member = await bot.get_chat_member(group.group_id, bot.id)
+            founder_member = await bot.get_chat_member(group.group_id, founder_user_id)
+        except Exception:
+            continue
+
+        bot_status = getattr(bot_member.status, "value", bot_member.status)
+        founder_status = getattr(founder_member.status, "value", founder_member.status)
+
+        if bot_status not in {"administrator", "creator"}:
+            continue
+        if founder_status not in {"administrator", "creator"}:
+            continue
+
+        await _continue_group_onboarding(
+            bot=bot,
+            dispatcher=dispatcher,
+            founder_user_id=founder_user_id,
+            group_id=group.group_id,
+            group_title=group.title,
+            group_username=group.username,
+            group_type="supergroup",
+        )
+        await call.answer("✅ گروه پیدا شد و وضعیت ربات بررسی شد.")
+        return
+
+    await call.answer(
+        "⚠️ هنوز گروهی که ربات در آن ادمین باشد پیدا نشد. "
+        "اول ربات را ادمین کن، سپس دوباره «بررسی گروه» را بزن.",
+        show_alert=True,
+    )
+
 @founder_router.my_chat_member()
 async def bot_group_status_changed(
     event: ChatMemberUpdated,
