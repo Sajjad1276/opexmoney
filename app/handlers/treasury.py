@@ -107,20 +107,16 @@ def treasury_keyboard(
             ]
         )
 
-    rows.extend(
+    rows.append(
         [
-            [
-                InlineKeyboardButton(
-                    text="📋 گزارش کامل",
-                    callback_data=f"treasury:report:{nation_id}",
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text="↩️ بازگشت",
-                    callback_data=f"nm:panel:{nation_id}",
-                )
-            ],
+            InlineKeyboardButton(
+                text="📋 گزارش کامل",
+                callback_data=f"treasury:report:{nation_id}",
+            ),
+            InlineKeyboardButton(
+                text="↩️ بازگشت",
+                callback_data=f"nm:panel:{nation_id}",
+            ),
         ]
     )
     return InlineKeyboardMarkup(inline_keyboard=rows)
@@ -633,13 +629,27 @@ async def confirm_withdraw(
 
         await state.clear()
 
+        success_text = (
+            "✅ <b>برداشت موفق</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            f"{_amount_text(amount)} ΩXR از خزانه برداشت شد."
+        )
         if callback.message is not None:
-            await callback.message.edit_text(
-                "✅ <b>برداشت موفق</b>\n"
-                "━━━━━━━━━━━━━━━━━━\n"
-                f"{_amount_text(amount)} ΩXR از خزانه برداشت شد.",
-                parse_mode="HTML",
-            )
+            try:
+                await callback.message.edit_text(
+                    success_text,
+                    parse_mode="HTML",
+                )
+            except Exception:
+                logger.exception(
+                    "Could not edit withdrawal success message user=%s",
+                    callback.from_user.id,
+                )
+                await callback.message.answer(
+                    success_text,
+                    parse_mode="HTML",
+                )
+
             async with async_session() as session:
                 async with session.begin():
                     role = await get_member_role(
