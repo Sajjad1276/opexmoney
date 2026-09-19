@@ -168,7 +168,7 @@ async def remember_bot_reply(user_id: int, message: str) -> None:
     await remember_bot_message(user_id, message)
 
 
-ai_router = Router(name="ai_companion")
+ai_router = Router(name="ai")
 
 
 @ai_router.message(F.text)
