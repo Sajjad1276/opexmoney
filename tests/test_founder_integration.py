@@ -1,4 +1,5 @@
 from decimal import Decimal
+import secrets
 
 import pytest
 from sqlalchemy import delete, select
@@ -21,7 +22,7 @@ async def test_registration_requires_currency_holding():
 
     async with async_session() as session:
         async with session.begin():
-            nation = Nation(name="Origin", currency_code="ORG", group_id=-100910001)
+            nation = Nation(name="Origin", currency_code="ORG", group_id=-100910001, invite_code=secrets.token_urlsafe(8))
             session.add(nation)
             await session.flush()
             session.add(CurrencyHolding(user_id=910001, nation_id=nation.nation_id, amount=Decimal("500")))
@@ -41,7 +42,7 @@ async def test_nation_name_is_english_and_currency_is_generated_uniquely():
 
     async with async_session() as session:
         async with session.begin():
-            session.add(Nation(name="Origin Currency", currency_code="NEW", group_id=-100910010))
+            session.add(Nation(name="Origin Currency", currency_code="NEW", group_id=-100910010, invite_code=secrets.token_urlsafe(8)))
             await session.flush()
             code = await generate_unique_currency_code("New Empire", session)
             assert code != "NEW"
@@ -54,7 +55,7 @@ async def test_create_nation_is_atomic_and_initializes_founder():
     async with async_session() as session:
         async with session.begin():
             user = User(user_id=910002, username="testuser2")
-            origin = Nation(name="Origin2", currency_code="OR2", group_id=-100910002)
+            origin = Nation(name="Origin2", currency_code="OR2", group_id=-100910002, invite_code=secrets.token_urlsafe(8))
             session.add_all([user, origin])
             await session.flush()
             session.add(CurrencyHolding(user_id=user.user_id, nation_id=origin.nation_id, amount=Decimal("500")))
@@ -113,7 +114,7 @@ async def test_founder_constraints_reject_duplicate_group_and_currency():
     async with async_session() as session:
         async with session.begin():
             user = User(user_id=910003, username="testuser3")
-            origin = Nation(name="Origin3", currency_code="OR3", group_id=-100910004)
+            origin = Nation(name="Origin3", currency_code="OR3", group_id=-100910004, invite_code=secrets.token_urlsafe(8))
             session.add_all([user, origin])
             await session.flush()
             session.add(CurrencyHolding(user_id=user.user_id, nation_id=origin.nation_id, amount=Decimal("500")))
@@ -130,7 +131,7 @@ async def test_founder_constraints_reject_duplicate_group_and_currency():
     async with async_session() as session:
         async with session.begin():
             user = User(user_id=910004, username="testuser4")
-            origin = Nation(name="Origin4", currency_code="OR4", group_id=-100910006)
+            origin = Nation(name="Origin4", currency_code="OR4", group_id=-100910006, invite_code=secrets.token_urlsafe(8))
             session.add_all([user, origin])
             await session.flush()
             session.add(CurrencyHolding(user_id=user.user_id, nation_id=origin.nation_id, amount=Decimal("500")))
@@ -148,7 +149,7 @@ async def test_founder_constraints_reject_duplicate_group_and_currency():
     async with async_session() as session:
         async with session.begin():
             user = User(user_id=910005, username="testuser5")
-            origin = Nation(name="Origin5", currency_code="OR5", group_id=-100910007)
+            origin = Nation(name="Origin5", currency_code="OR5", group_id=-100910007, invite_code=secrets.token_urlsafe(8))
             session.add_all([user, origin])
             await session.flush()
             session.add(CurrencyHolding(user_id=user.user_id, nation_id=origin.nation_id, amount=Decimal("500")))
