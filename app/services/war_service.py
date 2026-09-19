@@ -114,6 +114,10 @@ async def declare_war(
         if target_nation is None or not target_nation.is_active:
             raise ValueError("⚠️ ملت هدف پیدا نشد یا فعال نیست.")
 
+        # Lock both treasuries as part of the war declaration transaction too.
+        await _ensure_treasury(session, declaring_nation)
+        await _ensure_treasury(session, target_nation)
+
         actor_user_id = actor_user_id or declaring_nation.founder_user_id
         if actor_user_id is None:
             raise ValueError("⛔ بنیان‌گذار ملت مشخص نیست.")
