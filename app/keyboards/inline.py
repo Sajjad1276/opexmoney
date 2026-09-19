@@ -110,11 +110,11 @@ def market_buy_keyboard(nations) -> InlineKeyboardMarkup:
 def buy_amount_keyboard(nation_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="۱۰۰", callback_data=f"buyq_100_{nation_id}", style=ButtonStyle.PRIMARY),
-            InlineKeyboardButton(text="۵۰۰", callback_data=f"buyq_500_{nation_id}", style=ButtonStyle.PRIMARY),
+            InlineKeyboardButton(text="100", callback_data=f"buyq_100_{nation_id}", style=ButtonStyle.PRIMARY),
+            InlineKeyboardButton(text="500", callback_data=f"buyq_500_{nation_id}", style=ButtonStyle.PRIMARY),
         ],
         [
-            InlineKeyboardButton(text="۱۰۰۰", callback_data=f"buyq_1000_{nation_id}", style=ButtonStyle.PRIMARY),
+            InlineKeyboardButton(text="100۰", callback_data=f"buyq_1000_{nation_id}", style=ButtonStyle.PRIMARY),
             InlineKeyboardButton(text="همه", callback_data=f"buyq_all_{nation_id}", style=ButtonStyle.PRIMARY),
         ],
         [InlineKeyboardButton(text="❌ انصراف", callback_data="market_buy", style=ButtonStyle.DANGER)],
@@ -158,11 +158,11 @@ def sell_currency_keyboard(holdings) -> InlineKeyboardMarkup:
 def sell_amount_keyboard(currency_code: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="۲۵٪", callback_data=f"sellq_25_{currency_code}", style=ButtonStyle.PRIMARY),
-            InlineKeyboardButton(text="۵۰٪", callback_data=f"sellq_50_{currency_code}", style=ButtonStyle.PRIMARY),
+            InlineKeyboardButton(text="25%", callback_data=f"sellq_25_{currency_code}", style=ButtonStyle.PRIMARY),
+            InlineKeyboardButton(text="50%", callback_data=f"sellq_50_{currency_code}", style=ButtonStyle.PRIMARY),
         ],
         [
-            InlineKeyboardButton(text="۷۵٪", callback_data=f"sellq_75_{currency_code}", style=ButtonStyle.PRIMARY),
+            InlineKeyboardButton(text="75%", callback_data=f"sellq_75_{currency_code}", style=ButtonStyle.PRIMARY),
             InlineKeyboardButton(text="همه", callback_data=f"sellq_100_{currency_code}", style=ButtonStyle.PRIMARY),
         ],
         [InlineKeyboardButton(text="❌ انصراف", callback_data="market_sell", style=ButtonStyle.DANGER)],
