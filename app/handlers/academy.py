@@ -16,6 +16,7 @@ from aiogram.types import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     Message,
+    ReplyKeyboardRemove,
 )
 from redis.asyncio import Redis
 from sqlalchemy import select
@@ -251,6 +252,7 @@ async def open_academy(message: Message) -> None:
                     message.from_user.id,
                     user_xp.level,
                 )
+        await message.answer("⁠", reply_markup=ReplyKeyboardRemove())
         await message.answer(
             build_academy_main_msg(user_xp),
             reply_markup=academy_keyboard(modules),
