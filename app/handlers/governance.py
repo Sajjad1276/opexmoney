@@ -34,6 +34,7 @@ from app.services.rules.registry import RULE_REGISTRY, get_rule, parse_rule_inpu
 from app.services.rules.resolver import resolve
 from app.states.governance import GovernanceStates
 from app.utils.formatting import to_fa
+from app.utils.ui import close_inline_panel, remember_inline_panel
 
 
 governance_router = Router(name="governance")
@@ -196,6 +197,7 @@ async def governance_select_rule(call: CallbackQuery, state: FSMContext):
         "مقدار پیشنهادی رو به عدد بفرست.",
         parse_mode="HTML",
     )
+    await remember_inline_panel(state, call.message)
     await call.answer()
 
 
@@ -242,7 +244,7 @@ async def governance_receive_value(message: Message, state: FSMContext):
     )
     await state.set_state(GovernanceStates.CONFIRM_PROPOSAL)
 
-    await message.answer(
+    preview_message = await message.answer(
         "📋 <b>پیش‌نمایش طرح</b>\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
         f"قانون: <b>{html.escape(rule.title_fa)}</b>\n"
@@ -253,6 +255,8 @@ async def governance_receive_value(message: Message, state: FSMContext):
         parse_mode="HTML",
     )
 
+
+    await remember_inline_panel(state, preview_message)
 
 @governance_router.callback_query(
     F.data == "gov_confirm",
