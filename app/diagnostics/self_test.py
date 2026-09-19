@@ -33,7 +33,7 @@ CONTRACTS = {
 EXPECTED_JOB_IDS = {
     "rate_engine_15m", "nation_rank_hourly", "governance_cycle",
     "daily_market_reset", "nation_join_request_expiration",
-    "nation_weekly_ai_report",
+    "nation_weekly_ai_report", "price_alert_checker_5m",
 }
 
 EXPECTED_ROUTER_NAMES = {
