@@ -126,10 +126,9 @@ def _scenario_header(scenario: PromptScenario) -> str:
 
 def _nation_personality(ctx: Mapping[str, Any]) -> str:
     nation = ctx.get("nation") or ctx.get("home_nation") or {}
-    personality = (
-        ctx.get("nation_personality")
-        or nation.get("personality") if isinstance(nation, dict) else None
-    )
+    personality = ctx.get("nation_personality")
+    if ctx.get("nation_personality") is not None
+    else nation.get("personality") if isinstance(nation, dict) else None
     return _clean(personality, "neutral")
 
 
