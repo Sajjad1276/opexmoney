@@ -102,6 +102,28 @@ async def run_startup_smoke_test(
         )
 
     try:
+        from app.diagnostics.flow_health import run_flow_health_test
+
+        flow_report = run_flow_health_test()
+        if flow_report.errors:
+            logger.error(
+                "SELFTEST|FAIL|flow-health|%s",
+                " | ".join(flow_report.errors),
+            )
+            ok = False
+        else:
+            logger.info(
+                "SELFTEST|PASS|flow-health|%s|warnings=%d",
+                " ".join(f"{key}={value}" for key, value in flow_report.metrics.items()),
+                len(flow_report.warnings),
+            )
+            for warning in flow_report.warnings:
+                logger.warning("SELFTEST|WARN|flow-health|%s", warning)
+    except Exception:
+        logger.exception("SELFTEST|FAIL|flow-health")
+        ok = False
+
+    try:
         async with async_session() as session:
             async with session.begin():
                 await session.execute(text("SELECT 1"))
