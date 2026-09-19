@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import Nation, NationMember, NationMemberRole, NationTreasury, TreasuryLog, User
+from app.services.nation_service import get_user_active_nation
 from app.services.user_service import sync_user_balance
 
 
