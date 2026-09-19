@@ -148,6 +148,7 @@ def build_smart_insight(
     rates: list[float],
     timestamps: list[datetime],
     change_7d: float | None,
+    three_day_downtrend: bool = False,
 ) -> str:
     if market_status == "best":
         return _fa_text("بهترین عملکرد امروز")
@@ -155,7 +156,7 @@ def build_smart_insight(
     if market_status == "worst":
         return _fa_text("بدترین عملکرد امروز")
 
-    if detect_three_day_downtrend(rates, timestamps):
+    if three_day_downtrend or detect_three_day_downtrend(rates, timestamps):
         return _fa_text("روند نزولی ۳ روزه")
 
     if change_7d is not None:
@@ -218,6 +219,7 @@ def _render_currency_chart(
     base_currency: str,
     market_status: str | None,
     change_7d: float | None,
+    three_day_downtrend: bool = False,
 ) -> BytesIO:
     if window not in _WINDOW_LABELS:
         raise ValueError("invalid_window")
@@ -260,6 +262,7 @@ def _render_currency_chart(
         rates=values,
         timestamps=timestamps,
         change_7d=change_7d,
+        three_day_downtrend=three_day_downtrend,
     )
 
     chart_values = np.asarray(values, dtype=float)
@@ -519,6 +522,7 @@ def render_price_chart(
     base_currency: str = "OPX",
     market_status: str | None = None,
     change_7d: float | None = None,
+    three_day_downtrend: bool = False,
     width: int = 800,
     height: int = 450,
 ) -> BytesIO:
@@ -549,6 +553,7 @@ def render_price_chart(
             base_currency=base_currency,
             market_status=market_status,
             change_7d=change_7d,
+            three_day_downtrend=three_day_downtrend,
         )
 
 
@@ -563,6 +568,7 @@ async def generate_currency_chart(
     current_rate: float | None = None,
     market_status: str | None = None,
     change_7d: float | None = None,
+    three_day_downtrend: bool = False,
 ) -> BytesIO:
     """
     Async chart API for Telegram handlers.
@@ -582,4 +588,5 @@ async def generate_currency_chart(
         base_currency=base_currency,
         market_status=market_status,
         change_7d=change_7d,
+        three_day_downtrend=three_day_downtrend,
     )
