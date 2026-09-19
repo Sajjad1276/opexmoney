@@ -17,8 +17,9 @@ from aiogram.types import (
     ReplyKeyboardRemove,
 )
 
-from app.database.models import User
+from app.database.models import NationMember, NationMemberRole, User
 from app.database.session import async_session
+from app.services.nation_service import get_user_active_nation
 from app.services.treasury_service import (
     MIN_DEPOSIT,
     deposit_to_treasury,
@@ -281,20 +282,24 @@ async def open_treasury_from_main_menu(
     state: FSMContext,
 ) -> None:
     await state.clear()
+
     async with async_session() as session:
         async with session.begin():
-            user = await session.get(User, message.from_user.id)
-            if user is None or user.home_nation_id is None:
+            nation = await get_user_active_nation(
+                session,
+                message.from_user.id,
+                repair_founder_membership=True,
+            )
+            if nation is None:
                 await message.answer(
                     "⚠️ اول عضو یک ملت شو تا بتوانی خزانه را باز کنی."
                 )
                 return
 
-            nation_id = int(user.home_nation_id)
             role = await get_member_role(
                 session,
                 message.from_user.id,
-                nation_id,
+                nation.nation_id,
             )
             if role is None:
                 await message.answer(
@@ -302,16 +307,16 @@ async def open_treasury_from_main_menu(
                 )
                 return
 
-            treasury = await get_treasury(session, nation_id)
+            treasury = await get_treasury(session, nation.nation_id)
             if treasury is None:
                 await message.answer("⚠️ خزانه هنوز راه‌اندازی نشده.")
                 return
 
-            logs = await get_treasury_logs(session, nation_id, limit=5)
+            logs = await get_treasury_logs(session, nation.nation_id, limit=5)
             text = build_treasury_msg(treasury, logs)
-            markup = treasury_keyboard(nation_id, role)
+            markup = treasury_keyboard(nation.nation_id, role)
 
-    await message.answer("⁠", reply_markup=ReplyKeyboardRemove())
+    await message.answer("\u2060", reply_markup=ReplyKeyboardRemove())
     await message.answer(
         text,
         reply_markup=markup,
