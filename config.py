@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -10,7 +11,10 @@ class Settings(BaseSettings):
     owner_id: int | None = None
 
     ai_enabled: bool = True
-    gemini_api_key: str | None = None
+    gemini_api_key: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("GEMINI_API_KEY", "GOOGLE_API_KEY"),
+    )
     ai_model: str = "gemini-2.5-flash-lite"
     ai_timeout_seconds: float = 12.0
     ai_cache_ttl_seconds: int = 120
