@@ -21,6 +21,9 @@ from aiogram.types import (
 from app.database.models import NationMember, NationMemberRole, User
 from app.database.session import async_session
 from app.services.nation_service import get_user_active_nation_context
+from app.handlers.nation_management import nation_admin_panel
+from app.keyboards.inline import nation_panel_keyboard
+from app.services.user_service import is_fully_registered
 from app.services.treasury_service import (
     MIN_DEPOSIT,
     deposit_to_treasury,
@@ -88,15 +91,23 @@ def time_ago(dt: datetime) -> str:
     return f"{to_fa(days)} روز پیش"
 
 
+TREASURY_RETURN_TARGETS = {"dashboard", "nations", "management"}
+
+
 def treasury_keyboard(
     nation_id: int,
     role: str | None,
+    *,
+    return_target: str = "dashboard",
 ) -> InlineKeyboardMarkup:
+    if return_target not in TREASURY_RETURN_TARGETS:
+        return_target = "dashboard"
+
     rows = [
         [
             InlineKeyboardButton(
                 text="💎 واریز به خزانه",
-                callback_data=f"treasury:deposit:{nation_id}",
+                callback_data=f"treasury:deposit:{nation_id}:{return_target}",
                 style=ButtonStyle.SUCCESS,
             )
         ]
@@ -107,7 +118,7 @@ def treasury_keyboard(
             [
                 InlineKeyboardButton(
                     text="📤 برداشت",
-                    callback_data=f"treasury:withdraw:{nation_id}",
+                    callback_data=f"treasury:withdraw:{nation_id}:{return_target}",
                     style=ButtonStyle.DANGER,
                 )
             ]
@@ -117,12 +128,12 @@ def treasury_keyboard(
         [
             InlineKeyboardButton(
                 text="📋 گزارش کامل",
-                callback_data=f"treasury:report:{nation_id}",
+                callback_data=f"treasury:report:{nation_id}:{return_target}",
                 style=ButtonStyle.PRIMARY,
             ),
             InlineKeyboardButton(
                 text="↩️ بازگشت",
-                callback_data=f"nm:panel:{nation_id}",
+                callback_data=f"treasury:back:{nation_id}:{return_target}",
             ),
         ]
     )
@@ -132,6 +143,7 @@ def treasury_keyboard(
 def confirm_withdraw_keyboard(
     nation_id: int,
     amount_str: str,
+    return_target: str = "dashboard",
 ) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -139,20 +151,23 @@ def confirm_withdraw_keyboard(
                 InlineKeyboardButton(
                     text="✅ تأیید برداشت",
                     callback_data=(
-                        f"treasury:withdraw_confirm:{nation_id}:{amount_str}"
+                        f"treasury:withdraw_confirm:{nation_id}:{amount_str}:{return_target}"
                     ),
                     style=ButtonStyle.SUCCESS,
                 ),
                 InlineKeyboardButton(
                     text="❌ انصراف",
-                    callback_data=f"treasury:cancel:{nation_id}",
+                    callback_data=f"treasury:cancel:{nation_id}:{return_target}",
                 ),
             ]
         ]
     )
 
 
-def cancel_keyboard(nation_id: int) -> InlineKeyboardMarkup:
+def cancel_keyboard(
+    nation_id: int,
+    return_target: str = "dashboard",
+) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
@@ -220,9 +235,16 @@ async def _render_treasury(
 ) -> bool:
     try:
         data = callback.data or ""
-        nation_id = int(data.split(":")[2])
-        if state is not None and clear_state:
-            await state.clear()
+        parts = data.split(":")
+        nation_id = int(parts[2])
+        return_target = parts[3] if len(parts) >= 4 else "nations"
+        if return_target not in TREASURY_RETURN_TARGETS:
+            return_target = "nations"
+        if state is not None:
+            await state.update_data(treasury_return=return_target)
+            if clear_state:
+                await state.clear()
+                await state.update_data(treasury_return=return_target)
 
         async with async_session() as session:
             async with session.begin():
@@ -253,7 +275,7 @@ async def _render_treasury(
                 )
 
                 text = build_treasury_msg(treasury, logs)
-                markup = treasury_keyboard(nation_id, role)
+                markup = treasury_keyboard(nation_id, role, return_target=return_target)
 
         if callback.message is not None:
             await callback.message.edit_text(
@@ -341,7 +363,7 @@ async def open_treasury_from_main_menu(
         await message.answer("⚠️ نمایش خزانه انجام نشد. دوباره تلاش کن.")
 
 
-@router.callback_query(F.data.regexp(r"^treasury:show:\d+$"))
+@router.callback_query(F.data.regexp(r"^treasury:show:\d+(?::(?:dashboard|nations|management))?$"))
 async def show_treasury(callback: CallbackQuery, state: FSMContext) -> None:
     try:
         await _render_treasury(
@@ -360,13 +382,15 @@ async def show_treasury(callback: CallbackQuery, state: FSMContext) -> None:
         )
 
 
-@router.callback_query(F.data.regexp(r"^treasury:deposit:\d+$"))
+@router.callback_query(F.data.regexp(r"^treasury:deposit:\d+:(?:dashboard|nations|management)$"))
 async def start_deposit(
     callback: CallbackQuery,
     state: FSMContext,
 ) -> None:
     try:
-        nation_id = int((callback.data or "").split(":")[2])
+        parts = (callback.data or "").split(":")
+        nation_id = int(parts[2])
+        return_target = parts[3]
         async with async_session() as session:
             async with session.begin():
                 role = await get_member_role(
@@ -394,7 +418,10 @@ async def start_deposit(
 
         await state.clear()
         await state.set_state(TreasuryStates.ENTER_DEPOSIT_AMOUNT)
-        await state.update_data(nation_id=nation_id)
+        await state.update_data(
+            nation_id=nation_id,
+            treasury_return=return_target,
+        )
 
         if callback.message is not None:
             await callback.message.edit_text(
@@ -404,7 +431,7 @@ async def start_deposit(
                 f"<code>{_amount_text(xr_balance)}</code>\n"
                 f"حداقل واریز: <code>{_amount_text(MIN_DEPOSIT)}</code> ΩXR\n\n"
                 "مقدار واریز را بنویسید:",
-                reply_markup=cancel_keyboard(nation_id),
+                reply_markup=cancel_keyboard(nation_id, return_target),
                 parse_mode="HTML",
             )
             await remember_inline_panel(state, callback.message)
@@ -508,9 +535,14 @@ async def receive_deposit_amount(
                     int(nation_id),
                 )
         if role is not None:
+            return_target = data.get("treasury_return", "dashboard")
             await message.answer(
                 refreshed_text,
-                reply_markup=treasury_keyboard(int(nation_id), role),
+                reply_markup=treasury_keyboard(
+                    int(nation_id),
+                    role,
+                    return_target=return_target,
+                ),
                 parse_mode="HTML",
             )
     except Exception:
@@ -525,13 +557,15 @@ async def receive_deposit_amount(
         )
 
 
-@router.callback_query(F.data.regexp(r"^treasury:withdraw:\d+$"))
+@router.callback_query(F.data.regexp(r"^treasury:withdraw:\d+:(?:dashboard|nations|management)$"))
 async def start_withdraw(
     callback: CallbackQuery,
     state: FSMContext,
 ) -> None:
     try:
-        nation_id = int((callback.data or "").split(":")[2])
+        parts = (callback.data or "").split(":")
+        nation_id = int(parts[2])
+        return_target = parts[3]
         async with async_session() as session:
             async with session.begin():
                 role = await get_member_role(
@@ -556,7 +590,10 @@ async def start_withdraw(
 
         await state.clear()
         await state.set_state(TreasuryStates.ENTER_WITHDRAW_AMOUNT)
-        await state.update_data(nation_id=nation_id)
+        await state.update_data(
+            nation_id=nation_id,
+            treasury_return=return_target,
+        )
 
         if callback.message is not None:
             await callback.message.edit_text(
@@ -565,7 +602,7 @@ async def start_withdraw(
                 f"موجودی خزانه: "
                 f"<code>{_amount_text(treasury['balance_xr'])}</code> ΩXR\n\n"
                 "مقدار برداشت را بنویسید:",
-                reply_markup=cancel_keyboard(nation_id),
+                reply_markup=cancel_keyboard(nation_id, return_target),
                 parse_mode="HTML",
             )
             await remember_inline_panel(state, callback.message)
@@ -638,7 +675,7 @@ async def receive_withdraw_amount(
         await message.answer("⚠️ آماده‌سازی برداشت انجام نشد.")
 
 
-@router.callback_query(F.data.regexp(r"^treasury:withdraw_confirm:\d+:[0-9.]+$"))
+@router.callback_query(F.data.regexp(r"^treasury:withdraw_confirm:\d+:[0-9.]+:(?:dashboard|nations|management)$"))
 async def confirm_withdraw(
     callback: CallbackQuery,
     state: FSMContext,
@@ -647,6 +684,7 @@ async def confirm_withdraw(
         parts = (callback.data or "").split(":")
         nation_id = int(parts[2])
         amount = Decimal(parts[3])
+        return_target = parts[4]
 
         async with async_session() as session:
             async with session.begin():
@@ -718,7 +756,11 @@ async def confirm_withdraw(
             if role is not None:
                 await callback.message.edit_text(
                     refreshed_text,
-                    reply_markup=treasury_keyboard(nation_id, role),
+                    reply_markup=treasury_keyboard(
+                        nation_id,
+                        role,
+                        return_target=return_target,
+                    ),
                     parse_mode="HTML",
                 )
 
@@ -748,6 +790,7 @@ async def confirm_withdraw_text(
         data = await state.get_data()
         nation_id = data.get("nation_id")
         amount_str = data.get("withdraw_amount")
+        return_target = data.get("treasury_return", "dashboard")
 
         if not nation_id or not amount_str:
             await state.clear()
@@ -760,6 +803,7 @@ async def confirm_withdraw_text(
             reply_markup=confirm_withdraw_keyboard(
                 int(nation_id),
                 format(amount, "f"),
+                return_target,
             ),
         )
     except Exception:
@@ -771,10 +815,13 @@ async def confirm_withdraw_text(
         await message.answer("⚠️ خطای موقت رخ داد. دوباره وارد خزانه شو.")
 
 
-@router.callback_query(F.data.regexp(r"^treasury:report:\d+$"))
-async def show_full_report(callback: CallbackQuery) -> None:
+@router.callback_query(F.data.regexp(r"^treasury:report:\d+:(?:dashboard|nations|management)$"))
+async def show_full_report(callback: CallbackQuery, state: FSMContext) -> None:
     try:
-        nation_id = int((callback.data or "").split(":")[2])
+        parts = (callback.data or "").split(":")
+        nation_id = int(parts[2])
+        return_target = parts[3]
+        await state.update_data(treasury_return=return_target)
 
         async with async_session() as session:
             async with session.begin():
@@ -838,7 +885,7 @@ async def show_full_report(callback: CallbackQuery) -> None:
                 [
                     InlineKeyboardButton(
                         text="↩️ بازگشت به خزانه",
-                        callback_data=f"treasury:show:{nation_id}",
+                        callback_data=f"treasury:show:{nation_id}:{return_target}",
                     )
                 ]
             ]
@@ -863,7 +910,117 @@ async def show_full_report(callback: CallbackQuery) -> None:
         )
 
 
-@router.callback_query(F.data.regexp(r"^treasury:cancel:\d+$"))
+@router.callback_query(
+    F.data.regexp(r"^treasury:back:\d+:(?:dashboard|nations|management)$")
+)
+async def treasury_back(
+    callback: CallbackQuery,
+    state: FSMContext,
+) -> None:
+    try:
+        parts = (callback.data or "").split(":")
+        nation_id = int(parts[2])
+        return_target = parts[3]
+
+        await state.clear()
+
+        if return_target == "dashboard":
+            async with async_session() as session:
+                async with session.begin():
+                    user = await session.get(User, callback.from_user.id)
+                    if user is None:
+                        await callback.answer("⚠️ حساب کاربری پیدا نشد.", show_alert=True)
+                        return
+            if callback.message is not None:
+                await show_dashboard(
+                    callback.message,
+                    user,
+                    replace_inline=True,
+                    bot=callback.bot,
+                    display_user=callback.from_user,
+                )
+            await callback.answer()
+            return
+
+        if return_target == "nations":
+            if callback.message is not None:
+                async with async_session() as session:
+                    async with session.begin():
+                        user = await session.get(User, callback.from_user.id)
+                        registered = user is not None and await is_fully_registered(
+                            session,
+                            callback.from_user.id,
+                        )
+                        if not registered:
+                            await callback.answer(
+                                "⚠️ اول باید وارد بازی بشی.",
+                                show_alert=True,
+                            )
+                            return
+                        context = await get_user_active_nation_context(
+                            session,
+                            callback.from_user.id,
+                            repair=True,
+                        )
+                        active_nation = context[0] if context is not None else None
+                        active_role = context[1] if context is not None else None
+                        is_manager = active_role in {"founder", "minister"}
+                        nation_panel = nation_panel_keyboard(
+                            is_manager,
+                            active_nation.nation_id if active_nation is not None else nation_id,
+                        )
+                await callback.message.edit_text(
+                    "🌍 <b>ملت‌ها</b>\n"
+                    "اینجا می‌تونی ملت‌ها رو بررسی کنی.\n"
+                    "از گزینه‌ها برای ادامه استفاده کن.",
+                    reply_markup=nation_panel,
+                    parse_mode="HTML",
+                )
+            await callback.answer()
+            return
+
+        if return_target == "management":
+            try:
+                markup = await nation_admin_panel(
+                    callback.from_user.id,
+                    nation_id,
+                )
+            except ValueError as exc:
+                await callback.answer(str(exc), show_alert=True)
+                return
+
+            async with async_session() as session:
+                async with session.begin():
+                    nation = await session.get(Nation, nation_id)
+                    if nation is None or not nation.is_active:
+                        await callback.answer("⚠️ ملت فعال پیدا نشد.", show_alert=True)
+                        return
+                    # Reuse the canonical management panel text contract.
+                    member_count = nation.member_count
+                    text = f"👑 <b>مدیریت {html.escape(nation.name)}</b>\n"
+                    text += "━━━━━━━━━━━━━━━━━━━━\n"
+                    text += f"👥 اعضا: <b>{member_count}</b>\n"
+                    text += f"💰 خزانه: <b>{_amount_text(nation.treasury)}</b> ΩXR\n"
+                await callback.message.edit_text(
+                    text,
+                    reply_markup=markup,
+                    parse_mode="HTML",
+                )
+            await callback.answer()
+            return
+    except Exception:
+        logger.exception(
+            "Treasury back navigation failed user=%s data=%r",
+            callback.from_user.id,
+            callback.data,
+        )
+        await callback.answer(
+            "⚠️ بازگشت انجام نشد.",
+            show_alert=True,
+        )
+
+
+@router.callback_query(F.data.regexp(r"^treasury:cancel:\d+:(?:dashboard|nations|management)$"))
 async def cancel_treasury(
     callback: CallbackQuery,
     state: FSMContext,
