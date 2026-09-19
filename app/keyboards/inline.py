@@ -127,7 +127,7 @@ def founder_flag_selection_keyboard() -> InlineKeyboardMarkup:
 def nation_selection_keyboard(nations) -> InlineKeyboardMarkup:
     rows = [
         [InlineKeyboardButton(
-            text=f"{nation.flag_emoji or '🏴'} {nation.name} ({nation.currency_code}) · {nation.member_count} نفر",
+            text=f"{getattr(nation, 'flag_emoji', None) or '🏴'} {nation.name} ({nation.currency_code}) · {nation.member_count} نفر",
             callback_data=f"join_nation:{nation.nation_id}",
         )]
         for nation in nations
