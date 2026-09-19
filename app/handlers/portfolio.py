@@ -4,7 +4,7 @@ import html
 import logging
 
 from aiogram import F, Router
-from aiogram.enums import ParseMode
+from aiogram.enums import ButtonStyle, ParseMode
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import (
     CallbackQuery,
@@ -32,6 +32,7 @@ def portfolio_keyboard() -> InlineKeyboardMarkup:
                 InlineKeyboardButton(
                     text="🔄 بروزرسانی",
                     callback_data="portfolio_refresh",
+                    style=ButtonStyle.PRIMARY,
                 ),
                 InlineKeyboardButton(
                     text="↩️ بازگشت",
