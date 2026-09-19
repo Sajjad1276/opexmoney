@@ -340,7 +340,6 @@ def governance_revoke_keyboard(overrides) -> InlineKeyboardMarkup:
             text=f"لغو {override.rule_key} #{override.id}",
             callback_data=f"gov_revoke:{override.id}",
             style=ButtonStyle.DANGER,
-            style=ButtonStyle.DANGER,
         )]
         for override in overrides
     ]
