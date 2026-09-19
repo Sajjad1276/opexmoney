@@ -92,8 +92,9 @@ def market_text(user, nation, others, active):
         f"<code>ΩXR</code>: <b>{fmt_amount(user.xr_balance)}</b>",
         "",
         "ارز ملت تو:",
-        f"{get_rate_emoji(change)} <code>{html.escape(nation.currency_code)}</code> "
-        f"· <b>{fmt_rate(nation.exchange_rate)} ΩXR</b> · "
+        f"{get_rate_emoji(change)} <b>{html.escape(nation.name)}</b> "
+        f"(<code>{html.escape(nation.currency_code)}</code>)\n"
+        f"1 {html.escape(nation.currency_code)} = <b>{fmt_rate(nation.exchange_rate)} ΩXR</b> · "
         f"<i>{fmt_pct(change)}</i>",
         "",
         "─────────────────",
@@ -101,9 +102,9 @@ def market_text(user, nation, others, active):
     ]
     for item in others:
         lines.append(
-            f"{get_rate_emoji(get_rate_change(item))} "
-            f"<code>{html.escape(item.currency_code)}</code> · "
-            f"<b>{fmt_rate(item.exchange_rate)} ΩXR</b> · "
+            f"{get_rate_emoji(get_rate_change(item))} <b>{html.escape(item.name)}</b> "
+            f"(<code>{html.escape(item.currency_code)}</code>) · "
+            f"1 {html.escape(item.currency_code)} = <b>{fmt_rate(item.exchange_rate)} ΩXR</b> · "
             f"<i>{fmt_pct(get_rate_change(item))}</i>"
         )
     if not others:
@@ -119,7 +120,8 @@ def market_text(user, nation, others, active):
 async def render_market(message: Message, edit_call=None):
     async with async_session() as session:
         async with session.begin():
-            user = await session.get(User, message.from_user.id)
+            user_id = edit_call.from_user.id if edit_call is not None else message.from_user.id
+            user = await session.get(User, user_id)
             if not user or user.home_nation_id is None:
                 text = "🔴 حساب پیدا نشد. /start بزن."
                 if edit_call:
