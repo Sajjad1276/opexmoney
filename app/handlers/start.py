@@ -501,6 +501,43 @@ async def _begin_registration(
     await remember_inline_panel(state, panel)
 
 
+@router.callback_query(
+    F.data == "cancel_start",
+    StateFilter(OnboardingStates.ONBOARDING_NAME, OnboardingStates.SELECT_NATION),
+)
+async def cancel_onboarding_panel(
+    call: CallbackQuery,
+    state: FSMContext,
+) -> None:
+    await close_inline_panel(state, call.bot)
+    await state.clear()
+
+    async with async_session() as session:
+        async with session.begin():
+            user = await get_user(session, call.from_user.id) if await is_fully_registered(
+                session,
+                call.from_user.id,
+            ) else None
+
+    if user is not None:
+        if call.message is not None:
+            await show_dashboard(
+                call.message,
+                user,
+                replace_inline=False,
+            )
+    else:
+        if call.message is not None:
+            await call.message.answer(
+                "👋 <b>شروع OPEX MONEY</b>\n\n"
+                "برای ورود به بازی، روی «شروع بازی» بزن.",
+                reply_markup=welcome_keyboard(),
+                parse_mode=ParseMode.HTML,
+            )
+
+    await call.answer("❌ لغو شد.")
+
+
 @router.message(F.text == "🎮 شروع بازی")
 async def start_game_button(message: Message, state: FSMContext) -> None:
     await _begin_registration(message, state)
