@@ -89,12 +89,6 @@ def nation_selection_keyboard(nations) -> InlineKeyboardMarkup:
         )]
         for nation in nations
     ]
-    rows.append([
-        InlineKeyboardButton(
-            text="🏛 ساخت ملت جدید",
-            callback_data="found_nation",
-        )
-    ])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
