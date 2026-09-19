@@ -159,11 +159,16 @@ async def get_smart_insight(
     if trend is not None:
         insights.append(trend)
 
-    weekly = _rounded_percent(change_7d)
+    weekly = int(
+        Decimal(str(change_7d)).quantize(
+            Decimal("1"),
+            rounding=ROUND_HALF_UP,
+        )
+    )
     if weekly > 0:
-        insights.append(f"نسبت به هفته پیش {_fa(weekly)}٪ بالاتره")
+        insights.append(f"نسبت به هفته پیش {_fa(abs(weekly))}٪ بالاتره")
     elif weekly < 0:
-        insights.append(f"نسبت به هفته پیش {_fa(weekly)}٪ پایین‌تره")
+        insights.append(f"نسبت به هفته پیش {_fa(abs(weekly))}٪ پایین‌تره")
 
     if not insights:
         rounded = _rounded_percent(change_24h)
