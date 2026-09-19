@@ -4,7 +4,7 @@ from aiogram import F, Router
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message, ReplyKeyboardRemove
 from sqlalchemy import select
 
-from app.database.models import Nation, User
+from app.database.models import Nation, NationMember, NationMemberRole, User
 from app.database.session import async_session
 from app.handlers.start import show_dashboard
 from app.keyboards.inline import nation_panel_keyboard
@@ -12,11 +12,11 @@ from app.services.user_service import is_fully_registered
 
 nation_router = Router(name="nation")
 
-
-def _soon_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="↩️ بازگشت", callback_data="back_to_dashboard")]
-    ])
+def _can_manage(user: User | None) -> bool:
+    return user is not None and user.role in {
+        NationMemberRole.FOUNDER.value,
+        NationMemberRole.MINISTER.value,
+    }
 
 
 @nation_router.message(F.text == "🌍 ملت‌ها")
@@ -25,7 +25,8 @@ async def open_nations(message: Message) -> None:
         async with session.begin():
             user = await session.get(User, message.from_user.id)
             registered = await is_fully_registered(session, message.from_user.id)
-            is_founder = user is not None and user.role == "founder"
+            is_manager = _can_manage(user)
+            nation_id = user.home_nation_id if user is not None else None
 
     if not registered:
         await message.answer(
@@ -39,7 +40,7 @@ async def open_nations(message: Message) -> None:
         "🌍 <b>ملت‌ها</b>\n"
         "اینجا می‌تونی ملت‌ها رو بررسی کنی.\n"
         "از گزینه‌ها برای ادامه استفاده کن.",
-        reply_markup=nation_panel_keyboard(is_founder),
+        reply_markup=nation_panel_keyboard(is_manager, nation_id),
         parse_mode="HTML",
     )
 
@@ -65,11 +66,12 @@ async def back_to_nations_panel(call: CallbackQuery) -> None:
             if user is None or not await is_fully_registered(session, call.from_user.id):
                 await call.answer("⚠️ اول باید وارد بازی بشی.", show_alert=True)
                 return
-            is_founder = user.role == "founder"
+            is_manager = _can_manage(user)
+            nation_id = user.home_nation_id
     if call.message:
         await call.message.edit_text(
             "🌍 <b>ملت‌ها</b>\nاینجا می‌تونی ملت‌ها رو بررسی کنی.\nاز گزینه‌ها برای ادامه استفاده کن.",
-            reply_markup=nation_panel_keyboard(is_founder),
+            reply_markup=nation_panel_keyboard(is_manager, nation_id),
             parse_mode="HTML",
         )
     await call.answer()
@@ -90,20 +92,32 @@ async def my_nations(call: CallbackQuery) -> None:
                     nations.append(nation)
 
     if not nations:
-        text = "🌍 <b>ملت‌های من</b>\nهنوز عضو هیچ ملتی نیستی."
-    else:
-        nation = nations[0]
         text = (
             "🌍 <b>ملت‌های من</b>\n"
-            f"{nation.flag_emoji or '🏴'} {nation.name} · {nation.currency_code}\n"
-            f"👥 {nation.member_count} نفر\n"
-            "برای جزئیات بیشتر، این بخش در حال توسعه است."
+            "هنوز عضو هیچ ملتی نیستی.\n\n"
+            "می‌تونی یک ملت موجود را بررسی کنی یا ملت خودت را تأسیس کنی."
         )
-    await call.message.edit_text(
-        text,
-        reply_markup=_soon_keyboard(),
-        parse_mode="HTML",
-    ) if call.message else None
+        markup = nation_panel_keyboard(False, None)
+    else:
+        nation = nations[0]
+        manager = user is not None and _can_manage(user)
+        text = (
+            f"{nation.flag_emoji or '🏴'} <b>{nation.name}</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            f"💱 ارز: <b>{nation.currency_code}</b>\n"
+            f"📈 نرخ: <b>{nation.exchange_rate}</b> ΩXR\n"
+            f"👥 اعضا: <b>{nation.member_count}</b>\n"
+            f"🏦 خزانه: <b>{nation.treasury}</b> ΩXR\n\n"
+            "از دکمه‌های زیر وارد بخش‌های ملت شو."
+        )
+        markup = nation_panel_keyboard(manager, nation.nation_id)
+
+    if call.message:
+        await call.message.edit_text(
+            text,
+            reply_markup=markup,
+            parse_mode="HTML",
+        )
     await call.answer()
 
 
