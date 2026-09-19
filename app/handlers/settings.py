@@ -22,6 +22,7 @@ from app.services.settings_service import (
 from app.utils.name_filter import is_blocked_trader_name, is_valid_trader_name
 from app.handlers.onboarding_fix import BLOCKED_NAME, INVALID_NAME
 from app.utils.formatting import fmt_amount, to_fa
+from app.utils.ui import close_inline_panel, remember_inline_panel
 
 router = Router(name="settings")
 logger = logging.getLogger(__name__)
@@ -48,6 +49,7 @@ def settings_keyboard() -> InlineKeyboardMarkup:
                 InlineKeyboardButton(
                     text="✏️ تغییر نام معامله‌گر",
                     callback_data="settings:change_username",
+                    style=ButtonStyle.PRIMARY,
                     style=ButtonStyle.PRIMARY,
                 )
             ],
@@ -223,6 +225,7 @@ async def start_change_username(
             ),
             parse_mode=ParseMode.HTML,
         )
+        await remember_inline_panel(state, callback.message)
         await callback.answer()
     except Exception as e:
         logger.exception(e)
@@ -266,6 +269,7 @@ async def receive_new_username(
             )
             return
 
+        await close_inline_panel(state, message.bot)
         await state.clear()
         await message.answer(
             f"{RLM}✅ نام معامله‌گر به <code>{html.escape(new_name)}</code> تغییر یافت.",
