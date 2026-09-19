@@ -1,11 +1,5 @@
 [build]
-builder = "DOCKERFILE"
-dockerfilePath = "Dockerfile"
+builder = "RAILPACK"
 
 [deploy]
-preDeployCommand = [
-  "python scripts/repair_alembic_state.py",
-  "python -m alembic upgrade head",
-]
 startCommand = "python main.py"
-restartPolicyType = "ON_FAILURE"
