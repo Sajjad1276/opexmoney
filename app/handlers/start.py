@@ -28,8 +28,9 @@ from app.utils.name_filter import TRADER_NAME_RE
 from app.keyboards.inline import cancel_keyboard, first_trade_keyboard, nation_selection_keyboard, trade_confirmation_keyboard, welcome_keyboard
 from app.keyboards.reply import main_menu_keyboard
 from app.services.nation_service import get_active_nations, get_nation_rank
-from app.services.user_service import get_registration_status, get_user, is_fully_registered, username_exists
+from app.services.user_service import get_registration_status, get_user, is_fully_registered, sync_user_balance, username_exists
 from app.states.onboarding import OnboardingStates
+from config import settings
 from app.utils.formatting import fmt_amount, fmt_pct, fmt_rate, get_rate_change, get_rate_emoji, to_fa
 
 router = Router(name="start")
@@ -642,7 +643,7 @@ async def _generate_personalized_welcome(
             html.escape(username),
         )
 
-    model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")
+    model = settings.ai_model
     endpoint = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
         + model
@@ -1000,6 +1001,7 @@ async def confirm_nation(call: CallbackQuery, state: FSMContext) -> None:
                         activity_type="login",
                     )
                 )
+                await sync_user_balance(session, user.user_id)
                 await session.flush()
     except IntegrityError:
         logger.exception(
@@ -1226,6 +1228,7 @@ async def confirm_first_trade(call: CallbackQuery, state: FSMContext) -> None:
                 nation_id=nation.nation_id,
                 activity_type="trade",
             ))
+            await sync_user_balance(session, user.user_id)
 
     text = (
         "✅ <b>معامله انجام شد.</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
