@@ -267,10 +267,13 @@ def run_flow_health_test() -> FlowHealthReport:
         else:
             dynamic_buttons += 1
             literal_prefix = value.split("{", 1)[0]
-            if literal_prefix and not any(
-                (handler_kind == "startswith" and pattern.startswith(literal_prefix))
-                or (handler_kind == "regexp" and literal_prefix in pattern)
-                or (handler_kind == "exact" and pattern.startswith(literal_prefix))
+            # F-strings such as buyq_100_{nation_id} are concrete variants
+            # of a handler family like ^buyq_(\\d+|all)_\\d+$.
+            family_prefix = re.split(r"\\d", literal_prefix, maxsplit=1)[0]
+            if family_prefix and not any(
+                (handler_kind == "startswith" and pattern.startswith(family_prefix))
+                or (handler_kind == "regexp" and family_prefix in pattern)
+                or (handler_kind == "exact" and pattern.startswith(family_prefix))
                 for handler_kind, pattern in handler_specs
             ):
                 orphan_buttons.append(
