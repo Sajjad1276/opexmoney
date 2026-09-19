@@ -165,6 +165,12 @@ async def run_startup_smoke_test(
 
     try:
         root = Path(__file__).resolve().parents[2]
+        from app.handlers.start import username_exists as _username_exists
+        if not callable(_username_exists):
+            logger.error("SELFTEST|FAIL|onboarding-imports|username_exists is not callable")
+            ok = False
+        else:
+            logger.info("SELFTEST|PASS|onboarding-imports|username_exists")
         source_all = _all_handler_source(root)
         routers = {getattr(router, "name", ""): router for router in dp.sub_routers}
         for router_name, tokens in CONTRACTS.items():
