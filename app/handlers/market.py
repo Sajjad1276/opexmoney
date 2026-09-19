@@ -44,6 +44,8 @@ from app.services.alert_service import (
 )
 from app.services.market_intelligence import (
     format_change_text,
+    format_percent_value,
+    format_volume,
     get_market_overview,
     get_risk_label,
 )
@@ -159,9 +161,8 @@ def _risk_title(label: str) -> str:
 def _format_mover(code: str | None, pct: float, positive: bool) -> str:
     if not code:
         return "—"
-    rounded = abs(round(pct))
     arrow = "▲" if positive else "▼"
-    return f"{html.escape(code)} {arrow} {fmt_amount(rounded).replace('.00', '')}٪"
+    return f"{html.escape(code)} {arrow} {format_percent_value(pct)}"
 
 
 def market_text(user, overview: dict, active: int) -> str:
@@ -195,14 +196,13 @@ def market_text(user, overview: dict, active: int) -> str:
         change = float(item["change_24h"])
         direction = _direction_emoji(change)
         risk_title = html.escape(_risk_title(item["risk_label"]))
-        volume = fmt_amount(item["volume_24h"])
 
         lines.extend(
             [
                 f"{direction} <b>{code}</b> [{risk_title}]  "
                 f"<b>{price} OPX</b>",
                 f"   {format_change_text(change, '24h')}",
-                f"   📊 حجم ۲۴ ساعت: <b>{volume} OPX</b>",
+                f"   📊 حجم ۲۴ ساعت: <b>{format_volume(item['volume_24h'])} OPX</b>",
                 f"   <i>{html.escape(item['insight'])}</i>",
                 "",
             ]
@@ -237,7 +237,7 @@ async def render_market(message: Message, edit_call=None):
             overview = await get_market_overview(
                 session,
                 user.home_nation_id,
-                limit=10,
+                limit=20,
             )
             if not overview["currencies"]:
                 text = "⚠️ هنوز ارز فعالی برای نمایش بازار وجود ندارد."
