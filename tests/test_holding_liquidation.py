@@ -68,12 +68,13 @@ async def cleanup():
                 await session.execute(
                     delete(NationMember).where(NationMember.nation_id.in_(nation_ids))
                 )
-                await session.execute(
-                    delete(Nation).where(Nation.nation_id.in_(nation_ids))
-                )
             await session.execute(
                 delete(User).where(User.user_id.in_([USER_ID, FOUNDER_ID]))
             )
+            if nation_ids:
+                await session.execute(
+                    delete(Nation).where(Nation.nation_id.in_(nation_ids))
+                )
 
 
 async def seed_nation(*, rate: Decimal, prev: Decimal = Decimal("1")) -> int:
