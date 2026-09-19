@@ -56,6 +56,10 @@ class Nation(Base):
     last_rate_update: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     member_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
+    join_policy: Mapped[str] = mapped_column(String(20), default="OPEN", nullable=False)
+    personality: Mapped[str] = mapped_column(String(20), default="neutral", nullable=False)
+    invite_code: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    treasury: Mapped[Decimal] = mapped_column(Numeric(20, 2), default=Decimal("0.00"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
@@ -264,3 +268,123 @@ class BehaviorSnapshot(Base):
     median_net_worth: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False)
     gini_coefficient: Mapped[Decimal] = mapped_column(Numeric(10, 8), nullable=False)
     top10_wealth_share: Mapped[Decimal] = mapped_column(Numeric(10, 8), nullable=False)
+
+
+class NationMemberRole(StrEnum):
+    FOUNDER = "founder"
+    MINISTER = "minister"
+    TRADER = "trader"
+    CITIZEN = "citizen"
+
+
+class NationMember(Base):
+    __tablename__ = "nation_members"
+    __table_args__ = (
+        UniqueConstraint("nation_id", "user_id", name="uq_nation_member_nation_user"),
+        Index("ix_nation_members_nation_role", "nation_id", "role"),
+        Index("ix_nation_members_user_active", "user_id", "is_active"),
+    )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    nation_id: Mapped[int] = mapped_column(
+        ForeignKey("nations.nation_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    user_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    role: Mapped[NationMemberRole] = mapped_column(
+        SAEnum(
+            NationMemberRole,
+            name="nation_member_role",
+            values_callable=lambda values: [item.value for item in values],
+        ),
+        nullable=False,
+        default=NationMemberRole.CITIZEN,
+    )
+    joined_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
+
+
+class NationLog(Base):
+    __tablename__ = "nation_logs"
+    __table_args__ = (
+        Index("ix_nation_logs_nation_created", "nation_id", "created_at"),
+        Index("ix_nation_logs_nation_action", "nation_id", "action_type"),
+    )
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    nation_id: Mapped[int] = mapped_column(
+        ForeignKey("nations.nation_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    actor_id: Mapped[int | None] = mapped_column(
+        BigInteger,
+        ForeignKey("users.user_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    action_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    target_id: Mapped[int | None] = mapped_column(
+        BigInteger,
+        ForeignKey("users.user_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    event_metadata: Mapped[dict | None] = mapped_column(
+        "metadata",
+        postgresql.JSONB,
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class NationJoinRequest(Base):
+    __tablename__ = "nation_join_requests"
+    __table_args__ = (
+        Index(
+            "uq_nation_join_request_pending",
+            "nation_id",
+            "user_id",
+            unique=True,
+            postgresql_where=text("status = 'pending'"),
+        ),
+        Index("ix_nation_join_requests_expires", "status", "expires_at"),
+    )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    nation_id: Mapped[int] = mapped_column(
+        ForeignKey("nations.nation_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    user_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    reviewed_by: Mapped[int | None] = mapped_column(
+        BigInteger,
+        ForeignKey("users.user_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class NationWar(Base):
+    __tablename__ = "nation_wars"
+    __table_args__ = (
+        Index("ix_nation_wars_nation_status", "nation_id", "status"),
+        Index("ix_nation_wars_opponent_status", "opponent_nation_id", "status"),
+    )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    nation_id: Mapped[int] = mapped_column(
+        ForeignKey("nations.nation_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    opponent_nation_id: Mapped[int] = mapped_column(
+        ForeignKey("nations.nation_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)
+    declared_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
