@@ -47,6 +47,7 @@ from app.services.economic_engine import (
     update_nation_ranks,
 )
 from app.services.governance_service import governance_cycle
+from app.schedulers.alert_checker import register_price_alert_job
 from config import settings
 
 logging.basicConfig(
@@ -311,6 +312,7 @@ async def main() -> None:
         )
 
     scheduler = build_scheduler(bot)
+    register_price_alert_job(scheduler, bot)
     smoke_ok = await run_startup_smoke_test(dp, scheduler)
     if not smoke_ok:
         logger.error(
