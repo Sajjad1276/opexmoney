@@ -1349,7 +1349,6 @@ async def execute_war_declaration(call: CallbackQuery, bot: Bot) -> None:
             ),
             parse_mode="HTML",
         )
-    await call.answer("⚔️ جنگ اعلام شد.")
 
 
 @nation_management_router.callback_query(F.data.regexp(r"^nm:announce:\d+$"))
