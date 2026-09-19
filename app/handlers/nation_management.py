@@ -29,6 +29,7 @@ from app.database.models import (
 )
 from app.database.session import async_session
 from app.services.mission_service import increment_mission
+from app.services.nation_service import convert_holding_to_xr
 from app.services.user_service import sync_user_balance
 
 logger = logging.getLogger(__name__)
@@ -81,6 +82,7 @@ EVENT_EMOJI = {
     "POLICY_CHANGED": "⚙️",
     "TREASURY_DEPOSIT": "💵",
     "TREASURY_WITHDRAW": "💸",
+    "HOLDING_LIQUIDATED": "💱",
 }
 
 EVENT_TITLE = {
@@ -97,6 +99,7 @@ EVENT_TITLE = {
     "POLICY_CHANGED": "تغییر سیاست",
     "TREASURY_DEPOSIT": "واریز به خزانه",
     "TREASURY_WITHDRAW": "برداشت از خزانه",
+    "HOLDING_LIQUIDATED": "تصفیه دارایی ارزی",
 }
 
 
@@ -1047,6 +1050,8 @@ async def kick_member(call: CallbackQuery, bot: Bot) -> None:
             if actor_role == NationMemberRole.MINISTER and target_role != NationMemberRole.CITIZEN:
                 raise ValueError("⛔ وزیر فقط می‌تواند شهروند اخراج کند.")
 
+            # ECONOMIC RULE: holdings liquidate to XR on kick/dissolve wherever you touch this logic
+            await convert_holding_to_xr(target, nation, session)
             member.is_active = False
             # SYNC RULE: home_nation_id always mirrors active NationMember wherever you touch these fields
             target.home_nation_id = None
@@ -1421,6 +1426,8 @@ async def confirm_dissolve(call: CallbackQuery, bot: Bot) -> None:
             ).all()
 
             for member, user in members:
+                # ECONOMIC RULE: holdings liquidate to XR on kick/dissolve wherever you touch this logic
+                await convert_holding_to_xr(user, nation, session)
                 member.is_active = False
                 # SYNC RULE: home_nation_id always mirrors active NationMember wherever you touch these fields
                 user.home_nation_id = None

@@ -9,6 +9,8 @@ from sqlalchemy import desc, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.services.user_service import sync_user_balance
+
 from app.database.models import (
     ActivityType,
     CurrencyHolding,
@@ -16,6 +18,7 @@ from app.database.models import (
     NationLog,
     NationMember,
     NationMemberRole,
+    Transaction,
     User,
     UserActivity,
 )
@@ -43,6 +46,79 @@ async def get_nation_rank(session: AsyncSession, nation_id: int) -> int:
         )
     )
     return len(result.scalars().all()) + 1
+
+
+async def convert_holding_to_xr(
+    user: User,
+    nation: Nation,
+    session: AsyncSession,
+) -> dict[str, Decimal] | None:
+    """
+    Liquidate one user's local-currency holding into XR.
+
+    The caller owns the surrounding transaction and should already hold the
+    user/nation locks. The holding itself is locked here before mutation.
+    """
+    holding = await session.scalar(
+        select(CurrencyHolding)
+        .where(
+            CurrencyHolding.user_id == user.user_id,
+            CurrencyHolding.nation_id == nation.nation_id,
+        )
+        .with_for_update()
+    )
+    if holding is None:
+        return None
+
+    amount = Decimal(str(holding.amount or Decimal("0")))
+    if amount <= 0:
+        return None
+
+    rate = Decimal(str(nation.exchange_rate or Decimal("0")))
+    if rate <= 0:
+        rate = Decimal(str(nation.rate_prev or Decimal("0")))
+    if rate <= 0:
+        rate = Decimal("1.0")
+
+    xr_value = amount * rate
+
+    user.xr_balance = Decimal(str(user.xr_balance or Decimal("0"))) + xr_value
+    holding.amount = Decimal("0")
+
+    # ECONOMIC RULE: holdings liquidate to XR on kick/dissolve wherever you touch this logic
+    session.add(
+        Transaction(
+            user_id=user.user_id,
+            nation_id=nation.nation_id,
+            transaction_type="liquidate",
+            spend_xr=xr_value,
+            amount=amount,
+            fee_xr=Decimal("0"),
+            rate=rate,
+        )
+    )
+    session.add(
+        NationLog(
+            nation_id=nation.nation_id,
+            actor_id=None,
+            action_type="HOLDING_LIQUIDATED",
+            target_id=user.user_id,
+            event_metadata={
+                "amount": str(amount),
+                "rate": str(rate),
+                "xr_received": str(xr_value),
+            },
+        )
+    )
+
+    if user.home_nation_id == nation.nation_id:
+        await sync_user_balance(session, user.user_id)
+
+    return {
+        "amount": amount,
+        "rate": rate,
+        "xr_received": xr_value,
+    }
 
 
 async def create_nation(

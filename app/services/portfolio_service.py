@@ -46,6 +46,8 @@ async def get_portfolio_data(session: AsyncSession, user_id: int) -> dict:
         .where(
             CurrencyHolding.user_id == user_id,
             CurrencyHolding.amount > 0,
+            # ECONOMIC RULE: holdings liquidate to XR on kick/dissolve wherever you touch this logic.
+            # Keep active-nation filtering as a safety net against legacy/unrepaired rows.
             Nation.is_active.is_(True),
         )
     )
