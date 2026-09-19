@@ -427,7 +427,6 @@ async def start(message: Message, state: FSMContext) -> None:
     await message.answer("\u2060", reply_markup=ReplyKeyboardRemove())
 
     text = """
-    text = """
 👋 <b>به OPEX MONEY خوش اومدی</b>
 
 اینجا وارد یک اقتصاد زنده می‌شی.
@@ -492,6 +491,7 @@ async def start_game_callback(call: CallbackQuery, state: FSMContext) -> None:
 
 
 async def _show_help(message: Message) -> None:
+    await message.answer("\u2060", reply_markup=ReplyKeyboardRemove())
     await message.answer(
         "❓ <b>راهنمای OPEX MONEY</b>\n"
         "تو یه معامله‌گر اقتصادی هستی.\n"
