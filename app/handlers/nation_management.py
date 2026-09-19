@@ -1466,28 +1466,31 @@ async def approve_join_request(call: CallbackQuery, bot: Bot) -> None:
                 request.status = "expired"
                 request.reviewed_by = call.from_user.id
                 request.reviewed_at = _now()
-                raise ValueError("⌛ مهلت این درخواست تمام شده.")
-            if user.home_nation_id is not None:
+                nation = None
+                user = None
+            elif user.home_nation_id is not None:
                 request.status = "rejected"
                 request.reviewed_by = call.from_user.id
                 request.reviewed_at = _now()
-                raise ValueError("⚠️ این کاربر قبلاً عضو یک ملت شده.")
+                nation = None
+                user = None
+            else:
 
-            request.status = "approved"
-            request.reviewed_by = call.from_user.id
-            request.reviewed_at = _now()
-            user.home_nation_id = nation_id
-            user.role = "player"
-            nation.member_count += 1
-            session.add(
-                NationMember(
-                    nation_id=nation_id,
-                    user_id=user_id,
-                    role=NationMemberRole.CITIZEN,
-                    is_active=True,
+                request.status = "approved"
+                request.reviewed_by = call.from_user.id
+                request.reviewed_at = _now()
+                user.home_nation_id = nation_id
+                user.role = "player"
+                nation.member_count += 1
+                session.add(
+                    NationMember(
+                        nation_id=nation_id,
+                        user_id=user_id,
+                        role=NationMemberRole.CITIZEN,
+                        is_active=True,
+                    )
                 )
-            )
-            await _append_log(
+                await _append_log(
                 session,
                 nation_id=nation_id,
                 actor_id=call.from_user.id,
