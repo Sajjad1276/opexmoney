@@ -266,8 +266,9 @@ async def market_button(message: Message):
 
 
 @router.callback_query(F.data == "market_main")
-async def market_main(call: CallbackQuery):
+async def market_main(call: CallbackQuery, state: FSMContext):
     try:
+        await state.clear()
         await render_market(call.message, call)
         await call.answer()
     except Exception:
