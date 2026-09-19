@@ -101,7 +101,7 @@ def upgrade() -> None:
 
     op.create_table(
         "nation_logs",
-        sa.Column("id", sa.BigInteger(), primary_key=True),
+        sa.Column("id", sa.BigInteger(), primary_key=True, autoincrement=True),
         sa.Column(
             "nation_id",
             sa.Integer(),
