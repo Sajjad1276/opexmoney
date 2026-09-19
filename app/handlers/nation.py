@@ -172,10 +172,3 @@ async def explore_nations(call: CallbackQuery) -> None:
         )
     await call.answer()
 
-
-@nation_router.callback_query(F.data.in_({"confirm_trade", "cancel_trade"}))
-async def unavailable_trade_confirmation(call: CallbackQuery) -> None:
-    await call.answer(
-        "ℹ️ این تأیید در نسخه فعلی استفاده نمی‌شود.",
-        show_alert=True,
-    )
