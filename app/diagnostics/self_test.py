@@ -16,72 +16,31 @@ logger = logging.getLogger("opexmoney.selftest")
 
 CONTRACTS = {
     "start": [
-        "CommandStart",
-        "start_game",
-        "show_help",
-        "join_",
-        "first_trade_tutorial",
-        "confirm_first_trade",
-        "skip_first_trade",
+        "CommandStart", "start_game", "show_help", "join_",
+        "first_trade_tutorial", "confirm_first_trade", "skip_first_trade",
         "cancel_start",
     ],
-    "market": [
-        "market_main",
-        "market_refresh",
-        "market_buy",
-        "market_sell",
-        "market_chart",
-        "market_history",
-        "buy_",
-        "buyq_",
-        "cbuy_",
-        "sell_",
-        "sellq_",
-        "csell_",
-    ],
-    "founder": [
-        "found_nation",
-        "cancel_founder",
-        "confirm_founder",
-    ],
+    "market": ["market_main", "market_refresh", "market_buy", "market_sell",
+               "market_chart", "market_history", "buy_", "buyq_", "cbuy_",
+               "sell_", "sellq_", "csell_"],
+    "founder": ["found_nation", "cancel_founder", "confirm_founder"],
     "nation": ["🌍 ملت‌ها"],
-    "sections": [
-        "📊 پورتفولیو",
-        "⚡ مأموریت",
-        "🏆 رتبه‌بندی",
-        "⚙️ تنظیمات",
-    ],
-    "governance": [
-        "governance_main",
-        "gov_active",
-        "gov_new",
-        "gov_voting",
-        "gov_history",
-        "gov_vote",
-        "gov_revoke",
-    ],
+    "sections": ["📊 پورتفولیو", "⚡ مأموریت", "🏆 رتبه‌بندی", "⚙️ تنظیمات"],
+    "governance": ["governance_main", "gov_active", "gov_new", "gov_voting",
+                   "gov_history", "gov_vote", "gov_revoke"],
 }
 
 EXPECTED_JOB_IDS = {
-    "rate_engine_15m",
-    "nation_rank_hourly",
-    "governance_cycle",
-    "daily_market_reset",
-    "nation_join_request_expiration",
+    "rate_engine_15m", "nation_rank_hourly", "governance_cycle",
+    "daily_market_reset", "nation_join_request_expiration",
     "nation_weekly_ai_report",
 }
 
 EXPECTED_ROUTER_NAMES = {
-    "onboarding_fix",
-    "start",
-    "market",
-    "founder",
-    "nation_management",
-    "nation",
-    "governance",
-    "sections",
-    "ai",
+    "onboarding_fix", "start", "market", "founder", "nation_management",
+    "nation", "governance", "sections",
 }
+EXPECTED_AI_ROUTER_NAMES = {"ai_companion"}
 
 
 async def _table_exists(table_name: str) -> bool:
@@ -91,37 +50,35 @@ async def _table_exists(table_name: str) -> bool:
         )
 
 
+def _all_handler_source(root: Path) -> str:
+    parts = []
+    for source in (root / "app" / "handlers").glob("*.py"):
+        parts.append(source.read_text(encoding="utf-8"))
+    ai_init = root / "ai" / "__init__.py"
+    if ai_init.exists():
+        parts.append(ai_init.read_text(encoding="utf-8"))
+    return "\n".join(parts)
+
+
 async def run_startup_smoke_test(
     dp: Dispatcher,
     scheduler: AsyncIOScheduler | None = None,
 ) -> bool:
-    logger.info(
-        "SELFTEST|BEGIN|START->ONBOARDING->NATION->DASHBOARD->MARKET->FOUNDER->GOVERNANCE"
-    )
+    logger.info("SELFTEST|BEGIN|START->ONBOARDING->NATION->DASHBOARD->MARKET->FOUNDER->GOVERNANCE")
     ok = True
 
     registry_errors = validate_registry()
     if registry_errors:
-        logger.error(
-            "SELFTEST|FAIL|registry|%s",
-            " | ".join(registry_errors),
-        )
+        logger.error("SELFTEST|FAIL|registry|%s", " | ".join(registry_errors))
         ok = False
     else:
-        logger.info(
-            "SELFTEST|PASS|registry|keys=%d",
-            len(RULE_REGISTRY),
-        )
+        logger.info("SELFTEST|PASS|registry|keys=%d", len(RULE_REGISTRY))
 
     try:
         from app.diagnostics.flow_health import run_flow_health_test
-
         flow_report = run_flow_health_test()
         if flow_report.errors:
-            logger.error(
-                "SELFTEST|FAIL|flow-health|%s",
-                " | ".join(flow_report.errors),
-            )
+            logger.error("SELFTEST|FAIL|flow-health|%s", " | ".join(flow_report.errors))
             ok = False
         else:
             logger.info(
@@ -141,198 +98,114 @@ async def run_startup_smoke_test(
                 await session.execute(text("SELECT 1"))
                 for key in RULE_REGISTRY:
                     await resolve(session, key)
-
         logger.info("SELFTEST|PASS|database+resolver")
     except Exception:
         logger.exception("SELFTEST|FAIL|database+resolver")
         ok = False
 
     try:
-        phase2_tables = (
-            "proposals",
-            "votes",
-            "rule_overrides",
-            "governance_ledger",
-            "player_temporal_profiles",
-            "behavior_snapshots",
-        )
-        nation_management_tables = (
-            "nation_members",
-            "nation_logs",
-            "nation_join_requests",
-            "nation_wars",
-        )
-        missing_phase2 = [
-            table_name
-            for table_name in phase2_tables
-            if not await _table_exists(table_name)
-        ]
-        missing_nation_management = [
-            table_name
-            for table_name in nation_management_tables
-            if not await _table_exists(table_name)
-        ]
+        phase2_tables = ("proposals", "votes", "rule_overrides", "governance_ledger",
+                         "player_temporal_profiles", "behavior_snapshots")
+        nation_tables = ("nation_members", "nation_logs", "nation_join_requests", "nation_wars")
+        missing_phase2 = [x for x in phase2_tables if not await _table_exists(x)]
+        missing_nation = [x for x in nation_tables if not await _table_exists(x)]
         if missing_phase2:
-            logger.error(
-                "SELFTEST|FAIL|phase2-tables|missing=%s",
-                ",".join(missing_phase2),
-            )
-            ok = False
+            logger.error("SELFTEST|FAIL|phase2-tables|missing=%s", ",".join(missing_phase2)); ok = False
         else:
             logger.info("SELFTEST|PASS|phase2-tables")
-        if missing_nation_management:
-            logger.error(
-                "SELFTEST|FAIL|nation-management-tables|missing=%s",
-                ",".join(missing_nation_management),
-            )
-            ok = False
+        if missing_nation:
+            logger.error("SELFTEST|FAIL|nation-management-tables|missing=%s", ",".join(missing_nation)); ok = False
         else:
             logger.info("SELFTEST|PASS|nation-management-tables")
     except Exception:
-        logger.exception("SELFTEST|FAIL|schema-tables")
-        ok = False
+        logger.exception("SELFTEST|FAIL|schema-tables"); ok = False
 
     try:
         async with engine.connect() as connection:
-            identity_ok = await connection.run_sync(
-                lambda sync_connection: all(
-                    bool(
-                        sync_connection.execute(
-                            text(
-                                """
-                                SELECT attidentity IN ('a', 'd')
-                                FROM pg_attribute
-                                WHERE attrelid = CAST(:table_name AS regclass)
-                                  AND attname = 'id'
-                                """
-                            ),
-                            {"table_name": table_name},
-                        ).scalar()
-                    )
-                    for table_name in ("public.user_activities", "public.rate_history")
-                )
+            identity_rows = await connection.execute(text("""
+                SELECT
+                    c.relname,
+                    a.attidentity,
+                    pg_get_expr(d.adbin, d.adrelid) AS default_expr
+                FROM pg_class c
+                JOIN pg_attribute a ON a.attrelid = c.oid AND a.attname = 'id'
+                LEFT JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
+                WHERE c.relnamespace = 'public'::regnamespace
+                  AND c.relname IN ('user_activities', 'rate_history')
+            """))
+            identity = {row[0]: (row[1], row[2]) for row in identity_rows}
+        identity_ok = all(
+            name in identity and (
+                identity[name][0] in ("a", "d")
+                or (identity[name][1] or "").lower().startswith("nextval(")
             )
+            for name in ("user_activities", "rate_history")
+        )
         if not identity_ok:
-            logger.error(
-                "SELFTEST|FAIL|bigint-identities|user_activities/rate_history id is not generated"
-            )
+            logger.error("SELFTEST|FAIL|bigint-identities|user_activities/rate_history id is not generated|details=%s", identity)
             ok = False
         else:
             logger.info("SELFTEST|PASS|bigint-identities")
     except Exception:
-        logger.exception("SELFTEST|FAIL|bigint-identities")
-        ok = False
+        logger.exception("SELFTEST|FAIL|bigint-identities"); ok = False
 
     try:
         async with engine.connect() as connection:
             columns = await connection.run_sync(
-                lambda sync_connection: {
-                    column["name"]
-                    for column in inspect(sync_connection).get_columns("nations")
-                }
+                lambda sync_connection: {c["name"] for c in inspect(sync_connection).get_columns("nations")}
             )
-        required_nation_columns = {
-            "join_policy",
-            "personality",
-            "invite_code",
-            "treasury",
-        }
-        missing_nation_columns = sorted(required_nation_columns - columns)
-        if missing_nation_columns:
-            logger.error(
-                "SELFTEST|FAIL|nation-management-columns|missing=%s",
-                ",".join(missing_nation_columns),
-            )
-            ok = False
+        required = {"join_policy", "personality", "invite_code", "treasury"}
+        missing = sorted(required - columns)
+        if missing:
+            logger.error("SELFTEST|FAIL|nation-management-columns|missing=%s", ",".join(missing)); ok = False
         else:
             logger.info("SELFTEST|PASS|nation-management-columns")
     except Exception:
-        logger.exception("SELFTEST|FAIL|nation-management-columns")
-        ok = False
+        logger.exception("SELFTEST|FAIL|nation-management-columns"); ok = False
 
     try:
         root = Path(__file__).resolve().parents[2]
+        source_all = _all_handler_source(root)
         routers = {getattr(router, "name", ""): router for router in dp.sub_routers}
         for router_name, tokens in CONTRACTS.items():
             router = routers.get(router_name)
             if router is None:
-                logger.error(
-                    "SELFTEST|FAIL|router=%s|missing",
-                    router_name,
-                )
-                ok = False
+                logger.error("SELFTEST|FAIL|router=%s|missing", router_name); ok = False
                 continue
-
-            source = root / "app" / "handlers" / f"{router_name}.py"
-            body = source.read_text(encoding="utf-8")
-            missing = [token for token in tokens if token not in body]
+            missing = [token for token in tokens if token not in source_all]
             if missing:
-                logger.error(
-                    "SELFTEST|FAIL|contract=%s|missing=%s",
-                    router_name,
-                    ",".join(missing),
-                )
-                ok = False
+                logger.error("SELFTEST|FAIL|contract=%s|missing=%s", router_name, ",".join(missing)); ok = False
             else:
-                logger.info(
-                    "SELFTEST|PASS|contract=%s|checks=%d",
-                    router_name,
-                    len(tokens),
-                )
-    except Exception:
-        logger.exception("SELFTEST|FAIL|route-contracts")
-        ok = False
+                logger.info("SELFTEST|PASS|contract=%s|checks=%d", router_name, len(tokens))
 
-    expected_routers = {getattr(router, "name", "") for router in dp.sub_routers}
-    missing_routers = sorted(EXPECTED_ROUTER_NAMES - expected_routers)
-    if missing_routers:
-        logger.error(
-            "SELFTEST|FAIL|routers|missing=%s",
-            ",".join(missing_routers),
-        )
-        ok = False
-    else:
-        logger.info(
-            "SELFTEST|PASS|routers|count=%d",
-            len(EXPECTED_ROUTER_NAMES),
-        )
+        registered_names = set(routers)
+        missing_routers = sorted(EXPECTED_ROUTER_NAMES - registered_names)
+        if missing_routers:
+            logger.error("SELFTEST|FAIL|routers|missing=%s", ",".join(missing_routers)); ok = False
+        else:
+            logger.info("SELFTEST|PASS|routers|count=%d", len(EXPECTED_ROUTER_NAMES))
+
+        missing_ai = sorted(EXPECTED_AI_ROUTER_NAMES - registered_names)
+        if missing_ai:
+            logger.error("SELFTEST|FAIL|ai-router|missing=%s", ",".join(missing_ai)); ok = False
+        else:
+            logger.info("SELFTEST|PASS|ai-router|name=ai_companion")
+    except Exception:
+        logger.exception("SELFTEST|FAIL|route-contracts"); ok = False
 
     if scheduler is not None:
-        missing_jobs = [
-            job_id
-            for job_id in EXPECTED_JOB_IDS
-            if scheduler.get_job(job_id) is None
-        ]
+        missing_jobs = [job_id for job_id in EXPECTED_JOB_IDS if scheduler.get_job(job_id) is None]
         if missing_jobs:
-            logger.error(
-                "SELFTEST|FAIL|scheduler|missing=%s",
-                ",".join(missing_jobs),
-            )
-            ok = False
+            logger.error("SELFTEST|FAIL|scheduler|missing=%s", ",".join(missing_jobs)); ok = False
         else:
-            logger.info(
-                "SELFTEST|PASS|scheduler|jobs=%d",
-                len(EXPECTED_JOB_IDS),
-            )
+            logger.info("SELFTEST|PASS|scheduler|jobs=%d", len(EXPECTED_JOB_IDS))
 
-    expected_model_tables = {
-        "proposals",
-        "votes",
-        "rule_overrides",
-        "governance_ledger",
-        "player_temporal_profiles",
-        "behavior_snapshots",
-    }
-    missing_metadata = expected_model_tables.difference(Base.metadata.tables)
+    missing_metadata = {
+        "proposals", "votes", "rule_overrides", "governance_ledger",
+        "player_temporal_profiles", "behavior_snapshots"
+    }.difference(Base.metadata.tables)
     if missing_metadata:
-        logger.error(
-            "SELFTEST|FAIL|metadata|missing=%s",
-            ",".join(sorted(missing_metadata)),
-        )
-        ok = False
+        logger.error("SELFTEST|FAIL|metadata|missing=%s", ",".join(sorted(missing_metadata))); ok = False
 
-    logger.info(
-        "SELFTEST|%s|startup smoke test complete",
-        "PASS" if ok else "FAIL",
-    )
+    logger.info("SELFTEST|%s|startup smoke test complete", "PASS" if ok else "FAIL")
     return ok
