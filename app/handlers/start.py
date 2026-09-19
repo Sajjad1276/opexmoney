@@ -523,7 +523,11 @@ async def _begin_registration(
 
 @router.callback_query(
     F.data == "cancel_start",
-    StateFilter(OnboardingStates.ONBOARDING_NAME, OnboardingStates.SELECT_NATION),
+    StateFilter(
+        OnboardingStates.ONBOARDING_NAME,
+        OnboardingStates.SET_USERNAME_PLAYER,
+        OnboardingStates.SELECT_NATION,
+    ),
 )
 async def cancel_onboarding_panel(
     call: CallbackQuery,
