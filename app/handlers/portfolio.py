@@ -104,7 +104,6 @@ def build_portfolio_text(data: dict) -> str:
     return "\n".join(f"{RLM}{line}" for line in lines)
 
 
-@router.message(F.text == "📊 پورتفولیو")
 async def show_portfolio(message: Message) -> None:
     try:
         async with async_session() as session:
@@ -128,7 +127,6 @@ async def show_portfolio(message: Message) -> None:
     )
 
 
-@router.callback_query(F.data == "portfolio_refresh")
 async def refresh_portfolio(callback: CallbackQuery) -> None:
     try:
         async with async_session() as session:
