@@ -250,7 +250,7 @@ async def get_chart_data(
         "rate_emoji": rate_emoji,
         "currency_code": str(nation.currency_code),
         "nation_name": str(nation.name),
-        "nation_flag": "",
+        "nation_flag": "🌍",
         "window_hours": requested_hours,
         "window": window,
         "enough_data": True,
