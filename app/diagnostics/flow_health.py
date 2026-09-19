@@ -267,15 +267,29 @@ def run_flow_health_test() -> FlowHealthReport:
         else:
             dynamic_buttons += 1
             literal_prefix = value.split("{", 1)[0]
-            # F-strings such as buyq_100_{nation_id} are concrete variants
-            # of a handler family like ^buyq_(\\d+|all)_\\d+$.
-            family_prefix = re.split(r"\\d", literal_prefix, maxsplit=1)[0]
-            if family_prefix and not any(
-                (handler_kind == "startswith" and pattern.startswith(family_prefix))
-                or (handler_kind == "regexp" and family_prefix in pattern)
-                or (handler_kind == "exact" and pattern.startswith(family_prefix))
-                for handler_kind, pattern in handler_specs
-            ):
+            # Collapse a concrete f-string variant onto its handler family.
+            # Examples: buyq_100_ -> buyq_, buyq_all_ -> buyq_.
+            prefix_candidates = [literal_prefix]
+            cut_positions = [
+                index + 1
+                for index, char in enumerate(literal_prefix)
+                if char in "_:"
+            ]
+            for position in reversed(cut_positions):
+                candidate = literal_prefix[:position]
+                if candidate not in prefix_candidates:
+                    prefix_candidates.append(candidate)
+            family_prefix = ""
+            for candidate in prefix_candidates:
+                if any(
+                    (handler_kind == "startswith" and pattern.startswith(candidate))
+                    or (handler_kind == "regexp" and candidate in pattern)
+                    or (handler_kind == "exact" and pattern.startswith(candidate))
+                    for handler_kind, pattern in handler_specs
+                ):
+                    family_prefix = candidate
+                    break
+            if not family_prefix:
                 orphan_buttons.append(
                     f"{path.relative_to(ROOT)} -> dynamic:{value}"
                 )
