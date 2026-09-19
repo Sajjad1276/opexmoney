@@ -6,7 +6,7 @@ import logging
 from decimal import Decimal
 
 from aiogram import F, Router
-from aiogram.enums import ParseMode
+from aiogram.enums import ButtonStyle, ParseMode
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
@@ -53,8 +53,17 @@ class AcademyStates(StatesGroup):
     ASKING_AI = State()
 
 
-def _button(text: str, callback_data: str) -> InlineKeyboardButton:
-    return InlineKeyboardButton(text=text[:64], callback_data=callback_data)
+def _button(
+    text: str,
+    callback_data: str,
+    *,
+    style: ButtonStyle = ButtonStyle.PRIMARY,
+) -> InlineKeyboardButton:
+    return InlineKeyboardButton(
+        text=text[:64],
+        callback_data=callback_data,
+        style=style,
+    )
 
 
 def build_academy_main_msg(user_xp) -> str:
