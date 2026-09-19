@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import html
+import logging
 from decimal import Decimal, InvalidOperation
 
 from aiogram import F, Router
+from aiogram.filters import Command
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.types import (
@@ -34,6 +36,17 @@ from app.keyboards.inline import (
 )
 from app.services.economic_engine import get_active_members
 from app.services.market_service import get_user_sell_holdings
+from app.services.alert_service import (
+    create_price_alert,
+    delete_price_alert,
+    list_price_alerts,
+    parse_direction,
+)
+from app.services.market_intelligence import (
+    format_change_text,
+    get_market_overview,
+    get_risk_label,
+)
 from app.services.mission_service import increment_mission
 from app.services.user_service import sync_user_balance
 from app.services.rules.resolver import resolve
@@ -50,6 +63,7 @@ from app.utils.formatting import (
 )
 
 router = Router(name="market")
+logger = logging.getLogger(__name__)
 
 def market_keyboard_for_nation(nation_id: int) -> InlineKeyboardMarkup:
     keyboard = market_keyboard()
@@ -63,6 +77,31 @@ def market_keyboard_for_nation(nation_id: int) -> InlineKeyboardMarkup:
             )
         ],
     )
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+def market_intelligence_keyboard(nations: list[Nation]) -> InlineKeyboardMarkup:
+    rows: list[list[InlineKeyboardButton]] = []
+    for nation in nations:
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text=f"📈 {nation.currency_code}",
+                    callback_data=f"market_chart:{nation.nation_id}",
+                ),
+                InlineKeyboardButton(
+                    text="🔔 هشدار",
+                    callback_data=f"alert:set:{nation.currency_code}",
+                ),
+            ]
+        )
+
+    rows.append([
+        InlineKeyboardButton(
+            text="🔔 هشدارهای من",
+            callback_data="alert:list",
+        )
+    ])
+    rows.extend([list(row) for row in market_keyboard().inline_keyboard])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -105,38 +144,80 @@ async def _trade_parameters(
     return fee_rate, peak_multiplier
 
 
-def market_text(user, nation, others, active):
-    change = get_rate_change(nation)
+def _direction_emoji(change: float) -> str:
+    if change > 0:
+        return "🟢"
+    if change < 0:
+        return "🔴"
+    return "🟡"
+
+
+def _risk_title(label: str) -> str:
+    return label.split(" ", 1)[1] if " " in label else label
+
+
+def _format_mover(code: str | None, pct: float, positive: bool) -> str:
+    if not code:
+        return "—"
+    rounded = abs(round(pct))
+    arrow = "▲" if positive else "▼"
+    return f"{html.escape(code)} {arrow} {fmt_amount(rounded).replace('.00', '')}٪"
+
+
+def market_text(user, overview: dict, active: int) -> str:
     lines = [
         "💹 <b>بازار OPEX</b>",
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-        f"💰 موجودی: <code>{html.escape(nation.currency_code)}</code>: "
-        f"<b>{fmt_amount(user.balance)}</b> · "
-        f"<code>ΩXR</code>: <b>{fmt_amount(user.xr_balance)}</b>",
+        "━━━━━━━━━━━━━━━━━━━━━━━━",
+        f"💰 ΩXR: <b>{fmt_amount(user.xr_balance)}</b> · "
+        f"{html.escape(user.home_nation_id and overview['currencies'][0]['nation'].currency_code or '—')}",
         "",
-        "ارز ملت تو:",
-        f"{get_rate_emoji(change)} <b>{html.escape(nation.name)}</b> "
-        f"(<code>{html.escape(nation.currency_code)}</code>)\n"
-        f"1 {html.escape(nation.currency_code)} = <b>{fmt_rate(nation.exchange_rate)} ΩXR</b> · "
-        f"<i>{fmt_pct(change)}</i>",
-        "",
-        "─────────────────",
-        "<b>سایر ارزها:</b>",
+        "━━━━━━━━━━━━━━━",
+        overview["mood"],
+        "━━━━━━━━━━━━━━━",
     ]
-    for item in others:
+
+    winner_code, winner_pct = overview["top_mover"]["winner"]
+    loser_code, loser_pct = overview["top_mover"]["loser"]
+    if winner_code:
         lines.append(
-            f"{get_rate_emoji(get_rate_change(item))} <b>{html.escape(item.name)}</b> "
-            f"(<code>{html.escape(item.currency_code)}</code>) · "
-            f"1 {html.escape(item.currency_code)} = <b>{fmt_rate(item.exchange_rate)} ΩXR</b> · "
-            f"<i>{fmt_pct(get_rate_change(item))}</i>"
+            f"🏆 بهترین: {_format_mover(winner_code, winner_pct, True)}"
         )
-    if not others:
-        lines.append("هنوز ارز دیگه‌ای فعال نیست.")
-    lines += [
-        "",
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-        f"⏱ {to_fa(0)} دقیقه پیش · 👥 {to_fa(active)} فعال",
-    ]
+    if loser_code:
+        lines.append(
+            f"💀 بدترین: {_format_mover(loser_code, loser_pct, False)}"
+        )
+    lines.append("")
+
+    for item in overview["currencies"]:
+        nation = item["nation"]
+        code = html.escape(nation.currency_code)
+        price = fmt_rate(item["current_rate"])
+        change = float(item["change_24h"])
+        direction = _direction_emoji(change)
+        risk_title = html.escape(_risk_title(item["risk_label"]))
+        volume = fmt_amount(item["volume_24h"])
+
+        lines.extend(
+            [
+                f"{direction} <b>{code}</b> [{risk_title}]  "
+                f"<b>{price} OPX</b>",
+                f"   {format_change_text(change, '24h')}",
+                f"   📊 حجم ۲۴ ساعت: <b>{volume} OPX</b>",
+                f"   <i>{html.escape(item['insight'])}</i>",
+                "",
+            ]
+        )
+
+        if sum(len(line) + 1 for line in lines) > 3600:
+            lines.append("… فقط بخشی از ارزها در این صفحه نمایش داده شد.")
+            break
+
+    lines.extend(
+        [
+            "━━━━━━━━━━━━━━━━━━━━━━━━",
+            f"⏱ بروزرسانی نرخ‌ها هر ۱۵ دقیقه · 👥 {to_fa(active)} عضو فعال ملت اصلی",
+        ]
+    )
     return "\n".join(lines)
 
 
@@ -153,28 +234,27 @@ async def render_market(message: Message, edit_call=None):
                     await message.answer(text, parse_mode="HTML")
                 return
 
-            nation = await session.get(Nation, user.home_nation_id)
-            others = (
-                await session.execute(
-                    select(Nation)
-                    .where(
-                        Nation.is_active.is_(True),
-                        Nation.nation_id != nation.nation_id,
-                    )
-                    .order_by(Nation.exchange_rate.desc())
-                    .limit(3)
-                )
-            ).scalars().all()
-            active = await get_active_members(session, nation.nation_id)
-            text = market_text(user, nation, others, active)
+            overview = await get_market_overview(
+                session,
+                user.home_nation_id,
+                limit=10,
+            )
+            if not overview["currencies"]:
+                text = "⚠️ هنوز ارز فعالی برای نمایش بازار وجود ندارد."
+                nations_for_keyboard: list[Nation] = []
+            else:
+                nations_for_keyboard = [item["nation"] for item in overview["currencies"]]
+                active = await get_active_members(session, user.home_nation_id)
+                text = market_text(user, overview, active)
 
+    markup = market_intelligence_keyboard(nations_for_keyboard)
     if edit_call:
-        await safe_edit(edit_call, text, market_keyboard_for_nation(nation.nation_id))
+        await safe_edit(edit_call, text, markup)
     else:
         await message.answer("\u2060", reply_markup=ReplyKeyboardRemove())
         await message.answer(
             text,
-            reply_markup=market_keyboard_for_nation(nation.nation_id),
+            reply_markup=markup,
             parse_mode="HTML",
         )
 
@@ -199,43 +279,215 @@ async def market_main(call: CallbackQuery):
 @router.callback_query(F.data == "market_refresh")
 async def market_refresh(call: CallbackQuery):
     try:
+        await render_market(call.message, call)
+        await call.answer("✅ بازار بروزرسانی شد")
+    except Exception:
+        logger.exception("Market refresh failed for user=%s", call.from_user.id)
+        await call.answer("⚠️ بازار موقتاً در دسترس نیست.", show_alert=True)
+
+
+@router.message(Command("alert"))
+async def alert_command(message: Message, state: FSMContext):
+    parts = (message.text or "").split()
+    if len(parts) not in {3, 4}:
+        await message.answer(
+            "🔔 <b>ساخت هشدار قیمت</b>\n"
+            "مثال:\n"
+            "<code>/alert ARY 1.5</code>\n"
+            "<code>/alert ARY 0.5 below</code>",
+            parse_mode="HTML",
+        )
+        return
+
+    code = parts[1].strip().upper()
+    try:
+        target = Decimal(
+            parts[2].strip()
+            .replace("٬", "")
+            .replace(",", "")
+            .replace("٫", ".")
+        )
+    except InvalidOperation:
+        await message.answer("⚠️ قیمت هدف نامعتبره.")
+        return
+
+    direction = parse_direction(parts[3]) if len(parts) == 4 else None
+    if len(parts) == 4 and direction is None:
+        await message.answer("⚠️ جهت باید <code>above</code> یا <code>below</code> باشه.", parse_mode="HTML")
+        return
+
+    await state.clear()
+    try:
         async with async_session() as session:
             async with session.begin():
-                user = await session.get(User, call.from_user.id)
-                if not user or user.home_nation_id is None:
-                    await call.answer("🔴 حساب پیدا نشد. /start بزن.", show_alert=True)
-                    return
-
-                nation = await session.get(Nation, user.home_nation_id)
-                others = (
-                    await session.execute(
-                        select(Nation)
-                        .where(
-                            Nation.is_active.is_(True),
-                            Nation.nation_id != nation.nation_id,
-                        )
-                        .order_by(Nation.exchange_rate.desc())
-                        .limit(3)
-                    )
-                ).scalars().all()
-                active = await get_active_members(session, nation.nation_id)
-                text = market_text(user, nation, others, active)
-
-        try:
-            await call.message.edit_text(
-                text,
-                reply_markup=market_keyboard_for_nation(nation.nation_id),
-                parse_mode="HTML",
-            )
-            await call.answer()
-        except TelegramBadRequest as exc:
-            await call.answer(
-                "نرخ‌ها تغییر نکردن."
-                if "not modified" in str(exc).lower()
-                else None
-            )
+                alert = await create_price_alert(
+                    session,
+                    user_id=message.from_user.id,
+                    currency_code=code,
+                    target_price=target,
+                    direction=direction,
+                )
+        arrow = "▲" if alert.direction == "above" else "▼"
+        await message.answer(
+            f"✅ هشدار ثبت شد\n"
+            f"🔔 {html.escape(alert.currency_code)} · هدف: <b>{fmt_rate(alert.target_price)} OPX</b> {arrow}",
+            parse_mode="HTML",
+        )
+    except ValueError as exc:
+        await message.answer(f"⚠️ {html.escape(str(exc))}", parse_mode="HTML")
     except Exception:
-        await call.answer("⚠️ بازار موقتاً در دسترس نیست.", show_alert=True)
+        logger.exception("Could not create alert from command user=%s", message.from_user.id)
+        await message.answer("⚠️ ساخت هشدار انجام نشد.")
+
+
+@router.callback_query(F.data.startswith("alert:set:"))
+async def alert_set_callback(call: CallbackQuery, state: FSMContext):
+    code = call.data.rsplit(":", 1)[1].strip().upper()
+    async with async_session() as session:
+        async with session.begin():
+            nation = await session.scalar(
+                select(Nation)
+                .where(
+                    Nation.currency_code == code,
+                    Nation.is_active.is_(True),
+                )
+                .limit(1)
+            )
+
+    if nation is None:
+        await call.answer("⚠️ این ارز دیگر فعال نیست.", show_alert=True)
+        return
+
+    await state.clear()
+    await state.set_state(MarketStates.WAITING_ALERT_PRICE)
+    await state.update_data(alert_currency=code)
+    if call.message:
+        await call.message.answer(
+            f"🔔 قیمت هدف برای <b>{html.escape(code)}</b> را بنویس.\n"
+            "مثال: <code>1.5</code> یا <code>1.5 below</code>",
+            parse_mode="HTML",
+        )
+    await call.answer()
+
+
+@router.message(MarketStates.WAITING_ALERT_PRICE, F.text)
+async def alert_price_message(message: Message, state: FSMContext):
+    data = await state.get_data()
+    code = str(data.get("alert_currency") or "").upper()
+    parts = (message.text or "").split()
+    if not code or len(parts) not in {1, 2}:
+        await state.clear()
+        await message.answer("⚠️ نشست هشدار نامعتبر شد. دوباره از بازار شروع کن.")
+        return
+
+    try:
+        target = Decimal(
+            parts[0]
+            .strip()
+            .replace("٬", "")
+            .replace(",", "")
+            .replace("٫", ".")
+        )
+    except InvalidOperation:
+        await message.answer("⚠️ قیمت هدف نامعتبره. مثلاً 1.5 بنویس.")
+        return
+
+    direction = parse_direction(parts[1]) if len(parts) == 2 else None
+    if len(parts) == 2 and direction is None:
+        await message.answer("⚠️ جهت را above یا below بنویس.")
+        return
+
+    try:
+        async with async_session() as session:
+            async with session.begin():
+                alert = await create_price_alert(
+                    session,
+                    user_id=message.from_user.id,
+                    currency_code=code,
+                    target_price=target,
+                    direction=direction,
+                )
+        await state.clear()
+        arrow = "▲" if alert.direction == "above" else "▼"
+        await message.answer(
+            f"✅ هشدار {html.escape(code)} ثبت شد.\n"
+            f"هدف: <b>{fmt_rate(alert.target_price)} OPX</b> {arrow}",
+            parse_mode="HTML",
+        )
+    except ValueError as exc:
+        await message.answer(f"⚠️ {html.escape(str(exc))}", parse_mode="HTML")
+    except Exception:
+        logger.exception("Could not create alert user=%s code=%s", message.from_user.id, code)
+        await state.clear()
+        await message.answer("⚠️ ساخت هشدار انجام نشد.")
+
+
+@router.callback_query(F.data == "alert:list")
+async def alert_list_callback(call: CallbackQuery):
+    async with async_session() as session:
+        async with session.begin():
+            alerts = await list_price_alerts(session, call.from_user.id)
+
+    lines = [
+        "🔔 <b>هشدارهای قیمت من</b>",
+        "━━━━━━━━━━━━━━━━━━━━",
+    ]
+    rows: list[list[InlineKeyboardButton]] = []
+    if not alerts:
+        lines.append("هنوز هشداری ثبت نکردی.")
+    else:
+        for alert in alerts[:20]:
+            status = "✅ فعال شده" if alert.triggered else "⏳ فعال"
+            arrow = "▲" if alert.direction == "above" else "▼"
+            lines.append(
+                f"• <b>{html.escape(alert.currency_code)}</b> · "
+                f"{fmt_rate(alert.target_price)} OPX {arrow} · {status}"
+            )
+            rows.append([
+                InlineKeyboardButton(
+                    text=f"🗑 حذف {alert.currency_code} #{alert.id}",
+                    callback_data=f"alert:delete:{alert.id}",
+                )
+            ])
+
+    rows.append([
+        InlineKeyboardButton(
+            text="↩️ بازگشت به بازار",
+            callback_data="market_main",
+        )
+    ])
+
+    if call.message:
+        await call.message.edit_text(
+            "\n".join(lines),
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=rows),
+            parse_mode="HTML",
+        )
+    await call.answer()
+
+
+@router.callback_query(F.data.startswith("alert:delete:"))
+async def alert_delete_callback(call: CallbackQuery):
+    try:
+        alert_id = int(call.data.rsplit(":", 1)[1])
+    except (TypeError, ValueError):
+        await call.answer("⚠️ شناسه هشدار نامعتبره.", show_alert=True)
+        return
+
+    async with async_session() as session:
+        async with session.begin():
+            deleted = await delete_price_alert(
+                session,
+                user_id=call.from_user.id,
+                alert_id=alert_id,
+            )
+
+    await call.answer(
+        "✅ هشدار حذف شد." if deleted else "⚠️ هشدار پیدا نشد.",
+        show_alert=not deleted,
+    )
+    if call.message:
+        await alert_list_callback(call)
 
 
 @router.callback_query(F.data == "market_buy")
