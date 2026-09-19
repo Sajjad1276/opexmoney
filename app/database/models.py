@@ -47,6 +47,7 @@ class Nation(Base):
     # Telegram chat/user identifiers can exceed PostgreSQL INTEGER (int4).
     group_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     name: Mapped[str] = mapped_column(String(100))
+    flag_emoji: Mapped[str | None] = mapped_column(String(10), nullable=True, default="🏴")
     currency_code: Mapped[str] = mapped_column(String(4))
     founder_user_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     exchange_rate: Mapped[Decimal] = mapped_column(Numeric(12, 4), default=Decimal("1.0000"), nullable=False)
