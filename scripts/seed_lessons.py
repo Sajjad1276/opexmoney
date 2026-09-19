@@ -1,4 +1,6 @@
 import asyncio
+
+# CI academy verification
 import json
 
 from sqlalchemy import select
