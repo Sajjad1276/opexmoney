@@ -33,6 +33,7 @@ from app.services.user_service import get_registration_status, get_user, is_full
 from app.states.onboarding import OnboardingStates
 from config import settings
 from app.utils.formatting import fmt_amount, fmt_pct, fmt_rate, get_rate_change, get_rate_emoji, to_fa
+from app.utils.ui import close_inline_panel, remember_inline_panel
 
 router = Router(name="start")
 logger = logging.getLogger(__name__)
@@ -473,6 +474,7 @@ async def _begin_registration(message: Message, state: FSMContext) -> None:
         reply_markup=cancel_keyboard(),
         parse_mode=ParseMode.HTML,
     )
+    await remember_inline_panel(state, message)
 
 
 @router.message(F.text == "🎮 شروع بازی")
@@ -845,6 +847,7 @@ async def onboarding_name(message: Message, state: FSMContext) -> None:
         username=name,
         onboarding_started_at=time.time(),
     )
+    await close_inline_panel(state, message.bot)
     await _render_nation_page(message, state, page=0)
 
 
