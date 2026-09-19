@@ -1014,32 +1014,21 @@ async def confirm_nation(call: CallbackQuery, state: FSMContext, bot: Bot) -> No
         return
 
     initial_omx = Decimal("500") * nation.exchange_rate
-    text = (
-        f"🏛 <b>{html.escape(nation.name)}</b>
+    text = f"""🏛 <b>{html.escape(nation.name)}</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-"
-        f"{user_mention(call.from_user)}، شهروند رسمی این ملت شدی.
+{user_mention(call.from_user)}، شهروند رسمی این ملت شدی.
 
-"
-        f"💰 موجودی اولیه:
+💰 موجودی اولیه:
 <b>500 <code>{html.escape(nation.currency_code)}</code> ≈ {fmt_amount(initial_omx)} ΩXR</b>
 
-"
-        "─────────────────
-"
-        f"{get_rate_emoji(get_rate_change(nation))} نرخ <code>{html.escape(nation.currency_code)}</code>: <b>{fmt_rate(nation.exchange_rate)} ΩXR</b>
-"
-        f"<i>{fmt_pct(get_rate_change(nation))} نسبت به دیروز</i>
+─────────────────
+{get_rate_emoji(get_rate_change(nation))} نرخ <code>{html.escape(nation.currency_code)}</code>: <b>{fmt_rate(nation.exchange_rate)} ΩXR</b>
+<i>{fmt_pct(get_rate_change(nation))} نسبت به دیروز</i>
 
-"
-        f"🏆 رتبه #{to_fa(rank)} از {to_fa(total_nations)}
-"
-        f"👥 {to_fa(nation.member_count)} عضو
-"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-"
-        f"هر معامله‌ات روی نرخ <code>{html.escape(nation.currency_code)}</code> اثر میذاره."
-    )
+🏆 رتبه #{to_fa(rank)} از {to_fa(total_nations)}
+👥 {to_fa(nation.member_count)} عضو
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+هر معامله‌ات روی نرخ <code>{html.escape(nation.currency_code)}</code> اثر میذاره."""
     await _safe_edit_text(call, text, first_trade_keyboard())
     await call.answer()
 
