@@ -70,3 +70,15 @@ def test_chart_metadata_defaults_to_black_flag_when_flag_is_empty():
     data = _empty_chart_data(nation, window_hours=24)
 
     assert data["nation_flag"] == "🏴"
+
+
+
+def test_chart_reference_layout_is_present_without_matplotlib_emoji_text():
+    source = __import__("inspect").getsource(price_chart)
+
+    assert "Large headline price." in source
+    assert "Change pill." in source
+    assert "Main chart panel." in source
+    assert 'facecolor="#FFFFFF"' in source
+    assert "fill_between(" in source
+    assert not re.search(r"[\U0001F000-\U0001FAFF]", source)
