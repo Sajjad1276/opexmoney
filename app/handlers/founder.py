@@ -108,7 +108,7 @@ async def _continue_group_onboarding(
     group_username: str | None,
     group_type: str,
 ) -> None:
-    founder_state = await dispatcher.fsm.get_context(
+    founder_state = dispatcher.fsm.get_context(
         bot=bot,
         chat_id=founder_user_id,
         user_id=founder_user_id,
