@@ -2507,12 +2507,3 @@ async def _get_holding_amount(user_id: int, nation_id: int) -> Decimal:
         return holding.amount if holding else Decimal("500")
 
 
-@router.callback_query(F.data == "cancel_start")
-async def cancel_start(call: CallbackQuery, state: FSMContext) -> None:
-    await state.clear()
-    text = f"{html.escape(call.from_user.first_name or 'معامله‌گر')}، ثبت‌نام لغو شد.\n\nهر وقت خواستی، /start بزن."
-    if call.message and getattr(call.message, "photo", None):
-        await _safe_edit_caption(call, text)
-    else:
-        await _safe_edit_text(call, text)
-    await call.answer()
