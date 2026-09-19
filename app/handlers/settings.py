@@ -8,7 +8,7 @@ from aiogram import F, Router
 from aiogram.enums import ParseMode
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
+from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message, ReplyKeyboardRemove
 
 from app.database.session import async_session
 from app.services.settings_service import (
@@ -150,6 +150,7 @@ async def _get_settings_panel(user_id: int) -> tuple[str, InlineKeyboardMarkup]:
 
 async def _show_settings_from_message(message: Message) -> None:
     text, markup = await _get_settings_panel(message.from_user.id)
+    await message.answer("⁠", reply_markup=ReplyKeyboardRemove())
     await message.answer(
         text,
         reply_markup=markup,
