@@ -18,7 +18,6 @@ from app.keyboards.inline import (
     confirm_found_nation_keyboard,
     founder_flag_selection_keyboard,
 )
-from app.keyboards.reply import main_menu_keyboard
 from app.services.nation_service import create_nation
 from app.handlers.start import show_dashboard
 from app.services.user_service import get_user
@@ -121,6 +120,7 @@ async def _continue_group_onboarding(
     if data.get("founder_user_id") != founder_user_id:
         return
 
+    previous_message_id = data.get("onboarding_message_id")
     try:
         bot_member = await bot.get_chat_member(group_id, bot.id)
         founder_member = await bot.get_chat_member(group_id, founder_user_id)
@@ -185,7 +185,13 @@ async def _continue_group_onboarding(
     )
     await founder_state.set_state(FounderStates.SET_NATION_NAME)
 
-    await bot.send_message(
+    if previous_message_id:
+        try:
+            await bot.delete_message(founder_user_id, int(previous_message_id))
+        except Exception:
+            logger.debug("Could not delete previous founder panel", exc_info=True)
+
+    connected_message = await bot.send_message(
         founder_user_id,
         "🎉 <b>گروه با موفقیت متصل شد!</b>\n"
         f"🏛 پایتخت: <b>{html.escape(group_title)}</b>\n"
@@ -195,6 +201,7 @@ async def _continue_group_onboarding(
         parse_mode="HTML",
         reply_markup=founder_cancel_keyboard(),
     )
+    await founder_state.update_data(onboarding_message_id=connected_message.message_id)
 
     try:
         await bot.send_message(
@@ -330,7 +337,19 @@ async def group_founder_start(
 async def receive_nation_name(message: Message, state: FSMContext) -> None:
     valid, error = validate_nation_name(message.text or "")
     if not valid:
-        await message.answer(error, reply_markup=founder_cancel_keyboard())
+        data = await state.get_data()
+        previous_message_id = data.get("onboarding_message_id")
+        if previous_message_id:
+            try:
+                await message.bot.delete_message(message.chat.id, int(previous_message_id))
+            except Exception:
+                logger.debug("Could not delete invalid-name panel", exc_info=True)
+
+        panel = await message.answer(
+            error,
+            reply_markup=founder_cancel_keyboard(),
+        )
+        await state.update_data(onboarding_message_id=panel.message_id)
         return
 
     async with async_session() as session:
@@ -344,7 +363,14 @@ async def receive_nation_name(message: Message, state: FSMContext) -> None:
     )
     await state.set_state(FounderStates.CONFIRM)
 
-    await message.answer(
+    previous_message_id = data.get("onboarding_message_id")
+    if previous_message_id:
+        try:
+            await message.bot.delete_message(message.chat.id, int(previous_message_id))
+        except Exception:
+            logger.debug("Could not delete previous founder panel", exc_info=True)
+
+    confirmation_message = await message.answer(
         "📋 <b>آماده تأسیس ملت</b>\n"
         f"🏛 نام ملت: <b>{html.escape(data.get('nation_name', message.text.strip()))}</b>\n"
         f"💱 کد خودکار ارز: <b>{html.escape(code)}</b>\n"
@@ -353,6 +379,7 @@ async def receive_nation_name(message: Message, state: FSMContext) -> None:
         reply_markup=confirm_found_nation_keyboard(),
         parse_mode="HTML",
     )
+    await state.update_data(onboarding_message_id=confirmation_message.message_id)
 
 
 async def _verify_founder_group(
@@ -449,7 +476,7 @@ async def _send_founder_success(
 
     async with async_session() as session:
         async with session.begin():
-            user = await session.get(NationMember, nation.founder_user_id) if False else await session.get(User, nation.founder_user_id)
+            user = await session.get(User, nation.founder_user_id)
 
     if user is not None:
         await show_dashboard(
