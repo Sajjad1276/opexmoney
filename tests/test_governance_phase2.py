@@ -176,35 +176,34 @@ async def test_resolver_priority_and_clamping():
 
     async with async_session() as session:
         async with session.begin():
-            session.add_all([
-                RuleOverride(
-                    rule_key="market.tx_fee",
-                    value=Decimal("0.25"),
-                    scope="global",
-                    target_id=None,
-                    active_from=now - timedelta(minutes=1),
-                    active_until=now + timedelta(hours=1),
-                    is_active=True,
-                ),
-                RuleOverride(
-                    rule_key="market.tx_fee",
-                    value=Decimal("1.5"),
-                    scope="nation",
-                    target_id=nation_id,
-                    active_from=now - timedelta(minutes=1),
-                    active_until=now + timedelta(hours=1),
-                    is_active=True,
-                ),
-                RuleOverride(
-                    rule_key="market.tx_fee",
-                    value=Decimal("3"),
-                    scope="player",
-                    target_id=player_id,
-                    active_from=now - timedelta(minutes=1),
-                    active_until=now + timedelta(hours=1),
-                    is_active=True,
-                ),
-            ])
+            global_override = RuleOverride(
+                rule_key="market.tx_fee",
+                value=Decimal("0.25"),
+                scope="global",
+                target_id=None,
+                active_from=now - timedelta(minutes=1),
+                active_until=now + timedelta(hours=1),
+                is_active=True,
+            )
+            nation_override = RuleOverride(
+                rule_key="market.tx_fee",
+                value=Decimal("1.5"),
+                scope="nation",
+                target_id=nation_id,
+                active_from=now - timedelta(minutes=1),
+                active_until=now + timedelta(hours=1),
+                is_active=True,
+            )
+            player_override = RuleOverride(
+                rule_key="market.tx_fee",
+                value=Decimal("3"),
+                scope="player",
+                target_id=player_id,
+                active_from=now - timedelta(minutes=1),
+                active_until=now + timedelta(hours=1),
+                is_active=True,
+            )
+            session.add_all([global_override, nation_override, player_override])
             await session.flush()
 
             invalidate_rule_cache("market.tx_fee")
@@ -215,13 +214,6 @@ async def test_resolver_priority_and_clamping():
                 player_id=player_id,
             ) == Decimal("3.000000")
 
-            player_override = await session.scalar(
-                select(RuleOverride).where(
-                    RuleOverride.rule_key == "market.tx_fee",
-                    RuleOverride.scope == "player",
-                    RuleOverride.target_id == player_id,
-                )
-            )
             player_override.is_active = False
             invalidate_rule_cache("market.tx_fee")
             assert await resolve(
@@ -231,13 +223,6 @@ async def test_resolver_priority_and_clamping():
                 player_id=player_id,
             ) == Decimal("1.500000")
 
-            nation_override = await session.scalar(
-                select(RuleOverride).where(
-                    RuleOverride.rule_key == "market.tx_fee",
-                    RuleOverride.scope == "nation",
-                    RuleOverride.target_id == nation_id,
-                )
-            )
             nation_override.is_active = False
             invalidate_rule_cache("market.tx_fee")
             assert await resolve(
@@ -247,13 +232,6 @@ async def test_resolver_priority_and_clamping():
                 player_id=player_id,
             ) == Decimal("0.250000")
 
-            global_override = await session.scalar(
-                select(RuleOverride).where(
-                    RuleOverride.rule_key == "market.tx_fee",
-                    RuleOverride.scope == "global",
-                    RuleOverride.target_id.is_(None),
-                )
-            )
             global_override.value = Decimal("99")
             invalidate_rule_cache("market.tx_fee")
             assert await resolve(
