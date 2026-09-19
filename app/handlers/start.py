@@ -39,7 +39,7 @@ ONBOARDING_TIMEOUT = 30
 NATIONS_PER_PAGE = 5
 INITIAL_BALANCE = Decimal("500.00")
 NAME_RE = re.compile(
-    r"^[A-Za-z0-9\u06f0-\u06f9\u0660-\u0669\u0621-\u063a\u0641-\u064a\u067e\u0686\u0698\u06af-]{3,20}$"
+    r"^[A-Za-z0-9\u06f0-\u06f9\u0660-\u0669\u0621-\u063a\u0641-\u064a\u06a9\u06cc\u067e\u0686\u0698\u06af-]{3,20}$"
 )
 
 
@@ -294,7 +294,7 @@ async def show_dashboard(message: Message, user: User) -> None:
     )
 
 
-async def continue_registrationasync def continue_registration(
+async def continue_registration(
     message: Message,
     state: FSMContext,
     user: User,
