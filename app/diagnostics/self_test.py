@@ -40,7 +40,7 @@ EXPECTED_ROUTER_NAMES = {
     "onboarding_fix", "start", "market", "founder", "nation_management",
     "nation", "governance", "sections",
 }
-EXPECTED_AI_ROUTER_NAMES = {"ai_companion"}
+EXPECTED_AI_ROUTER_NAMES = {"ai"}
 
 
 async def _table_exists(table_name: str) -> bool:
