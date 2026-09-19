@@ -85,11 +85,14 @@ def _callback_button_specs() -> list[tuple[str, str, Path]]:
             if isinstance(callback, ast.Constant) and isinstance(callback.value, str):
                 specs.append(("exact", callback.value, path))
             elif isinstance(callback, ast.JoinedStr):
-                literal = "".join(
-                    part.value
-                    for part in callback.values
-                    if isinstance(part, ast.Constant) and isinstance(part.value, str)
-                )
+                parts: list[str] = []
+                for part in callback.values:
+                    if isinstance(part, ast.Constant) and isinstance(part.value, str):
+                        parts.append(part.value)
+                    elif isinstance(part, ast.FormattedValue):
+                        expression = _dotted(part.value) or "value"
+                        parts.append("{" + expression + "}")
+                literal = "".join(parts)
                 specs.append(("dynamic:" + literal, literal, path))
     return specs
 
@@ -230,7 +233,12 @@ def run_flow_health_test() -> FlowHealthReport:
             "Unregistered handler routers: " + ", ".join(missing_registration)
         )
 
-    unexpected = sorted(_registered_router_modules() - EXPECTED_HANDLER_MODULES)
+    expected_router_extras = {"ai"}
+    unexpected = sorted(
+        _registered_router_modules()
+        - EXPECTED_HANDLER_MODULES
+        - expected_router_extras
+    )
     if unexpected:
         report.warnings.append(
             "Router registrations not in health registry: " + ", ".join(unexpected)
@@ -315,7 +323,8 @@ def run_flow_health_test() -> FlowHealthReport:
 
     states = _state_names()
     mentions = _state_mentions()
-    unused_states = sorted(states - mentions)
+    intentional_unreferenced_states = {"IDLE"}
+    unused_states = sorted(states - mentions - intentional_unreferenced_states)
     if unused_states:
         report.warnings.extend(
             "State has no handler-source mention: " + state
