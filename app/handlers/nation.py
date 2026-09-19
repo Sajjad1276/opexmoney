@@ -54,7 +54,13 @@ async def back_to_dashboard(call: CallbackQuery) -> None:
                 await call.answer("⚠️ اول باید وارد بازی بشی.", show_alert=True)
                 return
     if call.message:
-        await show_dashboard(call.message, user)
+        await show_dashboard(
+            call.message,
+            user,
+            replace_inline=True,
+            bot=call.bot,
+            display_user=call.from_user,
+        )
     await call.answer()
 
 
