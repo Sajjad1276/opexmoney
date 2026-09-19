@@ -121,12 +121,12 @@ def test_prompt_and_cache_key_are_deterministic() -> None:
     context = {"user": {"name": "سجاد"}, "active_days": 5}
     prompt = build_dynamic_prompt(context=context, user_message="وضعیتم چطوره؟")
     key_one = build_cache_key(
-        model="gpt-5.6-luna",
+        model="gemini-3.8-flash",
         context=context,
         user_message="وضعیتم چطوره؟",
     )
     key_two = build_cache_key(
-        model="gpt-5.6-luna",
+        model="gemini-3.8-flash",
         context=context,
         user_message="وضعیتم چطوره؟",
     )
@@ -147,7 +147,7 @@ async def test_ai_fallback_when_provider_is_unavailable(monkeypatch) -> None:
 
     monkeypatch.setattr("ai.build_user_context", fake_context)
     monkeypatch.setattr("ai.get_cached_response", fake_cache)
-    monkeypatch.setattr(settings, "openai_api_key", None)
+    monkeypatch.setattr(settings, "gemini_api_key", None)
     monkeypatch.setattr(settings, "ai_enabled", True)
 
     result = await companion.reply(123, "سلام اوپکس", SimpleNamespace())
@@ -171,26 +171,30 @@ async def test_ai_success_path_parses_and_caches(monkeypatch) -> None:
     async def fake_remember(_user_id, _message):
         events.append("remember")
 
-    class FakeResponses:
-        async def create(self, **kwargs):
-            assert kwargs["model"] == "gpt-5.6-luna"
-            return SimpleNamespace(output_text='{"reply":"<b>سلام</b>، معامله‌گر."}')
+    class FakeModels:
+        async def generate_content(self, **kwargs):
+            assert kwargs["model"] == "gemini-3.8-flash"
+            assert kwargs["config"].response_mime_type == "application/json"
+            return SimpleNamespace(text='{"reply":"<b>سلام</b>، معامله‌گر."}')
+
+    class FakeAsyncClient:
+        models = FakeModels()
+
+        async def aclose(self):
+            return None
 
     class FakeClient:
-        def __init__(self):
-            self.responses = FakeResponses()
-
-        async def close(self):
-            return None
+        def __init__(self, **_kwargs):
+            self.aio = FakeAsyncClient()
 
     monkeypatch.setattr("ai.build_user_context", fake_context)
     monkeypatch.setattr("ai.get_cached_response", fake_cache)
     monkeypatch.setattr("ai.set_cached_response", fake_set_cache)
     monkeypatch.setattr("ai.remember_bot_message", fake_remember)
-    monkeypatch.setattr("ai.AsyncOpenAI", lambda **_kwargs: FakeClient())
-    monkeypatch.setattr(settings, "openai_api_key", "test-key")
+    monkeypatch.setattr("ai.genai.Client", FakeClient)
+    monkeypatch.setattr(settings, "gemini_api_key", "test-key")
     monkeypatch.setattr(settings, "ai_enabled", True)
-    monkeypatch.setattr(settings, "ai_model", "gpt-5.6-luna")
+    monkeypatch.setattr(settings, "ai_model", "gemini-3.8-flash")
 
     result = await companion.reply(123, "سلام اوپکس", SimpleNamespace())
 
