@@ -45,14 +45,21 @@ if not any(
         backupCount=3,
         encoding="utf-8",
     )
-    file_handler.setFormatter(
-        logging.Formatter(
-            "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
-        )
+    formatter = logging.Formatter(
+        "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
     )
+    file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
-    logger.setLevel(logging.INFO)
-    logger.propagate = False
+
+if not any(isinstance(handler, logging.StreamHandler) for handler in logger.handlers):
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(
+        logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(message)s")
+    )
+    logger.addHandler(stream_handler)
+
+logger.setLevel(logging.INFO)
+logger.propagate = False
 
 
 class AICompanion:
@@ -147,9 +154,10 @@ class AICompanion:
                     return True
             except Exception as exc:
                 logger.warning(
-                    "health_check model_failed model=%s error_type=%s",
+                    "health_check model_failed model=%s error_type=%s error=%s",
                     model_name,
                     type(exc).__name__,
+                    str(exc)[:1000],
                 )
                 continue
 
@@ -240,10 +248,11 @@ class AICompanion:
                 except Exception as exc:
                     last_error = exc
                     logger.warning(
-                        "call user_id=%s model_failed model=%s error_type=%s",
+                        "call user_id=%s model_failed model=%s error_type=%s error=%s",
                         user_id,
                         model_name,
                         type(exc).__name__,
+                        str(exc)[:1000],
                     )
 
             if response is None:
