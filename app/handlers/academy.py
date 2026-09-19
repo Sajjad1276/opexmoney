@@ -771,8 +771,7 @@ async def start_ask_ai(
         )
 
         if callback.message is None:
-            await remember_inline_panel(state, callback.message)
-        await callback.answer()
+            await callback.answer()
             return
 
         await callback.message.edit_text(
@@ -791,6 +790,7 @@ async def start_ask_ai(
             ),
             parse_mode=ParseMode.HTML,
         )
+        await remember_inline_panel(state, callback.message)
         await callback.answer()
     except Exception:
         logger.exception(
