@@ -39,6 +39,7 @@ from app.services.academy_service import (
     save_ai_session,
 )
 from app.utils.formatting import fmt_amount, to_fa
+from app.utils.ui import close_inline_panel, remember_inline_panel
 
 router = Router(name="academy")
 logger = logging.getLogger(__name__)
@@ -770,7 +771,8 @@ async def start_ask_ai(
         )
 
         if callback.message is None:
-            await callback.answer()
+            await remember_inline_panel(state, callback.message)
+        await callback.answer()
             return
 
         await callback.message.edit_text(
@@ -839,6 +841,7 @@ async def receive_question(
             else state_data.get("ai_history", [])
         )
 
+        await close_inline_panel(state, message.bot)
         thinking = await message.answer(
             "در حال تفکر... 🤔",
             parse_mode=ParseMode.HTML,
