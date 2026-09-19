@@ -444,8 +444,15 @@ async def start(message: Message, state: FSMContext) -> None:
     )
 
 
-async def _begin_registration(message: Message, state: FSMContext) -> None:
-    await message.answer("\u2060", reply_markup=ReplyKeyboardRemove())
+async def _begin_registration(
+    message: Message,
+    state: FSMContext,
+    *,
+    replace_inline: bool = False,
+) -> None:
+    if not replace_inline:
+        await message.answer("\u2060", reply_markup=ReplyKeyboardRemove())
+
     async with async_session() as session:
         async with session.begin():
             registered = await is_fully_registered(session, message.from_user.id)
@@ -453,7 +460,16 @@ async def _begin_registration(message: Message, state: FSMContext) -> None:
 
     if user is not None:
         await state.clear()
-        await show_dashboard(message, user)
+        if replace_inline:
+            await show_dashboard(
+                message,
+                user,
+                replace_inline=True,
+                bot=message.bot,
+                display_user=message.from_user,
+            )
+        else:
+            await show_dashboard(message, user)
         return
 
     await state.clear()
@@ -469,11 +485,19 @@ async def _begin_registration(message: Message, state: FSMContext) -> None:
 فقط حروف فارسی یا انگلیسی، عدد و خط تیره مجازه.
 """
 
-    panel = await message.answer(
-        rtl_html(text),
-        reply_markup=cancel_keyboard(),
-        parse_mode=ParseMode.HTML,
-    )
+    if replace_inline:
+        await message.edit_text(
+            rtl_html(text),
+            reply_markup=cancel_keyboard(),
+            parse_mode=ParseMode.HTML,
+        )
+        panel = message
+    else:
+        panel = await message.answer(
+            rtl_html(text),
+            reply_markup=cancel_keyboard(),
+            parse_mode=ParseMode.HTML,
+        )
     await remember_inline_panel(state, panel)
 
 
@@ -489,17 +513,33 @@ async def start_game_callback(call: CallbackQuery, state: FSMContext) -> None:
         return
 
     await call.answer()
-    await _begin_registration(call.message, state)
+    await _begin_registration(call.message, state, replace_inline=True)
 
 
-async def _show_help(message: Message) -> None:
-    await message.answer("\u2060", reply_markup=ReplyKeyboardRemove())
-    await message.answer(
+async def _show_help(
+    message: Message,
+    *,
+    replace_inline: bool = False,
+) -> None:
+    text = (
         "❓ <b>راهنمای OPEX MONEY</b>\n"
         "تو یه معامله‌گر اقتصادی هستی.\n"
         "به ملت‌ها بپیوند، ارز بخر و بفروش.\n"
         "نرخ ارز با فعالیت بازار تغییر می‌کنه.\n"
-        "برای شروع، اسم معامله‌گرت رو انتخاب کن.",
+        "برای شروع، اسم معامله‌گرت رو انتخاب کن."
+    )
+
+    if replace_inline:
+        await message.edit_text(
+            text,
+            reply_markup=welcome_keyboard(),
+            parse_mode="HTML",
+        )
+        return
+
+    await message.answer("\u2060", reply_markup=ReplyKeyboardRemove())
+    await message.answer(
+        text,
         reply_markup=welcome_keyboard(),
         parse_mode="HTML",
     )
@@ -514,7 +554,7 @@ async def start_help(message: Message) -> None:
 async def start_help_callback(call: CallbackQuery) -> None:
     await call.answer()
     if call.message:
-        await _show_help(call.message)
+        await _show_help(call.message, replace_inline=True)
 
 
 
