@@ -414,37 +414,37 @@ async def complete_lesson(
         done_before + 1 >= len(module_lessons)
     )
 
+    xp = await get_user_xp(session, user_id)
+    xp.total_xp = int(xp.total_xp) + int(lesson.xp_reward)
+    level_up = await recalculate_level(session, xp)
+
     candidate_first_lesson = None
     candidate_first_progress = None
     next_module_id = None
     if module_completed and lesson.module_id < 6:
         candidate_id = lesson.module_id + 1
         candidate_meta = MODULE_META[candidate_id]
-        xp = await get_user_xp(session, user_id)
         if _level_allows(xp.level, candidate_meta["min_level"]):
-            candidate_first_lesson = await session.scalar(
-                select(Lesson)
-                .where(
-                    Lesson.module_id == candidate_id,
-                    Lesson.is_active.is_(True),
-                )
-                .order_by(Lesson.order.asc())
-                .limit(1)
-            )
-            if candidate_first_lesson is not None:
-                candidate_first_progress = await session.scalar(
-                    select(UserLessonProgress)
+            with session.no_autoflush:
+                candidate_first_lesson = await session.scalar(
+                    select(Lesson)
                     .where(
-                        UserLessonProgress.user_id == user_id,
-                        UserLessonProgress.lesson_id == candidate_first_lesson.id,
+                        Lesson.module_id == candidate_id,
+                        Lesson.is_active.is_(True),
                     )
-                    .with_for_update()
+                    .order_by(Lesson.order.asc())
+                    .limit(1)
                 )
-                next_module_id = candidate_id
-
-    xp = await get_user_xp(session, user_id)
-    xp.total_xp = int(xp.total_xp) + int(lesson.xp_reward)
-    level_up = await recalculate_level(session, xp)
+                if candidate_first_lesson is not None:
+                    candidate_first_progress = await session.scalar(
+                        select(UserLessonProgress)
+                        .where(
+                            UserLessonProgress.user_id == user_id,
+                            UserLessonProgress.lesson_id == candidate_first_lesson.id,
+                        )
+                        .with_for_update()
+                    )
+                    next_module_id = candidate_id
 
     xr_gained = Decimal(str(lesson.xr_reward or Decimal("0")))
     if xr_gained > 0:
