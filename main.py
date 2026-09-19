@@ -13,6 +13,7 @@ from sqlalchemy import select
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
+from ai import ai_router, companion
 from app.database.models import User
 from app.database.session import async_session, engine
 from app.diagnostics.flow_trace import FlowTraceMiddleware
@@ -205,6 +206,7 @@ async def main() -> None:
     dp.include_router(nation_router)
     dp.include_router(governance_router)
     dp.include_router(sections_router)
+    dp.include_router(ai_router)
 
     scheduler = build_scheduler(bot)
     smoke_ok = await run_startup_smoke_test(dp, scheduler)
@@ -222,6 +224,7 @@ async def main() -> None:
         )
     finally:
         scheduler.shutdown(wait=False)
+        await companion.close()
         await bot.session.close()
         await engine.dispose()
 

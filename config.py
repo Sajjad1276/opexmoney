@@ -9,6 +9,13 @@ class Settings(BaseSettings):
     redis_url: str | None = None
     owner_id: int | None = None
 
+    ai_enabled: bool = True
+    gemini_api_key: str | None = None
+    ai_model: str = "gemini-3.8-flash"
+    ai_timeout_seconds: float = 12.0
+    ai_cache_ttl_seconds: int = 120
+    ai_last_message_ttl_seconds: int = 1800
+
     governance_proposal_top_percent: Decimal = Decimal("10")
     governance_voting_hours: int = 24
     governance_implementation_days: int = 7
