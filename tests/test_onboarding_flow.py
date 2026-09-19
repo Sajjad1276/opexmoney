@@ -53,6 +53,11 @@ class FakeMessage:
         return self
 
 
+class FakeBot:
+    async def send_message(self, *args, **kwargs):
+        return SimpleNamespace()
+
+
 class FakeCall:
     def __init__(self, user_id: int, data: str):
         self.from_user = SimpleNamespace(
@@ -119,8 +124,9 @@ async def test_registration_to_first_trade_journey():
         },
     )
     call = FakeCall(USER_ID, f"confirm_nation:{nation_id}")
+    bot = FakeBot()
 
-    await start_module.confirm_nation(call, state)
+    await start_module.confirm_nation(call, state, bot)
 
     async with async_session() as session:
         user = await session.get(User, USER_ID)
@@ -142,7 +148,7 @@ async def test_registration_to_first_trade_journey():
 
     assert state.data["first_trade_available"] is True
     assert call.answers
-    assert call.message.answers
+    assert call.message.edits
 
     tutorial = FakeCall(USER_ID, "first_trade_tutorial")
     await start_module.first_trade_tutorial(tutorial, state)
