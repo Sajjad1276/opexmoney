@@ -6,7 +6,13 @@ from decimal import Decimal, InvalidOperation
 from aiogram import F, Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
-from aiogram.types import (\n    CallbackQuery,\n    InlineKeyboardButton,\n    InlineKeyboardMarkup,\n    Message,\n    ReplyKeyboardRemove,\n)
+from aiogram.types import (
+    CallbackQuery,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    Message,
+    ReplyKeyboardRemove,
+)
 from sqlalchemy import select
 
 from app.database.models import (
