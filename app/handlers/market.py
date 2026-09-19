@@ -218,7 +218,7 @@ async def market_refresh(call: CallbackQuery):
         try:
             await call.message.edit_text(
                 text,
-                reply_markup=market_keyboard(),
+                reply_markup=market_keyboard_for_nation(nation.nation_id),
                 parse_mode="HTML",
             )
             await call.answer()
@@ -988,7 +988,7 @@ async def confirm_sell(call, state=None):
                     user.user_id,
                 )
 
-    await safe_edit(call, text, market_keyboard())
+    await safe_edit(call, text, market_keyboard_for_nation(nation_id))
     await call.answer("✅ فروش انجام شد")
 
 
