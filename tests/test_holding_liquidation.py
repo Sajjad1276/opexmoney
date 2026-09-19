@@ -187,7 +187,7 @@ async def test_convert_holding_uses_current_rate_and_preserves_audit():
         assert tx is not None and tx.amount == Decimal("100.0000")
         assert tx.rate == Decimal("2.5000")
         assert log is not None
-        assert log.event_metadata["xr_received"] == "250.0"
+        assert Decimal(log.event_metadata["xr_received"]) == Decimal("250.0")
 
 
 @pytest.mark.asyncio
