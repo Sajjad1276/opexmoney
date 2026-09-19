@@ -87,7 +87,6 @@ async def start_founder(
 
     await call.answer()
     if call.message:
-        await call.message.answer("\u2060", reply_markup=ReplyKeyboardRemove())
         await call.message.edit_text(
             "🏛 <b>تأسیس ملت · مرحله 1</b>\n"
             "اول ربات رو به گروهی که می‌خوای پایتخت ملتت باشه اضافه کن.\n"
@@ -292,12 +291,9 @@ async def bot_group_status_changed(
     if new_status not in {"administrator", "creator"}:
         return
 
-    actor = event.from_user
     group_title = event.chat.title or "گروه بدون نام"
     group_username = getattr(event.chat, "username", None)
 
-    # Always persist the observed group first. The founder can then press
-    # «بررسی و دریافت اطلاعات» to explicitly continue onboarding.
     async with async_session() as session:
         async with session.begin():
             bot_group = await session.get(BotGroup, event.chat.id)
@@ -315,18 +311,17 @@ async def bot_group_status_changed(
                 bot_group.username = group_username
                 bot_group.is_active = True
 
-    if actor is None:
-        return
-
-    await _continue_group_onboarding(
-        bot=bot,
-        dispatcher=dispatcher,
-        founder_user_id=actor.id,
-        group_id=event.chat.id,
-        group_title=group_title,
-        group_username=group_username,
-        group_type=event.chat.type,
-    )
+    actor = event.from_user
+    if actor is not None:
+        try:
+            await bot.send_message(
+                actor.id,
+                "✅ ربات ادمین شد. مشخصات گروه ثبت شد.\n"
+                "حالا در پنل تأسیس ملت روی «🔎 بررسی و دریافت اطلاعات» بزن.",
+                parse_mode="HTML",
+            )
+        except Exception:
+            logger.debug("Could not notify founder about group admin state", exc_info=True)
 
 
 @founder_router.message(
@@ -345,17 +340,36 @@ async def group_founder_start(
     if not match:
         return
 
-    await _continue_group_onboarding(
-        bot=bot,
-        dispatcher=dispatcher,
-        founder_user_id=int(match.group(1)),
-        group_id=message.chat.id,
-        group_title=message.chat.title or "گروه بدون نام",
-        group_username=getattr(message.chat, "username", None),
-        group_type=message.chat.type,
-    )
+    founder_user_id = int(match.group(1))
+    group_title = message.chat.title or "گروه بدون نام"
+    group_username = getattr(message.chat, "username", None)
 
+    async with async_session() as session:
+        async with session.begin():
+            bot_group = await session.get(BotGroup, message.chat.id)
+            if bot_group is None:
+                session.add(
+                    BotGroup(
+                        group_id=message.chat.id,
+                        title=group_title,
+                        username=group_username,
+                        is_active=True,
+                    )
+                )
+            else:
+                bot_group.title = group_title
+                bot_group.username = group_username
+                bot_group.is_active = True
 
+    try:
+        await bot.send_message(
+            founder_user_id,
+            f"✅ گروه «{html.escape(group_title)}» ثبت شد.\n"
+            "حالا به پنل تأسیس ملت برگرد و «🔎 بررسی و دریافت اطلاعات» را بزن.",
+            parse_mode="HTML",
+        )
+    except Exception:
+        logger.debug("Could not notify founder after group start", exc_info=True)
 
 
 @founder_router.message(
