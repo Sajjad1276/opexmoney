@@ -179,6 +179,7 @@ async def test_open_join_then_policy_to_approval_then_admin_approval(monkeypatch
         assert nation.member_count == 2
 
         nation.join_policy = "APPROVAL"
+        await session.flush()
 
     request_text, _ = await nm._join_user(
         bot=bot,
