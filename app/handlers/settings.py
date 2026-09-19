@@ -50,15 +50,12 @@ def settings_keyboard() -> InlineKeyboardMarkup:
                     text="✏️ تغییر نام معامله‌گر",
                     callback_data="settings:change_username",
                     style=ButtonStyle.PRIMARY,
-                    style=ButtonStyle.PRIMARY,
-                    style=ButtonStyle.PRIMARY,
                 )
             ],
             [
                 InlineKeyboardButton(
                     text="🏛 تغییر ملت اصلی",
                     callback_data="settings:change_nation",
-                    style=ButtonStyle.PRIMARY,
                     style=ButtonStyle.PRIMARY,
                 )
             ],
