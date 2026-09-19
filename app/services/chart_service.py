@@ -46,6 +46,7 @@ def _empty_chart_data(
         "window_hours": window_hours,
         "enough_data": False,
         "market_status": market_status,
+        "three_day_downtrend": False,
         "volatility": Decimal("0"),
     }
 
@@ -121,6 +122,24 @@ def _calculate_7d_change(
         / first_rate
         * Decimal("100")
     )
+
+
+def _has_three_day_downtrend(rows: list[Any]) -> bool:
+    daily_last: dict[object, Decimal] = {}
+
+    for row in rows:
+        daily_last[row.calculated_at.date()] = Decimal(str(row.rate))
+
+    if len(daily_last) < 3:
+        return False
+
+    ordered_days = sorted(daily_last)
+    values = [
+        daily_last[ordered_days[-3]],
+        daily_last[ordered_days[-2]],
+        daily_last[ordered_days[-1]],
+    ]
+    return values[0] > values[1] > values[2]
 
 
 def _calculate_volatility(rates: list[Decimal]) -> Decimal:
@@ -236,6 +255,7 @@ async def get_chart_data(
         "window": window,
         "enough_data": True,
         "market_status": market_status,
+        "three_day_downtrend": _has_three_day_downtrend(history_rows),
         "volatility": _calculate_volatility(
             [*history_rates, current_rate]
         ),
