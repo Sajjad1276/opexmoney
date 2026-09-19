@@ -903,7 +903,7 @@ async def back_to_nations(call: CallbackQuery, state: FSMContext) -> None:
     F.data.startswith("confirm_nation:"),
     StateFilter(OnboardingStates.SELECT_NATION),
 )
-async def confirm_nation(call: CallbackQuery, state: FSMContext, bot: Bot | None = None) -> None:
+async def confirm_nation(call: CallbackQuery, state: FSMContext, bot: Bot) -> None:
     if not await _state_is_alive(state, OnboardingStates.SELECT_NATION):
         await call.answer()
         if call.message:
