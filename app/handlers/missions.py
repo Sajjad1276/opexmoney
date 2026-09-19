@@ -266,6 +266,9 @@ async def claim_all_rewards(callback: CallbackQuery) -> None:
     else:
         result_text = "هیچ جایزه‌ای برای دریافت وجود ندارد"
 
+    if len(result_text) > 200:
+        result_text = result_text[:197].rstrip() + "…"
+
     await callback.answer(result_text, show_alert=True)
 
     if callback.message is None:
