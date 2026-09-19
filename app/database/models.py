@@ -74,7 +74,7 @@ class User(Base):
     __tablename__ = "users"
     __table_args__ = (UniqueConstraint("username", name="uq_users_username"),)
     user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    username: Mapped[str] = mapped_column(String(15), nullable=False)
+    username: Mapped[str] = mapped_column(String(20), nullable=False)
     home_nation_id: Mapped[int | None] = mapped_column(ForeignKey("nations.nation_id"))
     balance: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("500.00"), nullable=False)
     xr_balance: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0.00"), nullable=False)
