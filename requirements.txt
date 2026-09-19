@@ -10,3 +10,7 @@ pytest==8.4.1
 pytest-asyncio==1.1.0
 
 google-genai==2.24.0
+
+matplotlib==3.10.6
+arabic-reshaper==3.0.0
+python-bidi==0.6.6
