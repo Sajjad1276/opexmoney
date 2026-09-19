@@ -261,4 +261,4 @@ async def cancel_start_fix(call: CallbackQuery, state: FSMContext) -> None:
             await _safe_edit_text(call, text)
         await call.answer()
     except TelegramBadRequest:
-        await call.answer("ثبت‌نام لغو شد.", show_alert=False)
+        await call.answer(rtl_text("ثبت‌نام لغو شد."), show_alert=False)
