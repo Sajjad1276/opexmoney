@@ -136,9 +136,9 @@ def _nation_page_keyboard(
                         html.escape(nation.name),
                         fmt_rate(nation.exchange_rate),
                         to_fa(nation.member_count),
+                    ),
                     callback_data="select_nation:{0}".format(nation.nation_id),
                 )
-            ]
         )
 
     navigation: list[InlineKeyboardButton] = []
