@@ -386,6 +386,13 @@ async def select_new_nation(
         await asyncio.sleep(0.5)
         await _edit_settings_from_callback(callback)
         await callback.answer()
+    except ValueError as exc:
+        logger.warning(
+            "Home nation change rejected | user_id=%s reason=%s",
+            callback.from_user.id,
+            exc,
+        )
+        await callback.answer(str(exc), show_alert=True)
     except Exception as e:
         logger.exception(e)
         await callback.answer(SETTINGS_ERROR, show_alert=True)
