@@ -216,7 +216,11 @@ async def test_resolver_priority_and_clamping():
             ) == Decimal("3.000000")
 
             player_override = await session.scalar(
-                select(RuleOverride).where(RuleOverride.scope == "player")
+                select(RuleOverride).where(
+                    RuleOverride.rule_key == "market.tx_fee",
+                    RuleOverride.scope == "player",
+                    RuleOverride.target_id == player_id,
+                )
             )
             player_override.is_active = False
             invalidate_rule_cache("market.tx_fee")
@@ -228,7 +232,11 @@ async def test_resolver_priority_and_clamping():
             ) == Decimal("1.500000")
 
             nation_override = await session.scalar(
-                select(RuleOverride).where(RuleOverride.scope == "nation")
+                select(RuleOverride).where(
+                    RuleOverride.rule_key == "market.tx_fee",
+                    RuleOverride.scope == "nation",
+                    RuleOverride.target_id == nation_id,
+                )
             )
             nation_override.is_active = False
             invalidate_rule_cache("market.tx_fee")
@@ -240,7 +248,11 @@ async def test_resolver_priority_and_clamping():
             ) == Decimal("0.250000")
 
             global_override = await session.scalar(
-                select(RuleOverride).where(RuleOverride.scope == "global")
+                select(RuleOverride).where(
+                    RuleOverride.rule_key == "market.tx_fee",
+                    RuleOverride.scope == "global",
+                    RuleOverride.target_id.is_(None),
+                )
             )
             global_override.value = Decimal("99")
             invalidate_rule_cache("market.tx_fee")
