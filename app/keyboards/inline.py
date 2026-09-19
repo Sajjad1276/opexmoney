@@ -114,7 +114,7 @@ def add_to_group_keyboard(url: str) -> InlineKeyboardMarkup:
         ],
         [
             InlineKeyboardButton(
-                text="🔎 بررسی گروه",
+                text="🔎 بررسی و دریافت اطلاعات",
                 callback_data="founder_check_group",
                 style=ButtonStyle.SUCCESS,
             )
@@ -159,6 +159,7 @@ def founder_flag_selection_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton(
                 text=f"{flag} {label}",
                 callback_data=f"founder_flag:{flag}",
+                style=ButtonStyle.PRIMARY,
             )
             for flag, label in flags[index:index + 3]
         ]
@@ -185,6 +186,7 @@ def nation_selection_keyboard(nations) -> InlineKeyboardMarkup:
         [InlineKeyboardButton(
             text=f"{getattr(nation, 'flag_emoji', None) or '🏴'} {nation.name} ({nation.currency_code}) · {nation.member_count} نفر",
             callback_data=f"join_nation:{nation.nation_id}",
+            style=ButtonStyle.PRIMARY,
         )]
         for nation in nations
     ]
