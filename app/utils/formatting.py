@@ -9,7 +9,8 @@ _FA_TO_LATIN = str.maketrans("۰۱۲۳۴۵۶۷۸۹٫٬−", "0123456789.,-")
 
 
 def to_fa(number) -> str:
-    return str(number).translate(_FA_DIGITS)
+    """Return user-facing numbers using Latin/English digits."""
+    return str(number)
 
 
 def from_fa(value: str) -> str:
