@@ -5,6 +5,7 @@ import logging
 import re
 
 from aiogram import Bot, Dispatcher, F, Router
+from aiogram.enums import ButtonStyle
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from aiogram.filters.state import StateFilter
 from aiogram.fsm.context import FSMContext
@@ -48,7 +49,7 @@ def founder_cancel_keyboard():
             InlineKeyboardButton(
                 text="❌ انصراف",
                 callback_data="cancel_founder",
-                style=__import__("aiogram.enums", fromlist=["ButtonStyle"]).ButtonStyle.DANGER,
+                style=ButtonStyle.DANGER,
             )
         ]]
     )
