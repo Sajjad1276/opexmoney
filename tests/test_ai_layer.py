@@ -209,9 +209,14 @@ async def test_ai_health_check_uses_gemini_model(monkeypatch) -> None:
     companion = AICompanion()
 
     class FakeModels:
-        async def get(self, **kwargs):
-            assert kwargs["model"] == settings.ai_model
-            return SimpleNamespace(name=f"models/{settings.ai_model}")
+        async def generate_content(self, **kwargs):
+            assert kwargs["model"] in {
+                settings.ai_model,
+                "gemini-3.1-flash-lite",
+                "gemini-3.5-flash-lite",
+                "gemini-3.5-flash",
+            }
+            return SimpleNamespace(text="فعال")
 
     class FakeAsyncClient:
         models = FakeModels()
