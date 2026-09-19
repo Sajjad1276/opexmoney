@@ -126,7 +126,8 @@ async def create_nation(
     founder_user_id: int,
     group_id: int,
     nation_name: str,
-    currency_code: str
+    currency_code: str,
+    flag_emoji: str = "🏴",
 ) -> Nation:
     async with session.begin():
         user_result = await session.execute(
@@ -167,6 +168,7 @@ async def create_nation(
         nation = Nation(
             group_id=group_id,
             name=nation_name,
+            flag_emoji=(flag_emoji or "🏴").strip() or "🏴",
             currency_code=currency_code,
             founder_user_id=founder_user_id,
             exchange_rate=Decimal("1.0000"),

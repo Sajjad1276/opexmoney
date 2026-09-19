@@ -131,7 +131,8 @@ def _nation_page_keyboard(
         rows.append(
             [
                 InlineKeyboardButton(
-                    text="🏴 {0} | 💰 نرخ: {1} ΩXR | 👥 {2} نفر".format(
+                    text="{0} {1} | 💰 نرخ: {2} ΩXR | 👥 {3} نفر".format(
+                        html.escape(nation.flag_emoji or "🏴"),
                         html.escape(nation.name),
                         fmt_rate(nation.exchange_rate),
                         to_fa(nation.member_count),
@@ -212,7 +213,7 @@ def nation_list_text(user, trader_name: str, nations: list[Nation]) -> str:
     lines = [f"✅ <b>«{html.escape(trader_name)}»</b> ثبت شد.", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", f"{user_mention(user)}، حالا باید به یه ملت بپیوندی.", "", "ارز اون ملت، پول اصلی حسابت میشه.", "هر معامله‌ات مستقیم روی نرخ اون ارز اثر میذاره.", "", "<b>🌍 ملت‌های فعال:</b>", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"]
     for index, nation in enumerate(nations, start=1):
         change = get_rate_change(nation)
-        lines.extend([f"🏛 <b>{html.escape(nation.name)} · {html.escape(nation.currency_code)}</b>", f"{get_rate_emoji(change)} <b>{fmt_rate(nation.exchange_rate)} ΩXR</b> · <i>{fmt_pct(change)} امروز</i>", f"👥 {to_fa(nation.active_members_24h)} عضو · 🏆 رتبه #{to_fa(nation.nation_rank or 0)}"])
+        lines.extend([f"{html.escape(nation.flag_emoji or '🏴')} <b>{html.escape(nation.name)} · {html.escape(nation.currency_code)}</b>", f"{get_rate_emoji(change)} <b>{fmt_rate(nation.exchange_rate)} ΩXR</b> · <i>{fmt_pct(change)} امروز</i>", f"👥 {to_fa(nation.active_members_24h)} عضو · 🏆 رتبه #{to_fa(nation.nation_rank or 0)}"])
         if index != len(nations):
             lines.append("─────────────────")
     lines.extend(["━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", "نرخ‌ها هر 15 دقیقه آپدیت میشن."])
@@ -273,7 +274,7 @@ async def show_dashboard(message: Message, user: User) -> None:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 {0}
 
-🏴 <b>{1}</b>
+{1}
 💰 <code>{2}</code>: <b>{3}</b>
 💎 <code>ΩXR</code>: <b>{4}</b>
 
@@ -284,7 +285,7 @@ async def show_dashboard(message: Message, user: User) -> None:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 """.format(
         user_mention(message.from_user),
-        html.escape(nation.name),
+        f"{html.escape(nation.flag_emoji or '🏴')} <b>{html.escape(nation.name)}</b>",
         html.escape(nation.currency_code),
         fmt_amount(balance),
         fmt_amount(user.xr_balance),
@@ -545,7 +546,7 @@ async def render_nation_profile(nation: Nation) -> str:
         status_emoji, status_text = "🟡", "پایدار"
 
     text = """
-🏴 <b>{0}</b>
+{0}
 ─────────────────
 💰 <b>واحد پول:</b> {1}
 📈 <b>نرخ ارز:</b> {2} ΩXR  <u>(آپدیت {3} دقیقه پیش)</u>
@@ -558,7 +559,7 @@ async def render_nation_profile(nation: Nation) -> str:
 ▸ معاملات امروز: {9}
 ▸ روند: {10} {11}
 """.format(
-        html.escape(nation.name),
+        f"{html.escape(nation.flag_emoji or '🏴')} <b>{html.escape(nation.name)}</b>",
         html.escape(nation.currency_code),
         fmt_rate(nation.exchange_rate),
         to_fa(update_minutes),
@@ -1014,7 +1015,7 @@ async def confirm_nation(call: CallbackQuery, state: FSMContext, bot: Bot) -> No
         return
 
     initial_omx = Decimal("500") * nation.exchange_rate
-    text = f"""🏛 <b>{html.escape(nation.name)}</b>
+    text = f"""{html.escape(nation.flag_emoji or "🏴")} <b>{html.escape(nation.name)}</b>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 {user_mention(call.from_user)}، شهروند رسمی این ملت شدی.
 

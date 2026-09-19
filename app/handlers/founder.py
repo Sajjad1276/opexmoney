@@ -16,6 +16,7 @@ from app.database.session import async_session
 from app.keyboards.inline import (
     add_to_group_keyboard,
     confirm_found_nation_keyboard,
+    founder_flag_selection_keyboard,
 )
 from app.keyboards.reply import main_menu_keyboard
 from app.services.nation_service import create_nation
@@ -31,6 +32,12 @@ logger = logging.getLogger(__name__)
 founder_router = Router(name="founder")
 
 _ADMIN_LINK_RIGHTS = "delete_messages+restrict_members+invite_users+pin_messages+manage_topics"
+DEFAULT_NATION_FLAG = "🏴"
+FOUNDER_FLAG_OPTIONS = {
+    DEFAULT_NATION_FLAG,
+    "🚩", "🏳", "🎌", "🏁",
+    "🇮🇷", "🇫🇮", "🇺🇸", "🇯🇵", "🇩🇪", "🇧🇷", "🇫🇷", "🇹🇷",
+}
 
 
 def founder_cancel_keyboard():
@@ -289,6 +296,124 @@ async def receive_nation_name(message: Message, state: FSMContext) -> None:
     )
 
 
+async def _verify_founder_group(
+    *,
+    bot: Bot,
+    group_id: int,
+    founder_user_id: int,
+) -> str | None:
+    try:
+        bot_member = await bot.get_chat_member(group_id, bot.id)
+        founder_member = await bot.get_chat_member(group_id, founder_user_id)
+        bot_status = getattr(bot_member.status, "value", bot_member.status)
+        founder_status = getattr(founder_member.status, "value", founder_member.status)
+
+        if bot_status not in {"administrator", "creator"}:
+            return "⚠️ ربات دیگه ادمین این گروه نیست."
+        if founder_status not in {"administrator", "creator"}:
+            return "⚠️ تو دیگه ادمین این گروه نیستی."
+    except Exception:
+        logger.exception("Could not verify founder group before creation")
+        return "⚠️ وضعیت گروه قابل بررسی نیست. دوباره امتحان کن."
+
+    return None
+
+
+async def _create_founder_nation(
+    *,
+    state: FSMContext,
+    bot: Bot,
+    founder_user_id: int,
+    flag_emoji: str,
+) -> tuple[Nation, int]:
+    data = await state.get_data()
+    group_id = data.get("group_id")
+    nation_name = data.get("nation_name")
+    currency_code = data.get("currency_code")
+
+    if not all((group_id, nation_name, currency_code)):
+        await state.clear()
+        raise ValueError("⚠️ اطلاعات تأسیس کامل نیست. دوباره شروع کن.")
+
+    try:
+        normalized_group_id = int(group_id)
+    except (TypeError, ValueError) as exc:
+        await state.clear()
+        raise ValueError("⚠️ اطلاعات گروه معتبر نیست. دوباره شروع کن.") from exc
+
+    verification_error = await _verify_founder_group(
+        bot=bot,
+        group_id=normalized_group_id,
+        founder_user_id=founder_user_id,
+    )
+    if verification_error:
+        raise ValueError(verification_error)
+
+    selected_flag = (
+        flag_emoji
+        if flag_emoji in FOUNDER_FLAG_OPTIONS
+        else DEFAULT_NATION_FLAG
+    )
+
+    async with async_session() as session:
+        try:
+            nation = await create_nation(
+                session=session,
+                founder_user_id=founder_user_id,
+                group_id=normalized_group_id,
+                nation_name=nation_name,
+                currency_code=currency_code,
+                flag_emoji=selected_flag,
+            )
+        except ValueError:
+            raise
+        except Exception:
+            logger.exception("Nation creation failed")
+            raise RuntimeError("⚠️ تأسیس ملت انجام نشد. دوباره امتحان کن.")
+
+    await state.clear()
+    return nation, normalized_group_id
+
+
+async def _send_founder_success(
+    *,
+    target_message: Message,
+    bot: Bot,
+    nation: Nation,
+    group_id: int,
+    founder_name: str,
+) -> None:
+    flag = html.escape(nation.flag_emoji or DEFAULT_NATION_FLAG)
+
+    await target_message.answer(
+        "🎉 <b>ملت تأسیس شد!</b>\n"
+        f"{flag} <b>{html.escape(nation.name)}</b>\n"
+        f"💱 ارز رسمی: <b>{html.escape(nation.currency_code)}</b>\n"
+        "👑 تو بنیان‌گذار این ملتی.\n"
+        "💰 موجودی اولیه: 1000 واحد\n"
+        "🌐 منوی اصلی آماده‌ست.",
+        reply_markup=main_menu_keyboard(),
+        parse_mode="HTML",
+    )
+
+    try:
+        await bot.send_message(
+            group_id,
+            "🎉 <b>ملت جدید تأسیس شد!</b>\n"
+            f"{flag} <b>نام ملت: {html.escape(nation.name)}</b>\n"
+            f"💱 ارز رسمی: <b>{html.escape(nation.currency_code)}</b>\n"
+            f"👑 بنیان‌گذار: {html.escape(founder_name or 'بنیان‌گذار')}\n"
+            "این گروه حالا پایتخت این ملت است.",
+            parse_mode="HTML",
+        )
+    except (TelegramBadRequest, TelegramForbiddenError):
+        logger.warning(
+            "Could not announce nation %s in group %s",
+            nation.nation_id,
+            group_id,
+        )
+
+
 @founder_router.callback_query(
     F.data.in_({"confirm_found", "confirm_founder"}),
     StateFilter(FounderStates.CONFIRM),
@@ -305,69 +430,95 @@ async def confirm_founder(
 
     if not all((group_id, nation_name, currency_code)):
         await state.clear()
-        await call.answer("⚠️ اطلاعات تأسیس کامل نیست. دوباره شروع کن.", show_alert=True)
+        await call.answer(
+            "⚠️ اطلاعات تأسیس کامل نیست. دوباره شروع کن.",
+            show_alert=True,
+        )
         return
 
-    try:
-        bot_member = await bot.get_chat_member(int(group_id), bot.id)
-        founder_member = await bot.get_chat_member(int(group_id), call.from_user.id)
-        bot_status = getattr(bot_member.status, "value", bot_member.status)
-        founder_status = getattr(founder_member.status, "value", founder_member.status)
-        if bot_status not in {"administrator", "creator"}:
-            await call.answer("⚠️ ربات دیگه ادمین این گروه نیست.", show_alert=True)
-            return
-        if founder_status not in {"administrator", "creator"}:
-            await call.answer("⚠️ تو دیگه ادمین این گروه نیستی.", show_alert=True)
-            return
-    except Exception:
-        logger.exception("Could not verify founder group before creation")
-        await call.answer("⚠️ وضعیت گروه قابل بررسی نیست. دوباره امتحان کن.", show_alert=True)
-        return
-
-    async with async_session() as session:
-        try:
-            nation = await create_nation(
-                session=session,
-                founder_user_id=call.from_user.id,
-                group_id=int(group_id),
-                nation_name=nation_name,
-                currency_code=currency_code,
-            )
-        except ValueError as exc:
-            await call.answer(str(exc), show_alert=True)
-            return
-        except Exception:
-            logger.exception("Nation creation failed")
-            await call.answer("⚠️ تأسیس ملت انجام نشد. دوباره امتحان کن.", show_alert=True)
-            return
-
-    await state.clear()
+    await state.update_data(flag_emoji=DEFAULT_NATION_FLAG)
+    await state.set_state(FounderStates.SELECT_FLAG)
     await call.answer()
 
     if call.message:
-        await call.message.answer(
-            "🎉 <b>ملت تأسیس شد!</b>\n"
-            f"🏛 {html.escape(nation.name)}\n"
-            f"💱 ارز رسمی: <b>{html.escape(nation.currency_code)}</b>\n"
-            "👑 تو بنیان‌گذار این ملتی.\n"
-            "💰 موجودی اولیه: 1000 واحد\n"
-            "🌐 منوی اصلی آماده‌ست.",
-            reply_markup=main_menu_keyboard(),
+        await call.message.edit_text(
+            "🚩 <b>پرچم ملتت رو انتخاب کن</b>\n"
+            f"🏛 نام ملت: <b>{html.escape(nation_name)}</b>\n"
+            f"💱 کد ارز: <b>{html.escape(currency_code)}</b>\n\n"
+            "پرچم فقط برای ظاهر و هویت بصری ملته و روی اقتصاد بازی اثری نداره.",
+            reply_markup=founder_flag_selection_keyboard(),
             parse_mode="HTML",
         )
 
+
+@founder_router.callback_query(
+    F.data.startswith("founder_flag:"),
+    StateFilter(FounderStates.SELECT_FLAG),
+)
+async def select_founder_flag(
+    call: CallbackQuery,
+    state: FSMContext,
+    bot: Bot,
+) -> None:
+    raw_flag = (call.data or "").split(":", 1)[1] if call.data else ""
+    selected_flag = (
+        DEFAULT_NATION_FLAG
+        if raw_flag == "default"
+        else raw_flag
+    )
+
     try:
-        await bot.send_message(
-            int(group_id),
-            "🎉 <b>ملت جدید تأسیس شد!</b>\n"
-            f"🏛 نام ملت: <b>{html.escape(nation.name)}</b>\n"
-            f"💱 ارز رسمی: <b>{html.escape(nation.currency_code)}</b>\n"
-            f"👑 بنیان‌گذار: {html.escape(call.from_user.first_name or 'بنیان‌گذار')}\n"
-            "این گروه حالا پایتخت این ملت است.",
-            parse_mode="HTML",
+        nation, group_id = await _create_founder_nation(
+            state=state,
+            bot=bot,
+            founder_user_id=call.from_user.id,
+            flag_emoji=selected_flag,
         )
-    except (TelegramBadRequest, TelegramForbiddenError):
-        logger.warning("Could not announce nation %s in group %s", nation.nation_id, group_id)
+    except ValueError as exc:
+        await call.answer(str(exc), show_alert=True)
+        return
+    except RuntimeError as exc:
+        await call.answer(str(exc), show_alert=True)
+        return
+
+    await call.answer("✅ پرچم ملت ثبت شد.")
+    if call.message:
+        await _send_founder_success(
+            target_message=call.message,
+            bot=bot,
+            nation=nation,
+            group_id=group_id,
+            founder_name=call.from_user.first_name or "بنیان‌گذار",
+        )
+
+
+@founder_router.message(FounderStates.SELECT_FLAG)
+async def receive_founder_flag_fallback(
+    message: Message,
+    state: FSMContext,
+    bot: Bot,
+) -> None:
+    try:
+        nation, group_id = await _create_founder_nation(
+            state=state,
+            bot=bot,
+            founder_user_id=message.from_user.id,
+            flag_emoji=DEFAULT_NATION_FLAG,
+        )
+    except ValueError as exc:
+        await message.answer(str(exc))
+        return
+    except RuntimeError as exc:
+        await message.answer(str(exc))
+        return
+
+    await _send_founder_success(
+        target_message=message,
+        bot=bot,
+        nation=nation,
+        group_id=group_id,
+        founder_name=message.from_user.first_name or "بنیان‌گذار",
+    )
 
 
 @founder_router.callback_query(
@@ -376,6 +527,7 @@ async def confirm_founder(
         FounderStates.WAITING_GROUP_ADMIN,
         FounderStates.SET_NATION_NAME,
         FounderStates.CONFIRM,
+        FounderStates.SELECT_FLAG,
     ),
 )
 async def cancel_founder(call: CallbackQuery, state: FSMContext) -> None:

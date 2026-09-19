@@ -13,6 +13,7 @@ from app.database.models import (
     NationLog,
     NationMember,
     NationMemberRole,
+    Transaction,
     User,
 )
 from app.database.session import async_session
@@ -122,6 +123,14 @@ async def cleanup():
                 )
             ).scalars().all()
             if nation_ids:
+                await session.execute(
+                    delete(Transaction).where(
+                        Transaction.nation_id.in_(nation_ids),
+                        Transaction.user_id.in_(
+                            [FOUNDER_ID, PLAYER_A_ID, PLAYER_B_ID, PLAYER_C_ID]
+                        ),
+                    )
+                )
                 await session.execute(
                     delete(NationJoinRequest).where(
                         NationJoinRequest.nation_id.in_(nation_ids)
