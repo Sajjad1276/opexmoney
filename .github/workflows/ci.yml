@@ -60,6 +60,9 @@ jobs:
       - name: Market journey
         run: pytest -q tests/test_market_flow.py
 
+      - name: Nation management journey
+        run: pytest -q tests/test_nation_management_flow.py
+
       - name: Core integration tests
         run: pytest -q tests/test_ai_layer.py tests/test_architecture.py tests/test_founder_integration.py tests/test_governance_phase2.py
 
