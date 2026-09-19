@@ -376,19 +376,32 @@ async def complete_lesson(
     ).scalars().all()
     module_lesson_ids = [item.id for item in module_lessons]
 
-    done_before = 0
+    progress_rows = []
     if module_lesson_ids:
-        done_before = int(
-            await session.scalar(
-                select(func.count(UserLessonProgress.id))
+        progress_rows = (
+            await session.execute(
+                select(UserLessonProgress)
                 .where(
                     UserLessonProgress.user_id == user_id,
                     UserLessonProgress.lesson_id.in_(module_lesson_ids),
-                    UserLessonProgress.status == "done",
                 )
+                .order_by(UserLessonProgress.lesson_id.asc())
+                .with_for_update()
             )
-            or 0
-        )
+        ).scalars().all()
+
+    progress_map = {row.lesson_id: row for row in progress_rows}
+    progress_map[lesson_id] = progress
+
+    now = datetime.utcnow()
+    progress.status = "done"
+    progress.quiz_score = max(0, min(100, int(quiz_score)))
+    progress.completed_at = now
+
+    done_count = sum(
+        1 for lesson_row in progress_map.values() if lesson_row.status == "done"
+    )
+    module_completed = bool(module_lessons) and done_count >= len(module_lessons)
 
     next_lesson = await session.scalar(
         select(Lesson)
@@ -399,19 +412,10 @@ async def complete_lesson(
         )
         .limit(1)
     )
-    next_progress = None
-    if next_lesson is not None:
-        next_progress = await session.scalar(
-            select(UserLessonProgress)
-            .where(
-                UserLessonProgress.user_id == user_id,
-                UserLessonProgress.lesson_id == next_lesson.id,
-            )
-            .with_for_update()
-        )
-
-    module_completed = bool(module_lessons) and (
-        done_before + 1 >= len(module_lessons)
+    next_progress = (
+        progress_map.get(next_lesson.id)
+        if next_lesson is not None
+        else None
     )
 
     xp = await get_user_xp(session, user_id)
@@ -450,11 +454,6 @@ async def complete_lesson(
     if xr_gained > 0:
         user.xr_balance = Decimal(str(user.xr_balance or Decimal("0"))) + xr_gained
 
-    now = datetime.utcnow()
-    progress.status = "done"
-    progress.quiz_score = max(0, min(100, int(quiz_score)))
-    progress.completed_at = now
-
     if next_lesson is not None:
         if next_progress is None:
             session.add(
@@ -492,7 +491,6 @@ async def complete_lesson(
         "next_module_id": next_module_id,
         "module_id": lesson.module_id,
     }
-
 
 async def get_ai_session(
     redis: Redis | None,
