@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+# CI final verification
+
 import asyncio
 import os
 import sys
