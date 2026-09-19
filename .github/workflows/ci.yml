@@ -30,15 +30,29 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
       - name: Install dependencies
         run: pip install -r requirements.txt
+
       - name: Compile Python sources
         run: python -m compileall -q .
+
       - name: Apply migrations
         run: alembic upgrade head
+
       - name: Verify migration downgrade
         run: |
           alembic downgrade 0002_founder_constraints
           alembic upgrade head
-      - name: Run tests
+
+      - name: Run flow health contract tests
+        run: pytest -q tests/test_flow_health.py
+
+      - name: Run market journey tests
+        run: pytest -q tests/test_market_flow.py
+
+      - name: Run core integration tests
+        run: pytest -q tests/test_ai_layer.py tests/test_architecture.py tests/test_founder_integration.py tests/test_governance_phase2.py
+
+      - name: Run full test suite
         run: pytest -q
