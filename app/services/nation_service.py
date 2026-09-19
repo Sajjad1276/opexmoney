@@ -122,7 +122,6 @@ async def create_nation(
         user.role = "founder"
         user.xr_balance += Decimal("1000.00")
         user.balance = Decimal("1000.00")
-        user.home_nation_id = nation.nation_id
 
         session.add(
             CurrencyHolding(
@@ -139,6 +138,10 @@ async def create_nation(
                 is_active=True,
             )
         )
+        await session.flush()
+
+        # SYNC RULE: home_nation_id always mirrors active NationMember wherever you touch these fields
+        user.home_nation_id = nation.nation_id
         session.add(
             NationLog(
                 nation_id=nation.nation_id,

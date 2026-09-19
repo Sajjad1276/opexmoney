@@ -560,7 +560,6 @@ async def _join_user(
                     result_message = "✅ درخواست عضویت ارسال شد. تا 48 ساعت فرصت بررسی دارد."
                     joined_user = user
             else:
-                user.home_nation_id = nation_id
                 user.role = "citizen"
                 nation.member_count += 1
                 holding = await session.scalar(
@@ -589,6 +588,8 @@ async def _join_user(
                 )
                 session.add(member)
                 await session.flush()
+                # SYNC RULE: home_nation_id always mirrors active NationMember wherever you touch these fields
+                user.home_nation_id = nation_id
                 await _append_log(
                     session,
                     nation_id=nation_id,
@@ -1026,7 +1027,15 @@ async def kick_member(call: CallbackQuery, bot: Bot) -> None:
         async with session.begin():
             actor = await _require_admin(session, nation_id, call.from_user.id)
             nation = await session.get(Nation, nation_id, with_for_update=True)
-            member = await _get_member(session, nation_id, user_id)
+            member = await session.scalar(
+                select(NationMember)
+                .where(
+                    NationMember.nation_id == nation_id,
+                    NationMember.user_id == user_id,
+                    NationMember.is_active.is_(True),
+                )
+                .with_for_update()
+            )
             target = await session.get(User, user_id, with_for_update=True)
             if nation is None or member is None or target is None:
                 raise ValueError("عضو پیدا نشد.")
@@ -1039,6 +1048,7 @@ async def kick_member(call: CallbackQuery, bot: Bot) -> None:
                 raise ValueError("⛔ وزیر فقط می‌تواند شهروند اخراج کند.")
 
             member.is_active = False
+            # SYNC RULE: home_nation_id always mirrors active NationMember wherever you touch these fields
             target.home_nation_id = None
             target.role = "player"
             nation.member_count = max(0, nation.member_count - 1)
@@ -1406,11 +1416,13 @@ async def confirm_dissolve(call: CallbackQuery, bot: Bot) -> None:
                         NationMember.nation_id == nation_id,
                         NationMember.is_active.is_(True),
                     )
+                    .with_for_update()
                 )
             ).all()
 
             for member, user in members:
                 member.is_active = False
+                # SYNC RULE: home_nation_id always mirrors active NationMember wherever you touch these fields
                 user.home_nation_id = None
                 user.role = "player"
 
@@ -1485,7 +1497,6 @@ async def approve_join_request(call: CallbackQuery, bot: Bot) -> None:
                 request.status = "approved"
                 request.reviewed_by = call.from_user.id
                 request.reviewed_at = now
-                user.home_nation_id = nation_id
                 user.role = "citizen"
                 nation.member_count += 1
                 holding = await session.scalar(
@@ -1512,6 +1523,9 @@ async def approve_join_request(call: CallbackQuery, bot: Bot) -> None:
                         is_active=True,
                     )
                 )
+                await session.flush()
+                # SYNC RULE: home_nation_id always mirrors active NationMember wherever you touch these fields
+                user.home_nation_id = nation_id
                 await _append_log(
                     session,
                     nation_id=nation_id,

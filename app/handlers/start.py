@@ -902,7 +902,7 @@ async def back_to_nations(call: CallbackQuery, state: FSMContext) -> None:
     F.data.startswith("confirm_nation:"),
     StateFilter(OnboardingStates.SELECT_NATION),
 )
-async def confirm_nation(call: CallbackQuery, state: FSMContext) -> None:
+async def confirm_nation(call: CallbackQuery, state: FSMContext, bot: Bot) -> None:
     if not await _state_is_alive(state, OnboardingStates.SELECT_NATION):
         await call.answer()
         if call.message:
@@ -926,93 +926,28 @@ async def confirm_nation(call: CallbackQuery, state: FSMContext) -> None:
         return
 
     try:
+        # The canonical join flow owns membership and home_nation_id assignment.
         async with async_session() as session:
             async with session.begin():
-                result = await session.execute(
-                    select(Nation)
-                    .where(
-                        Nation.nation_id == nation_id,
-                        Nation.is_active.is_(True),
-                    )
-                    .with_for_update()
-                )
-                nation = result.scalar_one_or_none()
-
-                if nation is None:
-                    await call.answer(
-                        rtl_html("⚠️ این ملت دیگر فعال نیست."),
-                        show_alert=True,
-                    )
-                    return
-
                 user = await session.get(
                     User,
                     call.from_user.id,
                     with_for_update=True,
                 )
-
                 if user is None:
                     user = User(
                         user_id=call.from_user.id,
                         username=username,
-                        home_nation_id=nation.nation_id,
-                        balance=INITIAL_BALANCE,
+                        # SYNC RULE: home_nation_id always mirrors active NationMember wherever you touch these fields
+                        home_nation_id=None,
+                        balance=Decimal("0.00"),
                         xr_balance=Decimal("0.00"),
                         role="player",
                     )
                     session.add(user)
-                    # Flush the parent row before inserting the FK child.
-                    # This makes the onboarding transaction deterministic even
-                    # without an ORM relationship configured between the models.
                     await session.flush()
-                    session.add(
-                        CurrencyHolding(
-                            user_id=user.user_id,
-                            nation_id=nation.nation_id,
-                            amount=INITIAL_BALANCE,
-                        )
-                    )
-                    nation.member_count += 1
-                    nation.active_members_24h += 1
                 else:
-                    old_nation_id = user.home_nation_id
-                    holding = await session.scalar(
-                        select(CurrencyHolding)
-                        .where(
-                            CurrencyHolding.user_id == user.user_id,
-                            CurrencyHolding.nation_id == nation.nation_id,
-                        )
-                        .with_for_update()
-                    )
-
                     user.username = username
-                    user.home_nation_id = nation.nation_id
-
-                    if holding is None:
-                        session.add(
-                            CurrencyHolding(
-                                user_id=user.user_id,
-                                nation_id=nation.nation_id,
-                                amount=INITIAL_BALANCE,
-                            )
-                        )
-                        user.balance = INITIAL_BALANCE
-                        user.xr_balance = Decimal("0.00")
-                        if old_nation_id != nation.nation_id:
-                            nation.member_count += 1
-                            nation.active_members_24h += 1
-                    else:
-                        user.balance = holding.amount
-
-                session.add(
-                    UserActivity(
-                        user_id=user.user_id,
-                        nation_id=nation.nation_id,
-                        activity_type="login",
-                    )
-                )
-                await sync_user_balance(session, user.user_id)
-                await session.flush()
     except IntegrityError:
         logger.exception(
             "Onboarding registration transaction failed | user_id=%s nation_id=%s",
@@ -1027,78 +962,6 @@ async def confirm_nation(call: CallbackQuery, state: FSMContext) -> None:
 یک نام دیگر برای معامله‌گرت انتخاب کن.
 """
             ),
-            show_alert=True,
-        )
-        return
-
-    await state.clear()
-    await state.update_data(first_trade_available=True)
-    personalized = await _generate_personalized_welcome(username, nation)
-
-    final_text = """
-🎉 <b>ثبت‌نام کامل شد</b>
-
-👤 <b>{0}</b>
-🏴 <b>{1}</b>
-💰 سرمایه اولیه: <b>{2} {3}</b>
-
-{4}
-""".format(
-        html.escape(username),
-        html.escape(nation.name),
-        fmt_amount(INITIAL_BALANCE),
-        html.escape(nation.currency_code),
-        personalized,
-    )
-
-    await call.answer()
-    if call.message:
-        await call.message.answer(
-            rtl_html(final_text),
-            reply_markup=main_menu_keyboard(),
-            parse_mode=ParseMode.HTML,
-        )
-
-@router.callback_query(F.data.startswith("join_nation:"), StateFilter(OnboardingStates.SELECT_NATION))
-async def join_nation(call: CallbackQuery, state: FSMContext, bot: Bot) -> None:
-    try:
-        nation_id = int(call.data.split(":", 1)[1])
-    except (ValueError, AttributeError):
-        await call.answer("⚠️ این ملت معتبر نیست.", show_alert=True)
-        return
-
-    data = await state.get_data()
-    trader_name = (data.get("username") or "").strip()
-    if not trader_name:
-        await call.answer("⏱ فرآیند ثبت‌نام منقضی شد. /start بزن.", show_alert=True)
-        await state.clear()
-        return
-
-    try:
-        async with async_session() as session:
-            async with session.begin():
-                user = await session.get(
-                    User,
-                    call.from_user.id,
-                    with_for_update=True,
-                )
-                if user is None:
-                    session.add(
-                        User(
-                            user_id=call.from_user.id,
-                            username=trader_name,
-                            home_nation_id=None,
-                            balance=Decimal("0.00"),
-                            xr_balance=Decimal("0.00"),
-                            role="player",
-                        )
-                    )
-                    await session.flush()
-                elif user.home_nation_id is None:
-                    user.username = trader_name
-    except IntegrityError:
-        await call.answer(
-            "🔴 این نام همین الان توسط کاربر دیگری ثبت شد. /start بزن و نام دیگری انتخاب کن.",
             show_alert=True,
         )
         return
@@ -1120,7 +983,7 @@ async def join_nation(call: CallbackQuery, state: FSMContext, bot: Bot) -> None:
             await call.message.edit_text(
                 result_message,
                 reply_markup=main_menu_keyboard(),
-                parse_mode="HTML",
+                parse_mode=ParseMode.HTML,
             )
         await call.answer("📝 درخواست عضویت ثبت شد.")
         return
@@ -1152,15 +1015,29 @@ async def join_nation(call: CallbackQuery, state: FSMContext, bot: Bot) -> None:
 
     initial_omx = Decimal("500") * nation.exchange_rate
     text = (
-        f"🏛 <b>{html.escape(nation.name)}</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"{user_mention(call.from_user)}، شهروند رسمی این ملت شدی.\n\n"
-        f"💰 موجودی اولیه:\n<b>500 <code>{html.escape(nation.currency_code)}</code> ≈ {fmt_amount(initial_omx)} ΩXR</b>\n\n"
-        "─────────────────\n"
-        f"{get_rate_emoji(get_rate_change(nation))} نرخ <code>{html.escape(nation.currency_code)}</code>: <b>{fmt_rate(nation.exchange_rate)} ΩXR</b>\n"
-        f"<i>{fmt_pct(get_rate_change(nation))} نسبت به دیروز</i>\n\n"
-        f"🏆 رتبه #{to_fa(rank)} از {to_fa(total_nations)}\n"
-        f"👥 {to_fa(nation.member_count)} عضو\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"🏛 <b>{html.escape(nation.name)}</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+"
+        f"{user_mention(call.from_user)}، شهروند رسمی این ملت شدی.
+
+"
+        f"💰 موجودی اولیه:
+<b>500 <code>{html.escape(nation.currency_code)}</code> ≈ {fmt_amount(initial_omx)} ΩXR</b>
+
+"
+        "─────────────────
+"
+        f"{get_rate_emoji(get_rate_change(nation))} نرخ <code>{html.escape(nation.currency_code)}</code>: <b>{fmt_rate(nation.exchange_rate)} ΩXR</b>
+"
+        f"<i>{fmt_pct(get_rate_change(nation))} نسبت به دیروز</i>
+
+"
+        f"🏆 رتبه #{to_fa(rank)} از {to_fa(total_nations)}
+"
+        f"👥 {to_fa(nation.member_count)} عضو
+"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+"
         f"هر معامله‌ات روی نرخ <code>{html.escape(nation.currency_code)}</code> اثر میذاره."
     )
     await _safe_edit_text(call, text, first_trade_keyboard())

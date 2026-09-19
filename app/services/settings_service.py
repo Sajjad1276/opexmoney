@@ -9,6 +9,7 @@ from app.database.models import (
     ActivityType,
     CurrencyHolding,
     Nation,
+    NationMember,
     Transaction,
     User,
     UserActivity,
@@ -137,13 +138,27 @@ async def change_home_nation(
         raise ValueError(f"User {user_id} not found")
 
     nation = await session.scalar(
-        select(Nation).where(
+        select(Nation)
+        .where(
             Nation.nation_id == nation_id,
             Nation.is_active.is_(True),
         )
+        .with_for_update()
     )
     if nation is None:
         raise ValueError("Active nation not found")
+
+    membership = await session.scalar(
+        select(NationMember)
+        .where(
+            NationMember.user_id == user_id,
+            NationMember.nation_id == nation_id,
+            NationMember.is_active.is_(True),
+        )
+        .with_for_update()
+    )
+    if membership is None:
+        raise ValueError("برای انتخاب این ملت، ابتدا باید عضو فعال آن ملت باشی.")
 
     holding = await session.scalar(
         select(CurrencyHolding)
@@ -163,6 +178,7 @@ async def change_home_nation(
         )
         await session.flush()
 
+    # SYNC RULE: home_nation_id always mirrors active NationMember wherever you touch these fields
     user.home_nation_id = nation_id
     await sync_user_balance(session, user_id)
 
