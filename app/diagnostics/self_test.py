@@ -67,6 +67,8 @@ EXPECTED_JOB_IDS = {
     "nation_rank_hourly",
     "governance_cycle",
     "daily_market_reset",
+    "nation_join_request_expiration",
+    "nation_weekly_ai_report",
 }
 
 
@@ -112,28 +114,75 @@ async def run_startup_smoke_test(
         ok = False
 
     try:
-        missing_tables = [
+        phase2_tables = (
+            "proposals",
+            "votes",
+            "rule_overrides",
+            "governance_ledger",
+            "player_temporal_profiles",
+            "behavior_snapshots",
+        )
+        nation_management_tables = (
+            "nation_members",
+            "nation_logs",
+            "nation_join_requests",
+            "nation_wars",
+        )
+        missing_phase2 = [
             table_name
-            for table_name in (
-                "proposals",
-                "votes",
-                "rule_overrides",
-                "governance_ledger",
-                "player_temporal_profiles",
-                "behavior_snapshots",
-            )
+            for table_name in phase2_tables
             if not await _table_exists(table_name)
         ]
-        if missing_tables:
+        missing_nation_management = [
+            table_name
+            for table_name in nation_management_tables
+            if not await _table_exists(table_name)
+        ]
+        if missing_phase2:
             logger.error(
-                "SELFTEST|FAIL|tables|missing=%s",
-                ",".join(missing_tables),
+                "SELFTEST|FAIL|phase2-tables|missing=%s",
+                ",".join(missing_phase2),
             )
             ok = False
         else:
             logger.info("SELFTEST|PASS|phase2-tables")
+        if missing_nation_management:
+            logger.error(
+                "SELFTEST|FAIL|nation-management-tables|missing=%s",
+                ",".join(missing_nation_management),
+            )
+            ok = False
+        else:
+            logger.info("SELFTEST|PASS|nation-management-tables")
     except Exception:
-        logger.exception("SELFTEST|FAIL|phase2-tables")
+        logger.exception("SELFTEST|FAIL|schema-tables")
+        ok = False
+
+    try:
+        async with engine.connect() as connection:
+            columns = await connection.run_sync(
+                lambda sync_connection: {
+                    column["name"]
+                    for column in inspect(sync_connection).get_columns("nations")
+                }
+            )
+        required_nation_columns = {
+            "join_policy",
+            "personality",
+            "invite_code",
+            "treasury",
+        }
+        missing_nation_columns = sorted(required_nation_columns - columns)
+        if missing_nation_columns:
+            logger.error(
+                "SELFTEST|FAIL|nation-management-columns|missing=%s",
+                ",".join(missing_nation_columns),
+            )
+            ok = False
+        else:
+            logger.info("SELFTEST|PASS|nation-management-columns")
+    except Exception:
+        logger.exception("SELFTEST|FAIL|nation-management-columns")
         ok = False
 
     try:
