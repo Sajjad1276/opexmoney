@@ -352,7 +352,7 @@ async def nation_admin_panel(
             [
                 InlineKeyboardButton(
                     text=f"💰 خزانه ({treasury})",
-                    callback_data=f"treasury:show:{nation_id}",
+                    callback_data=f"treasury:show:{nation_id}:management",
                     style=ButtonStyle.SUCCESS,
                 ),
                 InlineKeyboardButton(
