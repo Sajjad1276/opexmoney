@@ -469,12 +469,12 @@ async def _begin_registration(message: Message, state: FSMContext) -> None:
 فقط حروف فارسی یا انگلیسی، عدد و خط تیره مجازه.
 """
 
-    await message.answer(
+    panel = await message.answer(
         rtl_html(text),
         reply_markup=cancel_keyboard(),
         parse_mode=ParseMode.HTML,
     )
-    await remember_inline_panel(state, message)
+    await remember_inline_panel(state, panel)
 
 
 @router.message(F.text == "🎮 شروع بازی")
