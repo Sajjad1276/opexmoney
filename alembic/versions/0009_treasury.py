@@ -85,11 +85,10 @@ def upgrade() -> None:
             balance_local,
             total_deposited
         )
-        SELECT id, 0, 0, 0
+        SELECT nation_id, 0, 0, 0
         FROM nations
         ON CONFLICT (nation_id) DO NOTHING
         """
-        .replace("SELECT id, 0, 0, 0", "SELECT nation_id, 0, 0, 0")
     )
 
 
