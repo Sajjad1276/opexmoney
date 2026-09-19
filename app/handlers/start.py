@@ -139,6 +139,7 @@ def _nation_page_keyboard(
                     ),
                     callback_data="select_nation:{0}".format(nation.nation_id),
                 )
+            ]
         )
 
     navigation: list[InlineKeyboardButton] = []
