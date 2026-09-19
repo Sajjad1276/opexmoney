@@ -81,10 +81,53 @@ def confirm_found_nation_keyboard() -> InlineKeyboardMarkup:
     ]])
 
 
+
+
+
+def founder_flag_selection_keyboard() -> InlineKeyboardMarkup:
+    flags = [
+        ("🚩", "پرچم سرخ"),
+        ("🏳", "پرچم سفید"),
+        ("🎌", "پرچم‌های دوقلو"),
+        ("🏁", "شطرنجی"),
+        ("🇮🇷", "ایران"),
+        ("🇫🇮", "فنلاند"),
+        ("🇺🇸", "آمریکا"),
+        ("🇯🇵", "ژاپن"),
+        ("🇩🇪", "آلمان"),
+        ("🇧🇷", "برزیل"),
+        ("🇫🇷", "فرانسه"),
+        ("🇹🇷", "ترکیه"),
+    ]
+    rows = [
+        [
+            InlineKeyboardButton(
+                text=f"{flag} {label}",
+                callback_data=f"founder_flag:{flag}",
+            )
+            for flag, label in flags[index:index + 3]
+        ]
+        for index in range(0, len(flags), 3)
+    ]
+    rows.append([
+        InlineKeyboardButton(
+            text="🏴 پیش‌فرض",
+            callback_data="founder_flag:default",
+        )
+    ])
+    rows.append([
+        InlineKeyboardButton(
+            text="❌ انصراف",
+            callback_data="cancel_founder",
+            style=ButtonStyle.DANGER,
+        )
+    ])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
 def nation_selection_keyboard(nations) -> InlineKeyboardMarkup:
     rows = [
         [InlineKeyboardButton(
-            text=f"🏴 {nation.name} ({nation.currency_code}) · {nation.member_count} نفر",
+            text=f"{nation.flag_emoji or '🏴'} {nation.name} ({nation.currency_code}) · {nation.member_count} نفر",
             callback_data=f"join_nation:{nation.nation_id}",
         )]
         for nation in nations
