@@ -684,9 +684,33 @@ async def join_by_invite_command(message: Message, bot: Bot) -> None:
     await message.answer(text)
 
 
-@nation_management_router.callback_query(F.data.regexp(r"^nation_admin:(\d+)$"))
+@nation_management_router.callback_query(F.data.regexp(r"^(?:nation_admin|nm:panel):(\d+)$"))
 async def open_admin_panel(call: CallbackQuery) -> None:
-    nation_id = int(call.data.split(":")[1])
+    nation_id = int(call.data.split(":")[1]) if call.data.startswith("nation_admin:") else int(call.data.split(":")[2])
+    await open_admin_panel_for_nation(call, nation_id)
+
+
+@nation_management_router.callback_query(F.data == "founder_panel")
+async def founder_panel_entry(call: CallbackQuery) -> None:
+    async with async_session() as session:
+        async with session.begin():
+            member = await session.scalar(
+                select(NationMember)
+                .where(
+                    NationMember.user_id == call.from_user.id,
+                    NationMember.is_active.is_(True),
+                    NationMember.role == NationMemberRole.FOUNDER,
+                )
+                .limit(1)
+            )
+    if member is None:
+        await call.answer("⛔ تو بنیان‌گذار هیچ ملتی نیستی.", show_alert=True)
+        return
+
+    await open_admin_panel_for_nation(call, member.nation_id)
+
+
+async def open_admin_panel_for_nation(call: CallbackQuery, nation_id: int) -> None:
     try:
         markup = await nation_admin_panel(call.from_user.id, nation_id)
     except ValueError as exc:
