@@ -1,7 +1,7 @@
 """OPEX MONEY AI companion facade.
 
 Pipeline:
-context -> prompt -> Redis cache -> OpenAI -> parser -> fallback.
+context -> prompt -> Redis cache -> Gemini API -> parser -> fallback.
 """
 
 from __future__ import annotations
@@ -13,7 +13,8 @@ from pathlib import Path
 
 from aiogram import F, Router
 from aiogram.types import Message
-from openai import AsyncOpenAI
+from google import genai
+from google.genai import types
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.session import async_session
@@ -52,27 +53,27 @@ class AICompanion:
     """High-level AI service for conversational OPEX MONEY responses."""
 
     def __init__(self) -> None:
-        self._client: AsyncOpenAI | None = None
+        self._client: genai.Client | None = None
 
-    def _get_client(self) -> AsyncOpenAI | None:
-        """Create the async OpenAI client only when credentials exist."""
-        if not settings.ai_enabled or not settings.openai_api_key:
+    def _get_client(self) -> genai.Client | None:
+        """Create the Gemini client only when credentials exist."""
+        if not settings.ai_enabled or not settings.gemini_api_key:
             return None
+
         if self._client is None:
-            client_kwargs: dict[str, object] = {
-                "api_key": settings.openai_api_key,
-                "timeout": settings.ai_timeout_seconds,
-            }
-            if settings.openai_base_url:
-                client_kwargs["base_url"] = settings.openai_base_url
-            self._client = AsyncOpenAI(**client_kwargs)
+            self._client = genai.Client(
+                api_key=settings.gemini_api_key,
+                http_options=types.HttpOptions(
+                    timeout=settings.ai_timeout_seconds,
+                ),
+            )
         return self._client
 
     async def reply(self, user_id: int, user_message: str, db: AsyncSession) -> str:
         """
         Generate one safe AI response.
 
-        Any failure in context loading, Redis, OpenAI, or parsing falls back
+        Any failure in context loading, Redis, Gemini, or parsing falls back
         to a static message. The exception never reaches the Telegram handler.
         """
         started = time.perf_counter()
@@ -105,18 +106,34 @@ class AICompanion:
                 )
                 return AI_FALLBACK_MESSAGE
 
-            prompt = build_dynamic_prompt(context=context, user_message=clean_message)
-            response = await client.responses.create(
-                model=settings.ai_model,
-                instructions=SYSTEM_PERSONALITY,
-                input=prompt,
+            prompt = build_dynamic_prompt(
+                context=context,
+                user_message=clean_message,
             )
-            parsed = parse_ai_response(response.output_text)
+            response = await client.aio.models.generate_content(
+                model=settings.ai_model,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=SYSTEM_PERSONALITY,
+                    response_mime_type="application/json",
+                    response_schema={
+                        "type": "OBJECT",
+                        "properties": {
+                            "reply": {"type": "STRING"},
+                        },
+                        "required": ["reply"],
+                    },
+                    temperature=0.7,
+                    max_output_tokens=300,
+                ),
+            )
+            raw_output = response.text or ""
+            parsed = parse_ai_response(raw_output)
 
             await set_cached_response(cache_key, parsed.reply)
             await remember_bot_message(user_id, parsed.reply)
             logger.info(
-                "call user_id=%s status=success model=%s latency_ms=%.1f",
+                "call user_id=%s status=success provider=gemini model=%s latency_ms=%.1f",
                 user_id,
                 settings.ai_model,
                 (time.perf_counter() - started) * 1000,
@@ -124,16 +141,16 @@ class AICompanion:
             return parsed.reply
         except Exception:
             logger.exception(
-                "call user_id=%s status=fallback latency_ms=%.1f",
+                "call user_id=%s status=fallback provider=gemini latency_ms=%.1f",
                 user_id,
                 (time.perf_counter() - started) * 1000,
             )
             return AI_FALLBACK_MESSAGE
 
     async def close(self) -> None:
-        """Close OpenAI and Redis resources."""
+        """Close the Gemini async client and Redis resources."""
         if self._client is not None:
-            await self._client.close()
+            await self._client.aio.aclose()
             self._client = None
         await close_cache()
 
@@ -149,7 +166,6 @@ async def get_ai_reply(user_id: int, user_message: str, db: AsyncSession) -> str
 async def remember_bot_reply(user_id: int, message: str) -> None:
     """Track a non-AI bot message for future continuity."""
     await remember_bot_message(user_id, message)
-
 
 
 ai_router = Router(name="ai_companion")
