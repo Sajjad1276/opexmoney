@@ -4,7 +4,6 @@ import asyncio
 import html
 import json
 import os
-import re
 import time
 import urllib.request
 import logging
@@ -777,7 +776,7 @@ async def onboarding_name(message: Message, state: FSMContext) -> None:
                 return
 
     # 4. pattern_filter
-    if not NAME_RE.fullmatch(name):
+    if not TRADER_NAME_RE.fullmatch(name):
         await message.answer(
             rtl_html(
                 """
