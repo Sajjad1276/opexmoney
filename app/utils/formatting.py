@@ -125,3 +125,10 @@ def today_jalali() -> str:
         datetime.now().day,
     )
     return to_fa(f"{y:04d}/{m:02d}/{d:02d}")
+
+
+def progress_bar(current: int, total: int, length: int = 6) -> str:
+    if total <= 0:
+        return "░" * length
+    filled = min(round(current / total * length), length)
+    return "█" * filled + "░" * (length - filled)
