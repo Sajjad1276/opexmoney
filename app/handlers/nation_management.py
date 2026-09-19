@@ -8,7 +8,8 @@ from decimal import Decimal
 from typing import Any
 
 from aiogram import Bot, F, Router
-from aiogram.filters import Command, StateFilter
+from aiogram.filters import Command
+from aiogram.filters.state import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
@@ -556,7 +557,7 @@ async def _join_user(
                     joined_user = user
             else:
                 user.home_nation_id = nation_id
-                user.role = "trader" if False else "player"
+                user.role = "player"
                 nation.member_count += 1
                 member = NationMember(
                     nation_id=nation_id,
@@ -693,11 +694,11 @@ async def open_admin_panel(call: CallbackQuery) -> None:
         return
 
     async with async_session() as session:
-        nation = await session.get(Nation, nation_id)
-        if nation is None:
-            await call.answer("⚠️ ملت پیدا نشد.", show_alert=True)
-            return
         async with session.begin():
+            nation = await session.get(Nation, nation_id)
+            if nation is None:
+                await call.answer("⚠️ ملت پیدا نشد.", show_alert=True)
+                return
             text = await _panel_text(session, nation)
 
     if call.message:
