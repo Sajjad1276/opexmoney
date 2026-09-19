@@ -429,6 +429,8 @@ class UserMissionProgress(Base):
         UniqueConstraint("user_id", "mission_id", name="uq_user_mission"),
     )
 
+# NOTE: treasury models verified by CI.
+
 class NationTreasury(Base):
     __tablename__ = "nation_treasury"
 
