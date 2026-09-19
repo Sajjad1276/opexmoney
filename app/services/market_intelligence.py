@@ -9,7 +9,9 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import Nation, RateHistory, Transaction
-from app.utils.formatting import to_fa
+
+
+_FA_DIGITS = str.maketrans("0123456789.-", "۰۱۲۳۴۵۶۷۸۹٫−")
 
 
 WINDOW_LABELS = {
@@ -18,6 +20,10 @@ WINDOW_LABELS = {
     "24h": "۲۴ ساعت گذشته",
     "7d": "۷ روز گذشته",
 }
+
+
+def _fa(value: object) -> str:
+    return str(value).translate(_FA_DIGITS)
 
 
 def _rounded_percent(value: float | Decimal) -> int:
@@ -35,7 +41,7 @@ def format_change_text(change_pct: float, window: str = "24h") -> str:
         return "➡️ بدون تغییر"
 
     window_label = WINDOW_LABELS.get(window, window)
-    value = to_fa(rounded)
+    value = _fa(rounded)
 
     if change_pct > 0:
         return f"▲ {value} درصد رشد در {window_label}"
@@ -116,9 +122,9 @@ def get_consecutive_trend_days(
 
 def _trend_text(streak: int) -> str | None:
     if streak >= 3:
-        return f"⚠️ روند نزولی {to_fa(streak)} روزه"
+        return f"⚠️ روند نزولی {_fa(streak)} روزه"
     if streak <= -3:
-        return f"📈 روند صعودی {to_fa(abs(streak))} روزه"
+        return f"📈 روند صعودی {_fa(abs(streak))} روزه"
     return None
 
 
@@ -146,9 +152,9 @@ async def get_smart_insight(
 
     weekly = _rounded_percent(change_7d)
     if weekly > 0:
-        insights.append(f"نسبت به هفته پیش {to_fa(weekly)}٪ بالاتره")
+        insights.append(f"نسبت به هفته پیش {_fa(weekly)}٪ بالاتره")
     elif weekly < 0:
-        insights.append(f"نسبت به هفته پیش {to_fa(weekly)}٪ پایین‌تره")
+        insights.append(f"نسبت به هفته پیش {_fa(weekly)}٪ پایین‌تره")
 
     if not insights:
         rounded = _rounded_percent(change_24h)
