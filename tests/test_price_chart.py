@@ -34,10 +34,10 @@ def test_chart_rendering_is_emoji_free(caplog, recwarn, rates):
         current_rate=rates[-1],
     )
 
-    assert output.getvalue().startswith(b"\\x89PNG")
+    assert output.getvalue().startswith(b"\x89PNG")
 
     source = __import__("inspect").getsource(price_chart)
-    assert not re.search(r"[\\U0001F000-\\U0001FAFF]", source)
+    assert not re.search(r"[\U0001F000-\U0001FAFF]", source)
 
     warning_text = "\\n".join(str(item.message) for item in recwarn)
     log_text = "\\n".join(record.getMessage() for record in caplog.records)
