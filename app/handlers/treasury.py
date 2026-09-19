@@ -6,6 +6,7 @@ from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
 from aiogram import F, Router
+from aiogram.enums import ButtonStyle
 from aiogram.filters.state import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -95,6 +96,7 @@ def treasury_keyboard(
             InlineKeyboardButton(
                 text="💎 واریز به خزانه",
                 callback_data=f"treasury:deposit:{nation_id}",
+                style=ButtonStyle.SUCCESS,
             )
         ]
     ]
@@ -105,6 +107,7 @@ def treasury_keyboard(
                 InlineKeyboardButton(
                     text="📤 برداشت",
                     callback_data=f"treasury:withdraw:{nation_id}",
+                    style=ButtonStyle.DANGER,
                 )
             ]
         )
@@ -114,6 +117,7 @@ def treasury_keyboard(
             InlineKeyboardButton(
                 text="📋 گزارش کامل",
                 callback_data=f"treasury:report:{nation_id}",
+                style=ButtonStyle.PRIMARY,
             ),
             InlineKeyboardButton(
                 text="↩️ بازگشت",
@@ -136,6 +140,7 @@ def confirm_withdraw_keyboard(
                     callback_data=(
                         f"treasury:withdraw_confirm:{nation_id}:{amount_str}"
                     ),
+                    style=ButtonStyle.SUCCESS,
                 ),
                 InlineKeyboardButton(
                     text="❌ انصراف",
@@ -153,6 +158,7 @@ def cancel_keyboard(nation_id: int) -> InlineKeyboardMarkup:
                 InlineKeyboardButton(
                     text="❌ انصراف",
                     callback_data=f"treasury:cancel:{nation_id}",
+                    style=ButtonStyle.DANGER,
                 )
             ]
         ]
