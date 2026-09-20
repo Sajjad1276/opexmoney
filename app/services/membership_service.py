@@ -208,6 +208,7 @@ async def sync_telegram_membership(
     is_member: bool,
     observed_at: datetime | None = None,
     source: str = "chat_member",
+    project_game_membership: bool = True,
 ) -> MembershipSyncResult | None:
     observed_at = observed_at or datetime.utcnow()
 
