@@ -170,7 +170,7 @@ async def show_portfolio(message: Message) -> None:
         )
         return
 
-    await send_submenu_panel(
+    panel = await send_submenu_panel(
         message,
         build_portfolio_text(data),
         reply_markup=portfolio_keyboard(data),
