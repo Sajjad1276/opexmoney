@@ -57,6 +57,13 @@ class FakeBot:
     async def send_message(self, *args, **kwargs):
         return SimpleNamespace()
 
+    async def get_chat_member(self, group_id, user_id):
+        return SimpleNamespace(
+            status="member",
+            is_member=True,
+            user=SimpleNamespace(id=user_id),
+        )
+
 
 class FakeCall:
     def __init__(self, user_id: int, data: str):
