@@ -1234,16 +1234,10 @@ async def confirm_nation(call: CallbackQuery, state: FSMContext, bot: Bot) -> No
                     CurrencyHolding.nation_id == nation_id,
                 )
             )
-            rank = await get_nation_rank(session, nation_id)
-            total_nations = await session.scalar(
-                select(func.count(Nation.nation_id)).where(Nation.is_active.is_(True))
-            ) or 0
-
     if user is None or nation is None or holding is None:
         await call.answer("⚠️ حساب ملت ناقص است. /start بزن.", show_alert=True)
         return
 
-    initial_omx = Decimal("500") * nation.exchange_rate
     text = f"""{html.escape(nation.flag_emoji or "🏴")} <b>به {html.escape(nation.name)} خوش اومدی</b>
 <blockquote>⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀</blockquote>
 {user_mention(call.from_user)}، تو الان شهروند این ملت هستی.
