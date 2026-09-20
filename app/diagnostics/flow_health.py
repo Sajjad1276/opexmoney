@@ -13,14 +13,21 @@ STATES_DIR = ROOT / "app" / "states"
 MAIN_FILE = ROOT / "main.py"
 
 EXPECTED_HANDLER_MODULES = {
+    "academy",
+    "chart",
     "founder",
     "governance",
     "market",
+    "missions",
     "nation",
     "nation_management",
     "onboarding_fix",
+    "portfolio",
+    "ranking",
     "sections",
+    "settings",
     "start",
+    "treasury",
 }
 
 _DYNAMIC_VALUE_HINTS = {
