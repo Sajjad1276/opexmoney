@@ -119,6 +119,15 @@ async def _seed_nation():
                     is_active=True,
                 )
             )
+            session.add(
+                NationTelegramMember(
+                    nation_id=nation.nation_id,
+                    telegram_user_id=FOUNDER_ID,
+                    telegram_status="administrator",
+                    is_member=True,
+                    is_active=True,
+                )
+            )
             return nation.nation_id
 
 
