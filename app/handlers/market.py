@@ -35,6 +35,7 @@ from app.keyboards.inline import (
 )
 from app.services.economic_engine import get_active_members
 from app.services.market_service import get_tradeable_nation, get_user_sell_holdings
+from app.services.economy_events import enqueue_event
 from app.services.alert_service import (
     create_price_alert,
     delete_price_alert,
@@ -860,16 +861,32 @@ async def confirm_buy(call, state=None):
             holding.amount += calc["receive"]
             nation.trade_volume_24h += spend
 
-            session.add(
-                Transaction(
-                    user_id=user.user_id,
-                    nation_id=nation_id,
-                    transaction_type="buy",
-                    spend_xr=spend,
-                    amount=calc["receive"],
-                    fee_xr=calc["fee"],
-                    rate=nation.exchange_rate,
-                )
+            transaction = Transaction(
+                user_id=user.user_id,
+                nation_id=nation_id,
+                transaction_type="buy",
+                spend_xr=spend,
+                amount=calc["receive"],
+                fee_xr=calc["fee"],
+                rate=nation.exchange_rate,
+            )
+            session.add(transaction)
+            await session.flush()
+            await enqueue_event(
+                session,
+                event_key=f"transaction:{transaction.id}",
+                event_type="trade.buy",
+                aggregate_type="transaction",
+                aggregate_id=transaction.id,
+                payload={
+                    "user_id": user.user_id,
+                    "nation_id": nation_id,
+                    "side": "buy",
+                    "spend_xr": str(spend),
+                    "amount": str(calc["receive"]),
+                    "fee_xr": str(calc["fee"]),
+                    "rate": str(nation.exchange_rate),
+                },
             )
             session.add(
                 UserActivity(
@@ -1269,16 +1286,32 @@ async def confirm_sell(call, state=None):
             user.xr_balance += calc["receive"]
             nation.trade_volume_24h += amount * nation.exchange_rate
 
-            session.add(
-                Transaction(
-                    user_id=user.user_id,
-                    nation_id=nation_id,
-                    transaction_type="sell",
-                    spend_xr=amount * nation.exchange_rate,
-                    amount=amount,
-                    fee_xr=calc["fee"],
-                    rate=nation.exchange_rate,
-                )
+            transaction = Transaction(
+                user_id=user.user_id,
+                nation_id=nation_id,
+                transaction_type="sell",
+                spend_xr=amount * nation.exchange_rate,
+                amount=amount,
+                fee_xr=calc["fee"],
+                rate=nation.exchange_rate,
+            )
+            session.add(transaction)
+            await session.flush()
+            await enqueue_event(
+                session,
+                event_key=f"transaction:{transaction.id}",
+                event_type="trade.sell",
+                aggregate_type="transaction",
+                aggregate_id=transaction.id,
+                payload={
+                    "user_id": user.user_id,
+                    "nation_id": nation_id,
+                    "side": "sell",
+                    "spend_xr": str(amount * nation.exchange_rate),
+                    "amount": str(amount),
+                    "fee_xr": str(calc["fee"]),
+                    "rate": str(nation.exchange_rate),
+                },
             )
             session.add(
                 UserActivity(
