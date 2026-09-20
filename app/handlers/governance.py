@@ -34,7 +34,7 @@ from app.services.rules.registry import RULE_REGISTRY, get_rule, parse_rule_inpu
 from app.services.rules.resolver import resolve
 from app.states.governance import GovernanceStates
 from app.utils.formatting import to_fa
-from app.utils.ui import close_inline_panel, remember_inline_panel
+from app.utils.ui import close_inline_panel, remember_inline_panel, send_submenu_panel
 
 
 governance_router = Router(name="governance")
@@ -84,7 +84,12 @@ async def _send_governance_home(call: CallbackQuery | None, message: Message | N
             await call.message.edit_text(text, reply_markup=markup, parse_mode="HTML")
         await call.answer()
     else:
-        await message.answer(text, reply_markup=markup, parse_mode="HTML")
+        await send_submenu_panel(
+            message,
+            text,
+            reply_markup=markup,
+            parse_mode="HTML",
+        )
 
 
 @governance_router.message(F.text == "📜 قوانین")
