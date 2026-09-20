@@ -465,8 +465,8 @@ async def resolve_war(
         message = (
             "🏆 <b>نتیجه جنگ</b>\\n\\n"
             f"🥇 برنده: <b>{html.escape(result['winner_name'])}</b>\\n"
-            f"💱 نرخ برنده: <b>{winner_rate}</b> ΩXR\\n"
-            f"💸 غرامت منتقل‌شده: <b>{result['reparation_amount']}</b> ΩXR"
+            f"💱 نرخ برنده: <b>{winner_rate}</b> دلار\\n"
+            f"💸 غرامت منتقل‌شده: <b>{result['reparation_amount']}</b> دلار"
         )
 
     await _send_to_groups(
