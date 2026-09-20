@@ -53,7 +53,7 @@ from app.services.user_service import sync_user_balance
 from app.services.rules.resolver import resolve
 from app.services.temporal_service import get_peak_multiplier
 from app.states.market import MarketStates
-from app.utils.ui import close_inline_panel, remember_inline_panel
+from app.utils.ui import close_inline_panel, remember_inline_panel, send_submenu_panel
 from app.utils.formatting import (
     calc_trade,
     fmt_amount,
@@ -251,7 +251,8 @@ async def render_market(message: Message, edit_call=None):
     if edit_call:
         await safe_edit(edit_call, text, markup)
     else:
-        await message.answer(
+        await send_submenu_panel(
+            message,
             text,
             reply_markup=markup,
             parse_mode="HTML",
