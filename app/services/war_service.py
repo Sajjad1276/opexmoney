@@ -10,6 +10,8 @@ from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.session import async_session
+from app.services.nation_service import is_user_active_in_nation
+from app.services.economic_event_service import record_economic_event
 from app.database.models import (
     Nation,
     NationLog,
@@ -122,6 +124,14 @@ async def declare_war(
         if actor_user_id is None:
             raise ValueError("⛔ بنیان‌گذار ملت مشخص نیست.")
 
+        if not await is_user_active_in_nation(
+            session,
+            actor_user_id,
+            declaring_nation_id,
+            lock=True,
+        ):
+            raise ValueError("⛔ فقط اعضای فعال ملت می‌توانند جنگ اعلام کنند.")
+
         actor = await session.scalar(
             select(NationMember)
             .where(
@@ -168,6 +178,23 @@ async def declare_war(
         )
         session.add(war)
         await session.flush()
+
+        record_economic_event(
+            session,
+            nation_id=declaring_nation_id,
+            event_type="WAR_DECLARED",
+            actor_id=actor_user_id,
+            target_nation_id=target_nation_id,
+            metadata={"war_id": war.id, "ends_at": war.ends_at.isoformat()},
+        )
+        record_economic_event(
+            session,
+            nation_id=target_nation_id,
+            event_type="WAR_DECLARED",
+            actor_id=actor_user_id,
+            target_nation_id=declaring_nation_id,
+            metadata={"war_id": war.id, "ends_at": war.ends_at.isoformat()},
+        )
 
         await _append_war_log(
             session,
@@ -351,6 +378,35 @@ async def resolve_war(
             "status": war.status,
             "ended_at": ended_at.isoformat(),
         }
+
+        record_economic_event(
+            session,
+            nation_id=declaring_nation.nation_id,
+            event_type="WAR_RESOLVED",
+            actor_id=None,
+            target_nation_id=opponent_nation.nation_id,
+            amount_xr=reparation,
+            metadata={
+                "war_id": war.id,
+                "status": war.status,
+                "winner_id": winner_id,
+                "loser_id": loser_id,
+            },
+        )
+        record_economic_event(
+            session,
+            nation_id=opponent_nation.nation_id,
+            event_type="WAR_RESOLVED",
+            actor_id=None,
+            target_nation_id=declaring_nation.nation_id,
+            amount_xr=reparation,
+            metadata={
+                "war_id": war.id,
+                "status": war.status,
+                "winner_id": winner_id,
+                "loser_id": loser_id,
+            },
+        )
 
         await _append_war_log(
             session,
