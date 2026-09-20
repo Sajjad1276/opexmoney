@@ -68,6 +68,13 @@ def settings_keyboard() -> InlineKeyboardMarkup:
             ],
             [
                 InlineKeyboardButton(
+                    text="🏛 تأسیس ملت",
+                    callback_data="start_founder",
+                    style=ButtonStyle.SUCCESS,
+                )
+            ],
+            [
+                InlineKeyboardButton(
                     text="↩️ بازگشت",
                     callback_data="back_to_dashboard",
                 )
