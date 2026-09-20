@@ -64,34 +64,48 @@ async def get_user_active_nation_context(
     session: AsyncSession,
     user_id: int,
     *,
-    repair: bool = True,
+    repair: bool = False,
+    lock: bool = False,
 ) -> tuple[Nation, str, str] | None:
-    """Resolve the canonical active nation and membership role."""
+    """Resolve the active nation without writes unless explicit repair is requested.
 
-    user = await session.get(User, user_id, with_for_update=True)
+    repair=True requires lock=True so every repair path runs under row locks
+    inside the caller's transaction. Read-only callers stay side effect free
+    and do not acquire row locks.
+    """
+    if repair and not lock:
+        raise ValueError(
+            "repair=True requires lock=True; run repairs inside an explicit transaction."
+        )
+
+    user = await session.get(User, user_id, with_for_update=lock)
     if user is None:
         return None
 
+    def maybe_lock(statement):
+        return statement.with_for_update() if lock else statement
+
     if user.home_nation_id is not None:
         home_nation = await session.scalar(
-            select(Nation)
-            .where(
-                Nation.nation_id == user.home_nation_id,
-                Nation.is_active.is_(True),
+            maybe_lock(
+                select(Nation).where(
+                    Nation.nation_id == user.home_nation_id,
+                    Nation.is_active.is_(True),
+                )
             )
-            .with_for_update()
         )
 
         if home_nation is not None:
             member = await session.scalar(
-                select(NationMember)
-                .where(
-                    NationMember.user_id == user_id,
-                    NationMember.nation_id == home_nation.nation_id,
-                    NationMember.is_active.is_(True),
+                maybe_lock(
+                    select(NationMember)
+                    .where(
+                        NationMember.user_id == user_id,
+                        NationMember.nation_id == home_nation.nation_id,
+                        NationMember.is_active.is_(True),
+                    )
+                    .limit(1)
                 )
-                .with_for_update()
-                .limit(1)
             )
             if member is not None:
                 return (
@@ -112,13 +126,14 @@ async def get_user_active_nation_context(
                 return home_nation, role, "repaired_founder"
 
             holding = await session.scalar(
-                select(CurrencyHolding)
-                .where(
-                    CurrencyHolding.user_id == user_id,
-                    CurrencyHolding.nation_id == home_nation.nation_id,
+                maybe_lock(
+                    select(CurrencyHolding)
+                    .where(
+                        CurrencyHolding.user_id == user_id,
+                        CurrencyHolding.nation_id == home_nation.nation_id,
+                    )
+                    .limit(1)
                 )
-                .with_for_update()
-                .limit(1)
             )
             if repair and holding is not None:
                 role = await _repair_membership(
@@ -129,40 +144,39 @@ async def get_user_active_nation_context(
                 )
                 return home_nation, role, "repaired_holding"
 
-    row = (
-        await session.execute(
-            select(NationMember, Nation)
-            .join(Nation, Nation.nation_id == NationMember.nation_id)
-            .where(
-                NationMember.user_id == user_id,
-                NationMember.is_active.is_(True),
-                Nation.is_active.is_(True),
-            )
-            .order_by(NationMember.joined_at.desc(), Nation.nation_id.asc())
-            .with_for_update()
+    membership_stmt = (
+        select(NationMember, Nation)
+        .join(Nation, Nation.nation_id == NationMember.nation_id)
+        .where(
+            NationMember.user_id == user_id,
+            NationMember.is_active.is_(True),
+            Nation.is_active.is_(True),
         )
-    ).first()
-    if row is not None:
-        member, nation = row
-        user.home_nation_id = nation.nation_id
+        .order_by(NationMember.joined_at.desc(), Nation.nation_id.asc())
+    )
+    membership_row = (await session.execute(maybe_lock(membership_stmt))).first()
+    if membership_row is not None:
+        member, nation = membership_row
+        if repair:
+            user.home_nation_id = nation.nation_id
         return (
             nation,
             member.role.value
             if isinstance(member.role, NationMemberRole)
             else str(member.role),
-            "membership_fallback",
+            "membership_fallback_repaired" if repair else "membership_fallback",
         )
 
-    founder_nation = await session.scalar(
+    founder_stmt = (
         select(Nation)
         .where(
             Nation.founder_user_id == user_id,
             Nation.is_active.is_(True),
         )
         .order_by(Nation.nation_id.asc())
-        .with_for_update()
         .limit(1)
     )
+    founder_nation = await session.scalar(maybe_lock(founder_stmt))
     if founder_nation is not None:
         if repair:
             role = await _repair_membership(
@@ -178,18 +192,16 @@ async def get_user_active_nation_context(
             "founder_fallback",
         )
 
-    holding_row = (
-        await session.execute(
-            select(CurrencyHolding, Nation)
-            .join(Nation, Nation.nation_id == CurrencyHolding.nation_id)
-            .where(
-                CurrencyHolding.user_id == user_id,
-                Nation.is_active.is_(True),
-            )
-            .order_by(CurrencyHolding.created_at.desc(), Nation.nation_id.asc())
-            .with_for_update()
+    holding_stmt = (
+        select(CurrencyHolding, Nation)
+        .join(Nation, Nation.nation_id == CurrencyHolding.nation_id)
+        .where(
+            CurrencyHolding.user_id == user_id,
+            Nation.is_active.is_(True),
         )
-    ).first()
+        .order_by(CurrencyHolding.created_at.desc(), Nation.nation_id.asc())
+    )
+    holding_row = (await session.execute(maybe_lock(holding_stmt))).first()
     if holding_row is not None:
         _, nation = holding_row
         if repair:
@@ -200,7 +212,6 @@ async def get_user_active_nation_context(
                 role=NationMemberRole.CITIZEN,
             )
             return nation, role, "holding_fallback_repaired"
-        user.home_nation_id = nation.nation_id
         return (
             nation,
             NationMemberRole.CITIZEN.value,
