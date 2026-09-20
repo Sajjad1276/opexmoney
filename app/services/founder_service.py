@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import BotGroup, Nation, NationFoundingDraft, User
 from app.services.nation_service import create_nation
+from app.utils.validators import generate_unique_currency_code
 
 
 DRAFT_TTL = timedelta(minutes=30)
@@ -210,7 +211,6 @@ async def set_nation_name(
     *,
     founder_user_id: int,
     nation_name: str,
-    currency_code: str,
 ) -> NationFoundingDraft:
     async with session.begin():
         draft = await session.scalar(
@@ -230,7 +230,10 @@ async def set_nation_name(
             raise ValueError("فرآیند تأسیس منقضی شده. دوباره شروع کن.")
 
         draft.nation_name = nation_name
-        draft.currency_code = currency_code
+        draft.currency_code = await generate_unique_currency_code(
+            nation_name,
+            session,
+        )
         draft.status = "FLAG"
         draft.expires_at = _utcnow() + DRAFT_TTL
         await session.flush()
@@ -315,19 +318,50 @@ async def finalize_draft(
 
         draft.status = "FINALIZING"
 
-        nation = await create_nation(
-            session=session,
-            founder_user_id=founder_user_id,
-            group_id=int(draft.group_id),
-            nation_name=draft.nation_name,
-            currency_code=draft.currency_code,
-            flag_emoji=draft.flag_emoji or "🏴",
-        )
+        group_id = int(draft.group_id)
+        nation_name = draft.nation_name
+        flag_emoji = draft.flag_emoji or "🏴"
+
+        # Keep draft mutation, currency recovery, nation creation, and
+        # completion in one transaction. A savepoint protects this transaction
+        # from a concurrent winner of the currency unique constraint.
+        for attempt in range(2):
+            try:
+                existing_currency = await session.scalar(
+                    select(Nation.nation_id)
+                    .where(Nation.currency_code == draft.currency_code)
+                    .limit(1)
+                )
+                if existing_currency is not None:
+                    draft.currency_code = await generate_unique_currency_code(
+                        nation_name,
+                        session,
+                    )
+
+                async with session.begin_nested():
+                    nation = await create_nation(
+                        session=session,
+                        founder_user_id=founder_user_id,
+                        group_id=group_id,
+                        nation_name=nation_name,
+                        currency_code=draft.currency_code,
+                        flag_emoji=flag_emoji,
+                    )
+                break
+            except ValueError as exc:
+                if "کد ارز" not in str(exc) or attempt == 1:
+                    raise
+                draft.currency_code = await generate_unique_currency_code(
+                    nation_name,
+                    session,
+                )
+        else:
+            raise ValueError("تأسیس ملت انجام نشد.")
 
         draft.status = "COMPLETED"
         await session.flush()
 
-        return nation, int(draft.group_id)
+        return nation, group_id
 
 
 
@@ -362,31 +396,3 @@ async def reset_group(
         await session.flush()
         return draft
 
-
-async def refresh_currency_code(
-    session: AsyncSession,
-    *,
-    founder_user_id: int,
-    currency_code: str,
-) -> NationFoundingDraft:
-    async with session.begin():
-        draft = await session.scalar(
-            select(NationFoundingDraft)
-            .where(
-                NationFoundingDraft.founder_user_id == founder_user_id,
-                NationFoundingDraft.status == "REVIEW",
-            )
-            .with_for_update()
-            .limit(1)
-        )
-        if draft is None:
-            raise ValueError("صفحه تأیید پیدا نشد.")
-
-        if _is_expired(draft):
-            draft.status = "EXPIRED"
-            raise ValueError("فرآیند تأسیس منقضی شده. دوباره شروع کن.")
-
-        draft.currency_code = currency_code
-        draft.expires_at = _utcnow() + DRAFT_TTL
-        await session.flush()
-        return draft
