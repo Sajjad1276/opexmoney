@@ -193,7 +193,7 @@ def build_treasury_msg(
         f"🏦 <b>خزانه {nation_name}</b>",
         "━━━━━━━━━━━━━━━━━━",
         (
-            f"💎 ذخیره ΩXR: "
+            f"💎 ذخیره دلار: "
             f"<code>{_amount_text(treasury['balance_xr'])}</code>"
         ),
         (
@@ -221,7 +221,7 @@ def build_treasury_msg(
             action = ACTION_LABEL.get(log["action"], log["action"])
             lines.append(
                 f" ▸ {actor} — {action} "
-                f"{_amount_text(log['amount_xr'])} ΩXR — "
+                f"{_amount_text(log['amount_xr'])} دلار — "
                 f"{time_ago(log['created_at'])}"
             )
 
@@ -428,9 +428,9 @@ async def start_deposit(
             await callback.message.edit_text(
                 "💎 <b>واریز به خزانه</b>\n"
                 "━━━━━━━━━━━━━━━━━━\n"
-                f"موجودی ΩXR شما: "
+                f"موجودی دلار شما: "
                 f"<code>{_amount_text(xr_balance)}</code>\n"
-                f"حداقل واریز: <code>{_amount_text(MIN_DEPOSIT)}</code> ΩXR\n\n"
+                f"حداقل واریز: <code>{_amount_text(MIN_DEPOSIT)}</code> دلار\n\n"
                 "مقدار واریز را بنویسید:",
                 reply_markup=cancel_keyboard(nation_id, return_target),
                 parse_mode="HTML",
@@ -490,14 +490,14 @@ async def receive_deposit_amount(
                         await message.answer(
                             "🔴 موجودی کافی نیست.\n"
                             f"موجودی شما: "
-                            f"<code>{_amount_text(result['balance'])}</code> ΩXR",
+                            f"<code>{_amount_text(result['balance'])}</code> دلار",
                             parse_mode="HTML",
                         )
                         return
                     if reason == "below_minimum":
                         await message.answer(
                             "🔴 حداقل مقدار واریز "
-                            f"{_amount_text(result['minimum'])} ΩXR است."
+                            f"{_amount_text(result['minimum'])} دلار است."
                         )
                         return
                     if reason == "invalid_amount":
@@ -518,9 +518,9 @@ async def receive_deposit_amount(
 
                 success = (
                     "✅ <b>واریز موفق</b>\n"
-                    f"{_amount_text(amount)} ΩXR به خزانه واریز شد.\n"
+                    f"{_amount_text(amount)} دلار به خزانه واریز شد.\n"
                     f"موجودی جدید شما: "
-                    f"<code>{_amount_text(result['new_balance'])}</code> ΩXR"
+                    f"<code>{_amount_text(result['new_balance'])}</code> دلار"
                 )
 
         await close_inline_panel(state, message.bot)
@@ -601,7 +601,7 @@ async def start_withdraw(
                 "📤 <b>برداشت از خزانه</b>\n"
                 "━━━━━━━━━━━━━━━━━━\n"
                 f"موجودی خزانه: "
-                f"<code>{_amount_text(treasury['balance_xr'])}</code> ΩXR\n\n"
+                f"<code>{_amount_text(treasury['balance_xr'])}</code> دلار\n\n"
                 "مقدار برداشت را بنویسید:",
                 reply_markup=cancel_keyboard(nation_id, return_target),
                 parse_mode="HTML",
@@ -657,8 +657,8 @@ async def receive_withdraw_amount(
         confirm_message = await message.answer(
             "⚠️ <b>تأیید برداشت</b>\n"
             "━━━━━━━━━━━━━━━━━━\n"
-            f"مقدار: <code>{_amount_text(amount)}</code> ΩXR\n"
-            "این مبلغ به موجودی ΩXR شما اضافه می‌شود.\n\n"
+            f"مقدار: <code>{_amount_text(amount)}</code> دلار\n"
+            "این مبلغ به موجودی دلار شما اضافه می‌شود.\n\n"
             "مطمئنید؟",
             reply_markup=confirm_withdraw_keyboard(
                 int(nation_id),
@@ -745,7 +745,7 @@ async def confirm_withdraw(
         success_text = (
             "✅ <b>برداشت موفق</b>\n"
             "━━━━━━━━━━━━━━━━━━\n"
-            f"{_amount_text(amount)} ΩXR از خزانه برداشت شد."
+            f"{_amount_text(amount)} دلار از خزانه برداشت شد."
         )
         if callback.message is not None:
             async with async_session() as session:
@@ -877,7 +877,7 @@ async def show_full_report(callback: CallbackQuery, state: FSMContext) -> None:
                 )
                 lines.append(
                     f"▸ {actor} — {action} "
-                    f"{_amount_text(log['amount_xr'])} ΩXR"
+                    f"{_amount_text(log['amount_xr'])} دلار"
                     f"{note}\n"
                     f"   {time_ago(log['created_at'])}"
                 )
@@ -1002,7 +1002,7 @@ async def treasury_back(
                     text = f"👑 <b>مدیریت {html.escape(nation.name)}</b>\n"
                     text += "━━━━━━━━━━━━━━━━━━━━\n"
                     text += f"👥 اعضا: <b>{member_count}</b>\n"
-                    text += f"💰 خزانه: <b>{_amount_text(nation.treasury)}</b> ΩXR\n"
+                    text += f"💰 خزانه: <b>{_amount_text(nation.treasury)}</b> دلار\n"
                 await callback.message.edit_text(
                     text,
                     reply_markup=markup,
