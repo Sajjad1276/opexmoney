@@ -1249,7 +1249,7 @@ async def founder_announce_ack(call: CallbackQuery) -> None:
 
 
 @founder_router.callback_query(
-    F.data.in_({"cancel_founder", "cancel_start"}),
+    F.data == "cancel_founder",
     StateFilter(
         FounderStates.WAITING_GROUP_ADMIN,
         FounderStates.SET_NATION_NAME,
