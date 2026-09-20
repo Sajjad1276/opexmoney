@@ -34,14 +34,14 @@ from app.keyboards.inline import (
     trade_confirmation_keyboard,
     welcome_keyboard,
 )
-from app.keyboards.reply import main_menu_keyboard
+from app.keyboards.reply import main_menu_keyboard, new_player_menu_keyboard
 from app.services.nation_service import get_active_nations, get_nation_rank
 from app.services.mission_service import check_permanent_missions, increment_mission
 from app.services.user_service import get_registration_status, get_user, is_fully_registered, sync_user_balance, username_exists
 from app.states.onboarding import OnboardingStates
 from config import settings
 from app.utils.formatting import fmt_amount, fmt_pct, fmt_rate, get_rate_change, get_rate_emoji, to_fa
-from app.utils.ui import close_inline_panel, remember_inline_panel
+from app.utils.ui import close_inline_panel, remember_inline_panel, send_submenu_panel
 
 router = Router(name="start")
 logger = logging.getLogger(__name__)
@@ -362,6 +362,12 @@ async def show_dashboard(
         ),
     )
 
+    dashboard_markup = (
+        new_player_menu_keyboard()
+        if trade_count == 0
+        else main_menu_keyboard()
+    )
+
     if replace_inline and bot is not None:
         try:
             await message.delete()
@@ -370,13 +376,13 @@ async def show_dashboard(
         await bot.send_message(
             user.user_id,
             rtl_html(text),
-            reply_markup=main_menu_keyboard(),
+            reply_markup=dashboard_markup,
             parse_mode=ParseMode.HTML,
         )
     else:
         await message.answer(
             rtl_html(text),
-            reply_markup=main_menu_keyboard(),
+            reply_markup=dashboard_markup,
             parse_mode=ParseMode.HTML,
         )
 
@@ -984,6 +990,61 @@ async def open_treasury_from_more(call: CallbackQuery, state: FSMContext) -> Non
         from app.handlers.treasury import open_treasury_from_main_menu
         await open_treasury_from_main_menu(call.message, state)
     await call.answer()
+
+
+@router.message(F.text == "🎯 قدم بعدی")
+async def new_player_next_step(message: Message, state: FSMContext) -> None:
+    async with async_session() as session:
+        async with session.begin():
+            user = await session.get(User, message.from_user.id)
+            if user is None or user.home_nation_id is None:
+                await message.answer("⚠️ هنوز ملتت مشخص نشده. /start بزن.")
+                return
+            nation = await session.get(Nation, user.home_nation_id)
+            trade_count = int(
+                await session.scalar(
+                    select(func.count(Transaction.id)).where(
+                        Transaction.user_id == user.user_id,
+                    )
+                ) or 0
+            )
+
+    if nation is None:
+        await message.answer("⚠️ ملت فعال پیدا نشد. /start بزن.")
+        return
+
+    if trade_count > 0:
+        from app.handlers.market import render_market
+        await render_market(message)
+        return
+
+    await state.update_data(
+        first_trade_available=True,
+        onboarding_started_at=time.time(),
+    )
+    receive_omx = Decimal("50") * nation.exchange_rate
+    text = (
+        f"{html.escape(nation.flag_emoji or '🏴')} <b>قدم بعدی تو</b>\n"
+        "<blockquote>⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀</blockquote>"
+        "🎯 این اولین تصمیم اقتصادی توست.\n\n"
+        f"📤 می‌فروشی: <b>۵۰ {html.escape(nation.currency_code)}</b>\n"
+        f"📥 می‌گیری: <b>{fmt_amount(receive_omx)} دلار</b>\n\n"
+        "🧠 چرا؟ ارز ملتت را به دلار تبدیل می‌کنی تا بعداً بتوانی ارزهای دیگر را معامله کنی.\n"
+        "این فقط آموزش نیست؛ یک معامله واقعی در اقتصاد بازی است."
+    )
+    panel = await send_submenu_panel(
+        message,
+        text,
+        reply_markup=first_trade_keyboard(),
+        parse_mode=ParseMode.HTML,
+    )
+    await remember_inline_panel(state, panel)
+
+
+@router.message(F.text == "💰 پول من")
+async def new_player_money(message: Message) -> None:
+    from app.handlers.portfolio import show_portfolio
+    await show_portfolio(message)
 
 
 @router.message(OnboardingStates.ONBOARDING_NAME, F.text)
