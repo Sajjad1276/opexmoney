@@ -1367,11 +1367,18 @@ async def skip_first_trade(call: CallbackQuery, state: FSMContext) -> None:
             nation = await session.get(Nation, user.home_nation_id) if user and user.home_nation_id else None
     currency_code = nation.currency_code if nation else "ارز"
     balance = fmt_amount(nation and (await _get_holding_amount(call.from_user.id, nation.nation_id)) or Decimal("500")) if nation else "500"
-    text = f"{html.escape(call.from_user.first_name or 'معامله‌گر')}، هر وقت آماده شدی\nاز 💹 بازار شروع کن.\n\n💰 موجودی: {balance} <code>{html.escape(currency_code)}</code>"
-    await _safe_edit_text(call, text)
+    text = f"{html.escape(call.from_user.first_name or 'معامله‌گر')}، فعلاً از معامله رد شدی.\n\n💰 موجودی: {balance} <code>{html.escape(currency_code)}</code>\n\nهر وقت آماده شدی، از بازار شروع کن."
+    await _safe_edit_text(
+        call,
+        text,
+        InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text="💹 رفتن به بازار", callback_data="market_main", style=ButtonStyle.SUCCESS)],
+                [InlineKeyboardButton(text="🏠 دیدن داشبورد", callback_data="back_to_dashboard")],
+            ]
+        ),
+    )
     await call.answer()
-    if call.message:
-        await call.message.answer("🌐 <b>منوی اصلی آماده‌ست.</b>", reply_markup=main_menu_keyboard(), parse_mode="HTML")
 
 
 async def _get_holding_amount(user_id: int, nation_id: int) -> Decimal:
