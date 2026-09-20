@@ -95,47 +95,57 @@ def nation_panel_keyboard(
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
+def founder_cancel_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="❌ انصراف",
+                    callback_data="cancel_founder",
+                    style=ButtonStyle.DANGER,
+                )
+            ]
+        ]
+    )
+
+
 def add_to_group_keyboard(url: str) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(
-                text="➕ افزودن ربات به گروه",
-                url=url,
-                style=ButtonStyle.PRIMARY,
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                text="🔎 بررسی و دریافت اطلاعات",
-                callback_data="founder_check_group",
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                text="❌ انصراف",
-                callback_data="cancel_founder",
-                style=ButtonStyle.DANGER,
-            )
-        ],
-    ])
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="➕ افزودن ربات به گروه",
+                    url=url,
+                    style=ButtonStyle.PRIMARY,
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="🔎 بررسی گروه",
+                    callback_data="founder_check_group",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="❌ انصراف",
+                    callback_data="cancel_founder",
+                    style=ButtonStyle.DANGER,
+                )
+            ],
+        ]
+    )
 
 
-def confirm_found_nation_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="✅ تأسیس ملت", callback_data="confirm_found", style=ButtonStyle.SUCCESS),
-        InlineKeyboardButton(text="❌ انصراف", callback_data="cancel_founder", style=ButtonStyle.DANGER),
-    ]])
-
-
-
+def founder_name_step_keyboard() -> InlineKeyboardMarkup:
+    return founder_cancel_keyboard()
 
 
 def founder_flag_selection_keyboard() -> InlineKeyboardMarkup:
     flags = [
-        ("🚩", "پرچم سرخ"),
-        ("🏳", "پرچم سفید"),
-        ("🎌", "پرچم‌های دوقلو"),
-        ("🏁", "شطرنجی"),
+        ("🚩", "سرخ"),
+        ("🏳", "سفید"),
+        ("🎌", "دوگانه"),
+        ("🏁", "مسابقه"),
         ("🇮🇷", "ایران"),
         ("🇫🇮", "فنلاند"),
         ("🇺🇸", "آمریکا"),
@@ -150,25 +160,64 @@ def founder_flag_selection_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton(
                 text=f"{flag} {label}",
                 callback_data=f"founder_flag:{flag}",
-                )
+            )
             for flag, label in flags[index:index + 3]
         ]
         for index in range(0, len(flags), 3)
     ]
-    rows.append([
-        InlineKeyboardButton(
-            text="🏴 پیش‌فرض",
-            callback_data="founder_flag:default",
-        )
-    ])
-    rows.append([
-        InlineKeyboardButton(
-            text="❌ انصراف",
-            callback_data="cancel_founder",
-            style=ButtonStyle.DANGER,
-        )
-    ])
+    rows.append(
+        [InlineKeyboardButton(text="🏴 پیش‌فرض", callback_data="founder_flag:default")]
+    )
+    rows.append(
+        [
+            InlineKeyboardButton(
+                text="↩️ تغییر نام",
+                callback_data="founder_edit_name",
+            ),
+            InlineKeyboardButton(
+                text="❌ انصراف",
+                callback_data="cancel_founder",
+                style=ButtonStyle.DANGER,
+            ),
+        ]
+    )
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def founder_review_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="✅ تأسیس نهایی",
+                    callback_data="confirm_found",
+                    style=ButtonStyle.SUCCESS,
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="🚩 تغییر پرچم",
+                    callback_data="founder_edit_flag",
+                ),
+                InlineKeyboardButton(
+                    text="✏️ تغییر نام",
+                    callback_data="founder_edit_name",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text="❌ انصراف",
+                    callback_data="cancel_founder",
+                    style=ButtonStyle.DANGER,
+                )
+            ],
+        ]
+    )
+
+
+def confirm_found_nation_keyboard() -> InlineKeyboardMarkup:
+    return founder_review_keyboard()
+
 
 def nation_selection_keyboard(nations) -> InlineKeyboardMarkup:
     rows = [
