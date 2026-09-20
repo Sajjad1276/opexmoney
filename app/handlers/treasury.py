@@ -34,7 +34,7 @@ from app.services.treasury_service import (
     withdraw_from_treasury,
 )
 from app.utils.formatting import fmt_amount, to_fa
-from app.utils.ui import close_inline_panel, remember_inline_panel
+from app.utils.ui import close_inline_panel, remember_inline_panel, send_submenu_panel
 
 
 logger = logging.getLogger(__name__)
@@ -350,7 +350,8 @@ async def open_treasury_from_main_menu(
                 text = build_treasury_msg(treasury, logs)
                 markup = treasury_keyboard(nation_id, role)
 
-        await message.answer(
+        await send_submenu_panel(
+            message,
             text,
             reply_markup=markup,
             parse_mode="HTML",
