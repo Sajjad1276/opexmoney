@@ -35,6 +35,7 @@ def upgrade() -> None:
             nullable=False,
             server_default=sa.func.now(),
         ),
+        sa.Column("claimed_until", sa.DateTime(), nullable=True),
         sa.Column("published_at", sa.DateTime(), nullable=True),
         sa.Column("attempts", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("last_error", sa.Text(), nullable=True),
