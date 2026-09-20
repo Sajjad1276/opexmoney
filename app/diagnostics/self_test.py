@@ -24,6 +24,7 @@ CONTRACTS = {
                "market_chart", "market_history", "buy_", "buyq_", "cbuy_",
                "sell_", "sellq_", "csell_"],
     "founder": ["found_nation", "cancel_founder", "confirm_founder"],
+    "membership": ["chat_member", "sync_telegram_membership", "telegram_chat_member_state"],
     "nation": ["🌍 ملت‌ها"],
     "sections": ["📊 پورتفولیو", "⚡ مأموریت", "🏆 رتبه‌بندی", "⚙️ تنظیمات"],
     "governance": ["governance_main", "gov_active", "gov_new", "gov_voting",
@@ -31,14 +32,14 @@ CONTRACTS = {
 }
 
 EXPECTED_JOB_IDS = {
-    "rate_engine_15m", "nation_rank_hourly", "governance_cycle",
+    "rate_engine_15m", "nation_membership_reconciliation_15m", "nation_rank_hourly", "governance_cycle",
     "daily_market_reset", "nation_join_request_expiration",
     "nation_weekly_ai_report", "price_alert_checker_5m",
 }
 
 EXPECTED_ROUTER_NAMES = {
-    "onboarding_fix", "start", "market", "founder", "nation_management",
-    "nation", "governance", "sections",
+    "onboarding_fix", "start", "market", "membership", "founder",
+    "nation_management", "nation", "governance", "sections",
 }
 EXPECTED_AI_ROUTER_NAMES = {"ai"}
 
@@ -120,7 +121,13 @@ async def run_startup_smoke_test(
     try:
         phase2_tables = ("proposals", "votes", "rule_overrides", "governance_ledger",
                          "player_temporal_profiles", "behavior_snapshots")
-        nation_tables = ("nation_members", "nation_logs", "nation_join_requests", "nation_wars")
+        nation_tables = (
+            "nation_members",
+            "nation_logs",
+            "nation_join_requests",
+            "nation_wars",
+            "nation_telegram_members",
+        )
         missing_phase2 = [x for x in phase2_tables if not await _table_exists(x)]
         missing_nation = [x for x in nation_tables if not await _table_exists(x)]
         if missing_phase2:

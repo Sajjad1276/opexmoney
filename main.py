@@ -32,6 +32,7 @@ from app.handlers.governance import governance_router
 from app.handlers.academy import router as academy_router
 from app.handlers.chart import router as chart_router
 from app.handlers.market import router as market_router
+from app.handlers.membership import membership_router
 from app.handlers.missions import router as missions_router
 from app.handlers.portfolio import router as portfolio_router
 from app.handlers.ranking import router as ranking_router
@@ -53,6 +54,7 @@ from app.services.economic_engine import (
     update_nation_ranks,
 )
 from app.services.governance_service import governance_cycle
+from app.services.membership_service import reconcile_human_nation_member_counts
 from app.services.war_service import resolve_expired_wars
 from app.services.ai_world import ensure_ai_world, run_ai_world_cycle
 from app.schedulers.alert_checker import register_price_alert_job
@@ -165,6 +167,17 @@ async def run_rate_job() -> None:
         logger.exception("Behavior snapshot failed")
 
 
+async def run_membership_reconciliation(bot: Bot) -> None:
+    try:
+        updated = await reconcile_human_nation_member_counts(bot)
+        logger.info(
+            "Nation membership reconciliation completed | updated=%s",
+            updated,
+        )
+    except Exception:
+        logger.exception("Nation membership reconciliation failed")
+
+
 async def run_rank_job() -> None:
     try:
         async with async_session() as session:
@@ -256,6 +269,15 @@ def build_scheduler(bot: Bot) -> AsyncIOScheduler:
         run_rate_job,
         CronTrigger(minute="*/15"),
         id="rate_engine_15m",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+    scheduler.add_job(
+        run_membership_reconciliation,
+        CronTrigger(minute="*/15"),
+        args=[bot],
+        id="nation_membership_reconciliation_15m",
         replace_existing=True,
         max_instances=1,
         coalesce=True,
@@ -363,6 +385,7 @@ async def main() -> None:
     dp.include_router(onboarding_fix_router)
     dp.include_router(start_router)
     dp.include_router(market_router)
+    dp.include_router(membership_router)
     dp.include_router(chart_router)
     dp.include_router(missions_router)
     dp.include_router(portfolio_router)

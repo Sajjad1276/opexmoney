@@ -79,6 +79,44 @@ class BotGroup(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
 
+class NationTelegramMember(Base):
+    __tablename__ = "nation_telegram_members"
+    __table_args__ = (
+        UniqueConstraint(
+            "nation_id",
+            "telegram_user_id",
+            name="uq_nation_telegram_member_nation_user",
+        ),
+        Index(
+            "ix_nation_telegram_members_nation_active",
+            "nation_id",
+            "is_active",
+        ),
+        Index(
+            "ix_nation_telegram_members_user_active",
+            "telegram_user_id",
+            "is_active",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    nation_id: Mapped[int] = mapped_column(
+        ForeignKey("nations.nation_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    telegram_user_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    telegram_status: Mapped[str] = mapped_column(String(20), nullable=False)
+    is_member: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    joined_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    left_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_seen_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
 class NationFoundingDraft(Base):
     __tablename__ = "nation_founding_drafts"
     __table_args__ = (
