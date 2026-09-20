@@ -273,6 +273,56 @@ async def get_user_active_nation_context(
     return None
 
 
+async def is_user_active_in_nation(
+    session: AsyncSession,
+    user_id: int,
+    nation_id: int,
+    *,
+    lock: bool = False,
+) -> bool:
+    """Return whether a user has an active membership backed by Telegram for human nations."""
+    nation_stmt = select(Nation).where(
+        Nation.nation_id == nation_id,
+        Nation.is_active.is_(True),
+    )
+    if lock:
+        nation_stmt = nation_stmt.with_for_update()
+    nation = await session.scalar(nation_stmt)
+    if nation is None:
+        return False
+
+    member_stmt = (
+        select(NationMember)
+        .where(
+            NationMember.nation_id == nation_id,
+            NationMember.user_id == user_id,
+            NationMember.is_active.is_(True),
+        )
+        .limit(1)
+    )
+    if lock:
+        member_stmt = member_stmt.with_for_update()
+    member = await session.scalar(member_stmt)
+    if member is None:
+        return False
+
+    if nation.is_ai:
+        return True
+
+    telegram_stmt = (
+        select(NationTelegramMember.id)
+        .where(
+            NationTelegramMember.nation_id == nation_id,
+            NationTelegramMember.telegram_user_id == user_id,
+            NationTelegramMember.is_active.is_(True),
+        )
+        .limit(1)
+    )
+    if lock:
+        telegram_stmt = telegram_stmt.with_for_update()
+    return await session.scalar(telegram_stmt) is not None
+
+
 async def get_user_active_nation(
     session: AsyncSession,
     user_id: int,
