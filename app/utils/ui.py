@@ -77,22 +77,37 @@ async def send_submenu_panel(
     reply_markup=None,
     parse_mode: str | None = None,
 ) -> Message:
-    """Send a submenu while removing the Reply Keyboard on the same message."""
-    panel = await message.answer(
-        text,
+    """Show an inline submenu while safely removing the persistent reply keyboard.
+
+    Telegram does not allow converting a message carrying ReplyKeyboardRemove
+    into a message carrying InlineKeyboardMarkup. The two UI operations therefore
+    use separate messages: an invisible keyboard-removal marker followed by the
+    real submenu panel. The marker is deleted immediately after the panel is sent.
+    """
+    if reply_markup is None:
+        return await message.answer(
+            text,
+            reply_markup=ReplyKeyboardRemove(),
+            parse_mode=parse_mode,
+        )
+
+    marker = await message.answer(
+        "\u2060",
         reply_markup=ReplyKeyboardRemove(),
-        parse_mode=parse_mode,
     )
-    if reply_markup is not None:
+    try:
+        panel = await message.answer(
+            text,
+            reply_markup=reply_markup,
+            parse_mode=parse_mode,
+        )
+    finally:
         try:
-            await panel.edit_text(
-                text,
-                reply_markup=reply_markup,
-                parse_mode=parse_mode,
+            await message.bot.delete_message(
+                chat_id=marker.chat.id,
+                message_id=marker.message_id,
             )
         except Exception:
-            try:
-                await panel.edit_reply_markup(reply_markup=reply_markup)
-            except Exception:
-                raise
+            pass
+
     return panel
