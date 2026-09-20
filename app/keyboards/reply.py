@@ -1,1 +1,25 @@
-from aiogram.types import KeyboardButton, ReplyKeyboardMarkup\n\n\ndef main_menu_keyboard() -> ReplyKeyboardMarkup:\n    return ReplyKeyboardMarkup(\n        keyboard=[\n            [\n                KeyboardButton(text="💹 بازار"),\n                KeyboardButton(text="💼 دارایی‌های من"),\n            ],\n            [\n                KeyboardButton(text="🎯 مأموریت"),\n                KeyboardButton(text="🌍 ملت من"),\n            ],\n            [\n                KeyboardButton(text="🏆 رتبه‌بندی"),\n                KeyboardButton(text="🎓 آکادمی"),\n            ],\n            [\n                KeyboardButton(text="☰ بیشتر"),\n            ],\n        ],\n        resize_keyboard=True,\n        is_persistent=True,\n    )\n
+from aiogram.types import KeyboardButton, ReplyKeyboardMarkup
+
+
+def main_menu_keyboard() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [
+                KeyboardButton(text="💹 بازار"),
+                KeyboardButton(text="💼 دارایی‌های من"),
+            ],
+            [
+                KeyboardButton(text="🎯 مأموریت"),
+                KeyboardButton(text="🌍 ملت من"),
+            ],
+            [
+                KeyboardButton(text="🏆 رتبه‌بندی"),
+                KeyboardButton(text="🎓 آکادمی"),
+            ],
+            [
+                KeyboardButton(text="☰ بیشتر"),
+            ],
+        ],
+        resize_keyboard=True,
+        is_persistent=True,
+    )
