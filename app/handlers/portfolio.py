@@ -11,7 +11,6 @@ from aiogram.types import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     Message,
-    ReplyKeyboardRemove,
 )
 
 from app.database.session import async_session
@@ -57,7 +56,7 @@ def _format_rate_change(value) -> str:
 def build_portfolio_text(data: dict) -> str:
     lines = [
         f"📊 <b>پورتفولیو {html.escape(data['username'])}</b>",
-        "━━━━━━━━━━━━━━━━━━",
+        "<blockquote>⁠</blockquote>",
         "💎 <b>دلار (ذخیره جهانی)</b>",
         f"   موجودی: <code>{_format_amount(data['xr_balance'])}</code> دلار",
         "",
@@ -93,7 +92,7 @@ def build_portfolio_text(data: dict) -> str:
 
     lines.extend(
         [
-            "━━━━━━━━━━━━━━━━━━",
+            "<blockquote>⁠</blockquote>",
             (
                 f"💰 <b>ارزش کل: <code>{_format_amount(data['total_xr'])}</code> "
                 "دلار</b>"
@@ -122,7 +121,6 @@ async def show_portfolio(message: Message) -> None:
         )
         return
 
-    await message.answer("⁠", reply_markup=ReplyKeyboardRemove())
     await message.answer(
         build_portfolio_text(data),
         reply_markup=portfolio_keyboard(),
