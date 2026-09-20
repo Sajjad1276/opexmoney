@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from aiogram import F, Router
-from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message, ReplyKeyboardRemove
+from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from sqlalchemy import select
 
 from app.database.models import Nation, NationMemberRole, User
@@ -50,7 +50,6 @@ async def open_nations(message: Message) -> None:
         )
         return
 
-    await message.answer("\u2060", reply_markup=ReplyKeyboardRemove())
     await message.answer(
         "🌍 <b>ملت‌ها</b>\n"
         "اینجا می‌تونی ملت‌ها رو بررسی کنی.\n"
@@ -125,7 +124,7 @@ async def my_nations(call: CallbackQuery) -> None:
         manager = user is not None and _can_manage(user)
         text = (
             f"{nation.flag_emoji or '🏴'} <b>{nation.name}</b>\n"
-            "━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>⁠</blockquote>\n"
             f"💱 ارز: <b>{nation.currency_code}</b>\n"
             f"📈 نرخ: <b>{nation.exchange_rate}</b> ΩXR\n"
             f"👥 اعضا: <b>{nation.member_count}</b>\n"
