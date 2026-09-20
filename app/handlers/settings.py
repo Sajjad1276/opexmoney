@@ -8,7 +8,7 @@ from aiogram import F, Router
 from aiogram.enums import ButtonStyle, ParseMode
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message, ReplyKeyboardRemove
+from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 from app.database.session import async_session
 from app.services.settings_service import (
@@ -120,7 +120,7 @@ def nation_select_keyboard(nations: list[dict]) -> InlineKeyboardMarkup:
 def build_settings_msg(data: dict) -> str:
     lines = [
         "⚙️ <b>تنظیمات</b>",
-        "━━━━━━━━━━━━━━━━━━",
+        "<blockquote>⁠</blockquote>",
         f"👤 نام معامله‌گر: <code>{html.escape(data['username'])}</code>",
         f"🏛 ملت اصلی: {html.escape(data['nation_name'] or 'ندارد')}",
         f"📅 عضویت: {html.escape(data['created_at_jalali'])}",
@@ -137,7 +137,7 @@ def build_stats_msg(username: str, stats: dict) -> str:
     )
     lines = [
         f"📊 <b>آمار {html.escape(username)}</b>",
-        "━━━━━━━━━━━━━━━━━━",
+        "<blockquote>⁠</blockquote>",
         f"💹 کل معاملات: {to_fa(stats['tx_count'])}",
         f"📈 حجم خرید: {to_fa(fmt_amount(stats['buy_volume']))} ΩXR",
         f"📉 حجم فروش: {to_fa(fmt_amount(stats['sell_volume']))} ΩXR",
@@ -157,7 +157,6 @@ async def _get_settings_panel(user_id: int) -> tuple[str, InlineKeyboardMarkup]:
 
 async def _show_settings_from_message(message: Message) -> None:
     text, markup = await _get_settings_panel(message.from_user.id)
-    await message.answer("⁠", reply_markup=ReplyKeyboardRemove())
     await message.answer(
         text,
         reply_markup=markup,
@@ -307,7 +306,7 @@ async def start_change_nation(
             warning = "\n".join(
                 [
                     f"{RLM}⚠️ <b>تغییر ملت اصلی</b>",
-                    f"{RLM}━━━━━━━━━━━━━━━━━━",
+                    f"{RLM}<blockquote>⁠</blockquote>",
                     f"{RLM}موجودی ارز ملت فعلی‌ات نگه داشته می‌شه،",
                     f"{RLM}ولی ارز اصلی حسابت به ملت جدید تغییر می‌کنه.",
                     f"{RLM}مطمئنی؟",
