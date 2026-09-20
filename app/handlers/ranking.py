@@ -13,6 +13,7 @@ from aiogram.types import (
 )
 
 from app.database.session import async_session
+from app.utils.ui import send_submenu_panel
 from app.services.ranking_service import (
     build_nation_msg,
     build_trader_msg,
@@ -116,7 +117,8 @@ async def show_ranking(message: Message, redis=None) -> None:
         )
         return
 
-    await message.answer(
+    await send_submenu_panel(
+        message,
         text,
         reply_markup=ranking_keyboard("nations"),
         parse_mode=ParseMode.HTML,
