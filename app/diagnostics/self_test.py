@@ -127,6 +127,7 @@ async def run_startup_smoke_test(
             "nation_join_requests",
             "nation_wars",
             "nation_telegram_members",
+            "nation_economic_events",
         )
         missing_phase2 = [x for x in phase2_tables if not await _table_exists(x)]
         missing_nation = [x for x in nation_tables if not await _table_exists(x)]
@@ -229,7 +230,8 @@ async def run_startup_smoke_test(
 
     missing_metadata = {
         "proposals", "votes", "rule_overrides", "governance_ledger",
-        "player_temporal_profiles", "behavior_snapshots"
+        "player_temporal_profiles", "behavior_snapshots",
+        "nation_telegram_members", "nation_economic_events",
     }.difference(Base.metadata.tables)
     if missing_metadata:
         logger.error("SELFTEST|FAIL|metadata|missing=%s", ",".join(sorted(missing_metadata))); ok = False
