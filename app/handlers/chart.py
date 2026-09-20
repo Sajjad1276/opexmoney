@@ -316,7 +316,10 @@ async def back_to_market(callback: CallbackQuery) -> None:
 
         from app.handlers.market import render_market
 
-        await render_market(chart_message)
+        await render_market(
+            chart_message,
+            request_user_id=callback.from_user.id,
+        )
         await callback.answer()
     except Exception:
         logger.exception(
