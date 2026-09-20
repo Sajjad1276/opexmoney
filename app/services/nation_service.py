@@ -146,6 +146,14 @@ async def get_user_active_nation_context(
         return statement.with_for_update() if lock else statement
 
     async def resolve_nation(nation: Nation) -> tuple[Nation, str, str] | None:
+        if not nation.is_ai and not await _has_active_telegram_membership(
+            session,
+            user_id,
+            nation.nation_id,
+            lock=lock,
+        ):
+            return None
+
         member = await _active_member_for_nation(
             session,
             user_id,
@@ -158,9 +166,10 @@ async def get_user_active_nation_context(
                 if isinstance(member.role, NationMemberRole)
                 else str(member.role)
             )
-            return nation, role, "home_membership" if user.home_nation_id == nation.nation_id else (
+            source = "home_membership" if user.home_nation_id == nation.nation_id else (
                 "ai_membership" if nation.is_ai else "telegram_membership"
             )
+            return nation, role, source
 
         if nation.is_ai:
             if repair and nation.founder_user_id == user_id:
