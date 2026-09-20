@@ -22,7 +22,7 @@ from app.services.settings_service import (
 from app.utils.name_filter import is_blocked_trader_name, is_valid_trader_name
 from app.handlers.onboarding_fix import BLOCKED_NAME, INVALID_NAME
 from app.utils.formatting import fmt_amount, to_fa
-from app.utils.ui import close_inline_panel, remember_inline_panel
+from app.utils.ui import close_inline_panel, remember_inline_panel, send_submenu_panel
 
 router = Router(name="settings")
 logger = logging.getLogger(__name__)
@@ -157,7 +157,8 @@ async def _get_settings_panel(user_id: int) -> tuple[str, InlineKeyboardMarkup]:
 
 async def _show_settings_from_message(message: Message) -> None:
     text, markup = await _get_settings_panel(message.from_user.id)
-    await message.answer(
+    await send_submenu_panel(
+        message,
         text,
         reply_markup=markup,
         parse_mode=ParseMode.HTML,
