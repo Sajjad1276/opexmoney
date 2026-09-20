@@ -320,6 +320,8 @@ async def sync_telegram_membership(
                 .limit(1)
             )
             user.home_nation_id = fallback_nation_id
+            if fallback_nation_id is None:
+                user.role = "player"
 
     action_type: str | None = None
     if became_active:
