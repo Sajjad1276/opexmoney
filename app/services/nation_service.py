@@ -329,13 +329,20 @@ async def create_nation(
     currency_code: str,
     flag_emoji: str = "🏴",
 ) -> Nation:
-    async with session.begin():
-        user_result = await session.execute(
+    """Create a nation in the caller's transaction.
+
+    A transaction is opened only when the caller has not already started one.
+    This keeps the function backward-compatible for existing callers while
+    allowing the founder workflow to commit the draft and nation atomically.
+    """
+
+    async def _create() -> Nation:
+        user = await session.scalar(
             select(User)
             .where(User.user_id == founder_user_id)
             .with_for_update()
+            .limit(1)
         )
-        user = user_result.scalar_one_or_none()
 
         if user is None:
             raise ValueError("اول باید وارد بازی بشی.")
@@ -343,26 +350,37 @@ async def create_nation(
         if not (user.username or "").strip():
             raise ValueError("اول باید اسم معامله‌گرت رو ثبت کنی.")
 
-        if user.role == "founder":
+        existing_founder_nation = await session.scalar(
+            select(Nation)
+            .where(
+                Nation.founder_user_id == founder_user_id,
+                Nation.is_active.is_(True),
+            )
+            .with_for_update()
+            .limit(1)
+        )
+        if existing_founder_nation is not None or user.role == "founder":
             raise ValueError("هر معامله‌گر فقط یه ملت می‌تونه بسازه.")
 
-        group_result = await session.execute(
+        existing_group = await session.scalar(
             select(Nation)
             .where(
                 Nation.group_id == group_id,
                 Nation.is_active.is_(True),
             )
             .with_for_update()
+            .limit(1)
         )
-        if group_result.scalar_one_or_none() is not None:
+        if existing_group is not None:
             raise ValueError("این گروه قبلاً پایتخت یک ملت شده.")
 
-        currency_result = await session.execute(
+        existing_currency = await session.scalar(
             select(Nation)
             .where(Nation.currency_code == currency_code)
             .with_for_update()
+            .limit(1)
         )
-        if currency_result.scalar_one_or_none() is not None:
+        if existing_currency is not None:
             raise ValueError("این کد ارز قبلاً استفاده شده.")
 
         nation = Nation(
@@ -386,6 +404,7 @@ async def create_nation(
             treasury=Decimal("0.00"),
         )
         session.add(nation)
+
         try:
             await session.flush()
         except IntegrityError as exc:
@@ -400,6 +419,7 @@ async def create_nation(
         user.role = "founder"
         user.xr_balance += Decimal("1000.00")
         user.balance = Decimal("1000.00")
+        user.home_nation_id = nation.nation_id
 
         session.add(
             CurrencyHolding(
@@ -416,10 +436,6 @@ async def create_nation(
                 is_active=True,
             )
         )
-        await session.flush()
-
-        # SYNC RULE: home_nation_id always mirrors active NationMember wherever you touch these fields
-        user.home_nation_id = nation.nation_id
         session.add(
             NationLog(
                 nation_id=nation.nation_id,
@@ -440,4 +456,11 @@ async def create_nation(
             )
         )
 
+        await session.flush()
         return nation
+
+    if session.in_transaction():
+        return await _create()
+
+    async with session.begin():
+        return await _create()
