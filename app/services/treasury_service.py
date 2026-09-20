@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import Nation, NationMember, NationMemberRole, NationTreasury, TreasuryLog, User
 from app.services.nation_service import get_user_active_nation
+from app.services.economic_event_service import record_economic_event
 from app.services.user_service import sync_user_balance
 
 
@@ -194,6 +195,14 @@ async def deposit_to_treasury(
             amount_xr=amount_xr,
         )
     )
+    record_economic_event(
+        session,
+        nation_id=nation_id,
+        event_type="TREASURY_DEPOSIT",
+        actor_id=user_id,
+        amount_xr=amount_xr,
+        metadata={"source": "treasury"},
+    )
 
     await sync_user_balance(session, user_id)
 
@@ -270,6 +279,14 @@ async def withdraw_from_treasury(
             amount_xr=amount_xr,
             note=note,
         )
+    )
+    record_economic_event(
+        session,
+        nation_id=nation_id,
+        event_type="TREASURY_WITHDRAW",
+        actor_id=actor_id,
+        amount_xr=amount_xr,
+        metadata={"source": "treasury", "note": note},
     )
 
     await sync_user_balance(session, actor_id)
