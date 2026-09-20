@@ -31,6 +31,10 @@ from app.database.models import (
 from app.database.session import async_session
 from app.keyboards.reply import main_menu_keyboard
 from app.services.mission_service import increment_mission
+from app.services.membership_service import (
+    sync_telegram_membership,
+    telegram_chat_member_state,
+)
 from app.services.nation_service import convert_holding_to_xr
 from app.services.war_service import declare_war
 from app.services.user_service import sync_user_balance
@@ -516,6 +520,126 @@ async def _join_user(
     nation: Nation | None = None
     result_message = ""
 
+    # Human nations are Telegram-backed. Internal game membership cannot be
+    # created unless Telegram confirms that the user is currently in the group.
+    async with async_session() as session:
+        async with session.begin():
+            nation = await session.scalar(
+                select(Nation)
+                .where(Nation.nation_id == nation_id)
+                .with_for_update()
+                .limit(1)
+            )
+            if nation is None or not nation.is_active:
+                raise ValueError("⚠️ این ملت فعال نیست.")
+
+    if nation is not None and not nation.is_ai:
+        if nation.group_id is None:
+            raise ValueError("⚠️ این ملت انسانی به گروه تلگرام متصل نیست.")
+
+        try:
+            telegram_member = await bot.get_chat_member(
+                nation.group_id,
+                user_id,
+            )
+        except Exception:
+            logger.exception(
+                "Telegram membership lookup failed | nation=%s group=%s user=%s",
+                nation.nation_id,
+                nation.group_id,
+                user_id,
+            )
+            raise ValueError("⚠️ عضویت تلگرام قابل بررسی نیست. دوباره امتحان کن.")
+
+        status, is_member, active = telegram_chat_member_state(telegram_member)
+        if not active:
+            raise ValueError(
+                "⚠️ برای شهروند شدن باید اول عضو گروه تلگرامی این ملت باشی."
+            )
+
+        async with async_session() as session:
+            async with session.begin():
+                user = await session.get(
+                    User,
+                    user_id,
+                    with_for_update=True,
+                )
+                if user is None:
+                    raise ValueError("⚠️ اول با /start وارد بازی شو.")
+
+                nation = await session.get(
+                    Nation,
+                    nation_id,
+                    with_for_update=True,
+                )
+                if nation is None or not nation.is_active:
+                    raise ValueError("⚠️ این ملت فعال نیست.")
+
+                result = await sync_telegram_membership(
+                    session,
+                    group_id=nation.group_id,
+                    telegram_user_id=user_id,
+                    telegram_status=status,
+                    is_member=is_member,
+                    observed_at=datetime.utcnow(),
+                    source="private_join_verification",
+                )
+                if result is None or not result.active:
+                    raise ValueError(
+                        "⚠️ عضویت تلگرامی این ملت تأیید نشد."
+                    )
+
+                joined_user = user
+                joined_confirmed = result.became_active
+                result_message = (
+                    f"🎉 به «{nation.name}» پیوستی!"
+                    if result.became_active
+                    else f"✅ عضویتت در «{nation.name}» تأیید شد."
+                )
+
+        if joined_confirmed and joined_user is not None:
+            try:
+                async with async_session() as session:
+                    async with session.begin():
+                        await increment_mission(
+                            session,
+                            joined_user.user_id,
+                            "JOIN_NATION",
+                        )
+            except Exception:
+                logger.exception(
+                    "Mission trigger failed after Telegram nation join for user %s",
+                    joined_user.user_id,
+                )
+
+            await _welcome_member(
+                bot,
+                nation=nation,
+                user=joined_user,
+                actor_id=user_id,
+            )
+            await _notify_founder(
+                bot,
+                nation,
+                (
+                    f"👋 <b>عضو جدید وارد شد</b>\n"
+                    f"👤 {_safe_name(joined_user, joined_user.user_id)}\n"
+                    f"🏛 {html.escape(nation.name)}"
+                ),
+            )
+            await publish_nation_event_analysis(
+                bot,
+                nation_id=nation.nation_id,
+                event_type="MEMBER_JOIN",
+                actor_id=user_id,
+                target_id=user_id,
+                context=f"{_safe_name(joined_user, joined_user.user_id)} به ملت {nation.name} پیوست.",
+            )
+
+        return result_message, nation
+
+    # AI nations do not have a Telegram group and retain the existing
+    # virtual-world join semantics.
     async with async_session() as session:
         async with session.begin():
             user = (
@@ -610,7 +734,6 @@ async def _join_user(
                 )
                 session.add(member)
                 await session.flush()
-                # SYNC RULE: home_nation_id always mirrors active NationMember wherever you touch these fields
                 user.home_nation_id = nation_id
                 await sync_user_balance(session, user_id)
                 await _append_log(
@@ -628,7 +751,7 @@ async def _join_user(
                 joined_user = user
                 joined_confirmed = True
                 result_message = f"🎉 به «{nation.name}» پیوستی!"
-    
+
     if joined_confirmed and joined_user is not None:
         try:
             async with async_session() as session:
