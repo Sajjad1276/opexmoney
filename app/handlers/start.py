@@ -7,6 +7,7 @@ import os
 import time
 import urllib.request
 import logging
+import re
 from datetime import datetime, time as dt_time
 from decimal import Decimal
 
@@ -221,14 +222,14 @@ USERNAME_CAPTION = """💹 <b>اسم معامله‌گرت رو انتخاب ک�
 def nation_list_text(user, trader_name: str, nations: list[Nation]) -> str:
     lines = [
         f"✅ <b>«{html.escape(trader_name)}»</b> ثبت شد.",
-        "<blockquote>⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀</blockquote>",
+        "<blockquote>⁠</blockquote>",
         f"{user_mention(user)}، حالا باید به یه ملت بپیوندی.",
         "",
         "ارز اون ملت، پول اصلی حسابت میشه.",
         "هر معامله‌ات مستقیم روی نرخ اون ارز اثر میذاره.",
         "",
         "<b>🌍 ملت‌های فعال:</b>",
-        "<blockquote>⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀</blockquote>",
+        "<blockquote>⁠</blockquote>",
     ]
     for index, nation in enumerate(nations, start=1):
         change = get_rate_change(nation)
@@ -240,10 +241,10 @@ def nation_list_text(user, trader_name: str, nations: list[Nation]) -> str:
             ]
         )
         if index != len(nations):
-            lines.append("<blockquote>⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀</blockquote>")
+            lines.append("<blockquote>⁠</blockquote>")
     lines.extend(
         [
-            "<blockquote>⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀</blockquote>",
+            "<blockquote>⁠</blockquote>",
             "نرخ‌ها هر 15 دقیقه آپدیت میشن.",
         ]
     )
@@ -328,7 +329,7 @@ async def show_dashboard(
 
     text = """
 🌐 <b>OPEX MONEY</b>
-<blockquote>⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀</blockquote>
+<blockquote>⁠</blockquote>
 {0}
 
 {1}
@@ -342,7 +343,7 @@ async def show_dashboard(
 
 🎯 <b>هدف بازی:</b> ارزش دارایی‌هات رو بیشتر کن و رتبه‌ات رو بالا ببر.
 🚀 <b>حرکت بعدی:</b> {11}
-<blockquote>⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀</blockquote>
+<blockquote>⁠</blockquote>
 """.format(
         user_mention(display_user or message.from_user),
         f"{html.escape(nation.flag_emoji or '🏴')} <b>{html.escape(nation.name)}</b>",
@@ -463,12 +464,25 @@ async def continue_registration(
 
 @router.message(CommandStart())
 async def start(message: Message, state: FSMContext) -> None:
+    payload = ""
+    if message.text:
+        parts = message.text.split(maxsplit=1)
+        payload = parts[1].strip() if len(parts) == 2 else ""
+    preferred_nation_id = None
+    if payload.startswith("nation_"):
+        try:
+            preferred_nation_id = int(payload.split("_", 1)[1])
+        except (TypeError, ValueError):
+            preferred_nation_id = None
+
     async with async_session() as session:
         async with session.begin():
             registered = await is_fully_registered(session, message.from_user.id)
             user = await get_user(session, message.from_user.id) if registered else None
 
     await state.clear()
+    if preferred_nation_id is not None:
+        await state.update_data(preferred_nation_id=preferred_nation_id)
 
     if user is not None:
         await show_dashboard(message, user)
@@ -506,6 +520,9 @@ async def _begin_registration(
     *,
     replace_inline: bool = False,
 ) -> None:
+    data_before_clear = await state.get_data()
+    preferred_nation_id = data_before_clear.get("preferred_nation_id")
+
     async with async_session() as session:
         async with session.begin():
             registered = await is_fully_registered(session, message.from_user.id)
@@ -526,6 +543,8 @@ async def _begin_registration(
         return
 
     await state.clear()
+    if preferred_nation_id is not None:
+        await state.update_data(preferred_nation_id=preferred_nation_id)
     await _start_timed_state(state, OnboardingStates.ONBOARDING_NAME)
 
     suggested = (message.from_user.first_name or "").strip()[:20]
@@ -670,7 +689,7 @@ async def render_nation_profile(nation: Nation) -> str:
     خروجی HTML فرمت، راست‌چین:
 
     🏴 <b>نام ملت</b>
-    <blockquote>⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀</blockquote>
+    <blockquote>⁠</blockquote>
     💰 <b>واحد پول:</b> {symbol}
     📈 <b>نرخ ارز:</b> {rate} دلار  <u>(آپدیت 15 دقیقه پیش)</u>
     👥 <b>اعضا:</b> {member_count} نفر
@@ -733,7 +752,7 @@ async def render_nation_profile(nation: Nation) -> str:
 
     text = """
 {0}
-<blockquote>⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀</blockquote>
+<blockquote>⁠</blockquote>
 💰 <b>واحد پول:</b> {1}
 📈 <b>نرخ ارز:</b> {2} دلار  <u>(آپدیت {3} دقیقه پیش)</u>
 👥 <b>اعضا:</b> {4} نفر
@@ -939,8 +958,23 @@ async def use_suggested_name(call: CallbackQuery, state: FSMContext) -> None:
                 await call.answer("⚠️ این نام قبلاً گرفته شده.", show_alert=True)
                 return
 
+    data = await state.get_data()
     await state.update_data(username=name, onboarding_started_at=time.time())
     await call.answer("✅ نام انتخاب شد")
+    preferred_id = data.get("preferred_nation_id")
+    if call.message and preferred_id is not None:
+        async with async_session() as session:
+            async with session.begin():
+                preferred_nation = await session.get(Nation, int(preferred_id))
+        if preferred_nation is not None and preferred_nation.is_active:
+            await state.set_state(OnboardingStates.SELECT_NATION)
+            await state.update_data(selected_nation_id=preferred_nation.nation_id)
+            await _safe_edit_text(
+                call,
+                await render_nation_profile(preferred_nation),
+                _nation_profile_keyboard(preferred_nation.nation_id),
+            )
+            return
     if call.message:
         await _render_nation_page(call.message, state, page=0, edit=True)
 
@@ -1028,7 +1062,7 @@ async def new_player_next_step(message: Message, state: FSMContext) -> None:
     receive_omx = Decimal("50") * nation.exchange_rate
     text = (
         f"{html.escape(nation.flag_emoji or '🏴')} <b>قدم بعدی تو</b>\n"
-        "<blockquote>⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀</blockquote>"
+        "<blockquote>⁠</blockquote>"
         "🎯 این اولین تصمیم اقتصادی توست.\n\n"
         f"📤 می‌فروشی: <b>۵۰ {html.escape(nation.currency_code)}</b>\n"
         f"📥 می‌گیری: <b>{fmt_amount(receive_omx)} دلار</b>\n\n"
@@ -1119,11 +1153,31 @@ async def onboarding_name(message: Message, state: FSMContext) -> None:
         return
 
     # FSMStorage uses Redis when REDIS_URL is configured in main.py.
+    data = await state.get_data()
     await state.update_data(
         username=name,
         onboarding_started_at=time.time(),
     )
     await close_inline_panel(state, message.bot)
+
+    preferred_id = data.get("preferred_nation_id")
+    if preferred_id is not None:
+        async with async_session() as session:
+            async with session.begin():
+                preferred_nation = await session.get(Nation, int(preferred_id))
+        if preferred_nation is not None and preferred_nation.is_active:
+            await state.set_state(OnboardingStates.SELECT_NATION)
+            await state.update_data(
+                selected_nation_id=preferred_nation.nation_id,
+                onboarding_started_at=time.time(),
+            )
+            await message.answer(
+                await render_nation_profile(preferred_nation),
+                reply_markup=_nation_profile_keyboard(preferred_nation.nation_id),
+                parse_mode="HTML",
+            )
+            return
+
     await _render_nation_page(message, state, page=0)
 
 
@@ -1326,7 +1380,7 @@ async def confirm_nation(call: CallbackQuery, state: FSMContext, bot: Bot) -> No
         return
 
     text = f"""{html.escape(nation.flag_emoji or "🏴")} <b>به {html.escape(nation.name)} خوش اومدی</b>
-<blockquote>⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀</blockquote>
+<blockquote>⁠</blockquote>
 {user_mention(call.from_user)}، تو الان شهروند این ملت هستی.
 
 💰 سرمایه شروع: <b>۵۰۰ <code>{html.escape(nation.currency_code)}</code></b>
@@ -1358,7 +1412,7 @@ async def first_trade_tutorial(call: CallbackQuery, state: FSMContext) -> None:
         return
     receive_omx = Decimal("50") * nation.exchange_rate
     change = get_rate_change(nation)
-    text = ("⚡ <b>اولین معامله</b>\n<blockquote>⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀</blockquote>\n" f"📤 می‌فروشی:   <b>50 <code>{html.escape(nation.currency_code)}</code></b>\n" f"📥 دریافت می‌کنی: <b>{fmt_amount(receive_omx)} <code>دلار</code></b>\n\n<blockquote>⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀</blockquote>\n" f"💹 نرخ: <code>1 {html.escape(nation.currency_code)} = {fmt_rate(nation.exchange_rate)} دلار</code>\n" f"{get_rate_emoji(change)} تغییر 24h: <b>{fmt_pct(change)}</b>\n<blockquote>⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀</blockquote>")
+    text = ("⚡ <b>اولین معامله</b>\n<blockquote>⁠</blockquote>\n" f"📤 می‌فروشی:   <b>50 <code>{html.escape(nation.currency_code)}</code></b>\n" f"📥 دریافت می‌کنی: <b>{fmt_amount(receive_omx)} <code>دلار</code></b>\n\n<blockquote>⁠</blockquote>\n" f"💹 نرخ: <code>1 {html.escape(nation.currency_code)} = {fmt_rate(nation.exchange_rate)} دلار</code>\n" f"{get_rate_emoji(change)} تغییر 24h: <b>{fmt_pct(change)}</b>\n<blockquote>⁠</blockquote>")
     await _safe_edit_text(call, text, trade_confirmation_keyboard())
     await call.answer()
 
@@ -1419,7 +1473,7 @@ async def confirm_first_trade(call: CallbackQuery, state: FSMContext) -> None:
 
     text = (
         "✅ <b>اولین معامله انجام شد!</b>\n"
-        "<blockquote>⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀</blockquote>\n"
+        "<blockquote>⁠</blockquote>\n"
         f"📤 فروختی: <s>۵۰ {html.escape(nation.currency_code)}</s>\n"
         f"📥 دریافتی: <b>{fmt_amount(receive_omx)} دلار</b>\n\n"
         f"💰 حالا داری: <b>{fmt_amount(holding.amount)} {html.escape(nation.currency_code)}</b> + <b>{fmt_amount(user.xr_balance)} دلار</b>\n\n"
