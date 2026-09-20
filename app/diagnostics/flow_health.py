@@ -18,6 +18,7 @@ EXPECTED_HANDLER_MODULES = {
     "founder",
     "governance",
     "market",
+    "membership",
     "missions",
     "nation",
     "nation_management",
