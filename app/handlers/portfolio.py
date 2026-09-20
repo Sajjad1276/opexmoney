@@ -103,12 +103,18 @@ def _format_rate_change(value) -> str:
 
 
 def build_portfolio_text(data: dict) -> str:
+    """Render the live asset dashboard without separator bars."""
     lines = [
-        f"💼 <b>دارایی‌های {html.escape(data['username'])}</b>",
-        "<blockquote>⁠</blockquote>",
-        "💎 <b>دلار (ذخیره جهانی)</b>",
-        f"   موجودی: <code>{_format_amount(data['xr_balance'])}</code> دلار",
+        f"💼 <b>داشبورد دارایی {html.escape(data['username'])}</b>",
         "",
+        "📡 <b>ثروتت ثابت نیست؛ بازار هر لحظه ارزشش را دوباره محاسبه می‌کند.</b>",
+        "",
+        f"💰 <b>ارزش کل</b>  <code>{_format_amount(data['total_xr'])}</code> دلار",
+        f"📈 <b>عملکرد امروز</b>  <code>{_format_rate_change(data['portfolio_change_pct'])}</code>",
+        "",
+        "💎 <b>دارایی‌های شما</b>",
+        "",
+        f"💎 دلار  ·  <code>{_format_amount(data['xr_balance'])}</code> USD",
     ]
 
     holdings = data["holdings"]
@@ -117,39 +123,32 @@ def build_portfolio_text(data: dict) -> str:
             star = " ⭐" if holding["is_home_nation"] else ""
             lines.extend(
                 [
+                    "",
                     (
-                        f"🏛 <b>{html.escape(holding['nation_name'])} "
-                        f"({html.escape(holding['currency_code'])}){star}</b>"
+                        f"🏛 <b>{html.escape(holding['nation_name'])}</b> "
+                        f"· {html.escape(holding['currency_code'])}{star}"
                     ),
                     (
-                        f"   موجودی: <code>{_format_amount(holding['amount'])}</code> "
+                        f"موجودی  <code>{_format_amount(holding['amount'])}</code> "
                         f"{html.escape(holding['currency_code'])}"
                     ),
                     (
-                        f"   ارزش: <code>{_format_amount(holding['value_in_xr'])}</code> "
-                        "دلار"
+                        f"ارزش  <code>{_format_amount(holding['value_in_xr'])}</code> دلار  "
+                        f"{holding['rate_emoji']} <code>{_format_rate_change(holding['rate_change_pct'])}</code>"
                     ),
-                    (
-                        f"   {holding['rate_emoji']} "
-                        f"{_format_rate_change(holding['rate_change_pct'])} امروز"
-                    ),
-                    "",
                 ]
             )
     else:
-        lines.append("⚠️ هنوز هیچ ارزی نداری. از بازار خرید کن.")
+        lines.extend(["", "⚠️ هنوز هیچ ارزی در سبدت نیست."])
 
     lines.extend(
         [
-            "<blockquote>⁠</blockquote>",
-            (
-                f"💰 <b>ارزش کل: <code>{_format_amount(data['total_xr'])}</code> "
-                "دلار</b>"
-            ),
+            "",
+            f"⚡ <b>بازار زنده</b>  ·  بروزرسانی خودکار هر {data['live_update_seconds']} ثانیه",
+            f"🕐 آخرین محاسبه  <code>{data['current_time']}</code>",
             f"📅 {data['today_imperial']}",
         ]
     )
-
     return "\n".join(f"{RLM}{line}" for line in lines)
 
 
