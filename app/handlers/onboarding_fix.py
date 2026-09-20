@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.models import Nation, User
 from app.database.session import async_session
 from app.handlers.start import _safe_edit_caption, _safe_edit_text, start as restart_flow, user_mention
+from app.handlers.nation_management import _join_user
 from app.keyboards.inline import cancel_keyboard, nation_selection_keyboard
 from app.services.membership_service import sync_registered_user_memberships
 from app.services.temporal_service import ensure_temporal_profile
@@ -245,6 +246,54 @@ async def accept_valid_name(message: Message, state: FSMContext) -> None:
         await show_nation_selection(message, session, state)
 
 
+
+@router.callback_query(
+    F.data.startswith("confirm_nation:"),
+    StateFilter(OnboardingStates.SELECT_NATION),
+)
+async def confirm_nation(call: CallbackQuery, state: FSMContext, bot) -> None:
+    try:
+        nation_id = int((call.data or "").split(":", 1)[1])
+    except (TypeError, ValueError):
+        await call.answer("⚠️ ملت معتبر نیست.", show_alert=True)
+        return
+
+    data = await state.get_data()
+    username = (data.get("username") or "").strip()
+    if not username:
+        await call.answer("⏱ ثبت‌نام منقضی شد. /start بزن.", show_alert=True)
+        await state.clear()
+        return
+
+    try:
+        result_message, nation = await _join_user(
+            bot=bot,
+            user_id=call.from_user.id,
+            nation_id=nation_id,
+        )
+    except ValueError as exc:
+        await call.answer(str(exc), show_alert=True)
+        return
+
+    await state.clear()
+
+    if nation is None:
+        await call.answer("⚠️ اطلاعات ملت در دسترس نیست.", show_alert=True)
+        return
+
+    if call.message is not None:
+        try:
+            await call.message.edit_text(
+                result_message or f"✅ عضویتت در «{html.escape(nation.name)}» تأیید شد.",
+                parse_mode="HTML",
+            )
+        except TelegramBadRequest:
+            await call.message.answer(
+                result_message or f"✅ عضویتت در «{html.escape(nation.name)}» تأیید شد.",
+                parse_mode="HTML",
+            )
+
+    await call.answer("✅ عضویت ملت تأیید شد.")
 
 @router.callback_query(F.data == "onboarding_back_name", StateFilter(OnboardingStates.SELECT_NATION))
 async def onboarding_back_name(call: CallbackQuery, state: FSMContext) -> None:

@@ -21,6 +21,7 @@ from app.database.models import (
     Vote,
 )
 from app.services.economy_metrics import get_player_net_worth, get_player_net_worths
+from app.services.nation_control import require_nation_control
 from app.services.rules.registry import clamp_rule_value, get_rule
 from app.services.rules.resolver import invalidate_rule_cache
 from app.services.temporal_service import rotate_due_profiles
@@ -46,12 +47,27 @@ def _decimal_log10(value: Decimal) -> Decimal:
 
 async def is_proposer_eligible(session: AsyncSession, player_id: int) -> bool:
     user = await session.get(User, player_id)
-    if user is None:
+    if user is None or user.home_nation_id is None:
         return False
+
+    nation = await session.get(Nation, user.home_nation_id)
+    if nation is None or not nation.is_active:
+        return False
+    if not nation.is_ai:
+        telegram_presence = await session.scalar(
+            select(NationTelegramMember.id)
+            .where(
+                NationTelegramMember.nation_id == nation.nation_id,
+                NationTelegramMember.telegram_user_id == player_id,
+                NationTelegramMember.is_active.is_(True),
+            )
+            .limit(1)
+        )
+        if telegram_presence is None:
+            return False
+
     if user.role == "founder":
         return True
-    if user.home_nation_id is None:
-        return False
 
     players = (
         await session.execute(
@@ -96,8 +112,24 @@ async def is_active_voter(
 ) -> bool:
     now = now or utcnow()
     user = await session.get(User, player_id)
-    if user is None:
+    if user is None or user.home_nation_id is None:
         return False
+
+    nation = await session.get(Nation, user.home_nation_id)
+    if nation is None or not nation.is_active:
+        return False
+    if not nation.is_ai:
+        telegram_presence = await session.scalar(
+            select(NationTelegramMember.id)
+            .where(
+                NationTelegramMember.nation_id == nation.nation_id,
+                NationTelegramMember.telegram_user_id == player_id,
+                NationTelegramMember.is_active.is_(True),
+            )
+            .limit(1)
+        )
+        if telegram_presence is None:
+            return False
 
     cutoff = now - timedelta(days=settings.governance_voter_activity_days)
     exists = await session.scalar(
@@ -616,6 +648,18 @@ async def revoke_override(
     actor = await session.get(User, actor_player_id)
     if actor is None or actor.role != "founder":
         raise ValueError("فقط بنیان‌گذار می‌تونه این قانون رو فوراً لغو کنه.")
+    if actor.home_nation_id is None:
+        raise ValueError("بنیان‌گذار ملت فعالی نداره.")
+    try:
+        await require_nation_control(
+            session,
+            user_id=actor_player_id,
+            nation_id=actor.home_nation_id,
+            allowed_roles={"founder"},
+            lock=True,
+        )
+    except ValueError as exc:
+        raise ValueError(str(exc)) from exc
 
     override = (
         await session.execute(

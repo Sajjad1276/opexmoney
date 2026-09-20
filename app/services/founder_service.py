@@ -374,6 +374,34 @@ async def finalize_draft(
 
 
 
+async def expire_founder_drafts(
+    session: AsyncSession,
+    *,
+    limit: int = 200,
+) -> int:
+    """Expire stale founding drafts without touching completed/historical rows.
+
+    The operation is idempotent and safe to run from a periodic scheduler.
+    Only active lifecycle states are eligible for expiration.
+    """
+    now = _utcnow()
+    statement = (
+        select(NationFoundingDraft)
+        .where(
+            NationFoundingDraft.status.in_(ACTIVE_DRAFT_STATUSES),
+            NationFoundingDraft.expires_at <= now,
+        )
+        .order_by(NationFoundingDraft.id.asc())
+        .limit(max(1, min(int(limit), 1000)))
+        .with_for_update(skip_locked=True)
+    )
+    rows = list((await session.execute(statement)).scalars().all())
+    for draft in rows:
+        draft.status = "EXPIRED"
+    await session.flush()
+    return len(rows)
+
+
 async def reset_group(
     session: AsyncSession,
     *,

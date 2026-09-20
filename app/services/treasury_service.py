@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.models import Nation, NationMember, NationMemberRole, NationTreasury, TreasuryLog, User
 from app.services.nation_service import get_user_active_nation
 from app.services.user_service import sync_user_balance
+from app.services.nation_control import require_nation_control
 
 
 MIN_DEPOSIT = Decimal("10")
@@ -220,28 +221,17 @@ async def withdraw_from_treasury(
     if nation is None or not nation.is_active:
         return {"ok": False, "reason": "nation_not_found"}
 
-    member = await session.scalar(
-        select(NationMember)
-        .where(
-            NationMember.user_id == actor_id,
-            NationMember.nation_id == nation_id,
-            NationMember.is_active.is_(True),
+    try:
+        user, nation, member = await require_nation_control(
+            session,
+            user_id=actor_id,
+            nation_id=nation_id,
+            allowed_roles={NationMemberRole.FOUNDER},
+            lock=True,
         )
-        .with_for_update()
-    )
-    role = (
-        member.role.value
-        if member is not None and isinstance(member.role, NationMemberRole)
-        else str(member.role)
-        if member is not None
-        else None
-    )
-    if role != NationMemberRole.FOUNDER.value:
-        return {"ok": False, "reason": "permission_denied"}
-
-    user = await session.get(User, actor_id, with_for_update=True)
-    if user is None:
-        return {"ok": False, "reason": "user_not_found"}
+    except ValueError as exc:
+        reason = "permission_denied" if "دسترسی" in str(exc) or "عضویت" in str(exc) else "nation_not_found"
+        return {"ok": False, "reason": reason, "message": str(exc)}
 
     treasury = await _ensure_treasury(session, nation_id, lock_nation=False)
     if treasury is None:

@@ -57,6 +57,7 @@ from app.services.governance_service import governance_cycle
 from app.services.membership_service import reconcile_human_nation_member_counts
 from app.services.war_service import resolve_expired_wars
 from app.services.ai_world import ensure_ai_world, run_ai_world_cycle
+from app.services.economy_events import drain_outbox
 from app.schedulers.alert_checker import register_price_alert_job
 from app.schedulers.ai_world import register_ai_world_job
 from config import settings
@@ -178,6 +179,29 @@ async def run_membership_reconciliation(bot: Bot) -> None:
         logger.exception("Nation membership reconciliation failed")
 
 
+async def run_founder_draft_expiration() -> None:
+    try:
+        async with async_session() as session:
+            async with session.begin():
+                from app.services.founder_service import expire_founder_drafts
+                expired = await expire_founder_drafts(session)
+        logger.info("Founder draft expiration completed | expired=%s", expired)
+    except Exception:
+        logger.exception("Founder draft expiration failed")
+
+
+async def run_economy_outbox() -> None:
+    try:
+        published, failed = await drain_outbox(limit=100)
+        logger.info(
+            "Economy event outbox drained | published=%s failed=%s",
+            published,
+            failed,
+        )
+    except Exception:
+        logger.exception("Economy event outbox drain failed")
+
+
 async def run_rank_job() -> None:
     try:
         async with async_session() as session:
@@ -278,6 +302,22 @@ def build_scheduler(bot: Bot) -> AsyncIOScheduler:
         CronTrigger(minute="*/15"),
         args=[bot],
         id="nation_membership_reconciliation_15m",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+    scheduler.add_job(
+        run_founder_draft_expiration,
+        CronTrigger(minute="*/15"),
+        id="founder_draft_expiration_15m",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+    scheduler.add_job(
+        run_economy_outbox,
+        CronTrigger(minute="*"),
+        id="economy_event_outbox_1m",
         replace_existing=True,
         max_instances=1,
         coalesce=True,

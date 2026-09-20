@@ -19,6 +19,7 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
     text,
+    CheckConstraint,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -42,6 +43,10 @@ class Nation(Base):
             "group_id",
             unique=True,
             postgresql_where=text("is_active = TRUE"),
+        ),
+        CheckConstraint(
+            "(is_ai = TRUE AND group_id IS NULL) OR (is_ai = FALSE AND group_id IS NOT NULL)",
+            name="ck_nations_ai_group_boundary",
         ),
     )
     nation_id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -435,6 +440,32 @@ class NationMember(Base):
     )
     joined_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
+
+
+class EconomyEventOutbox(Base):
+    __tablename__ = "economy_event_outbox"
+    __table_args__ = (
+        Index(
+            "ix_economy_event_outbox_ready",
+            "published_at",
+            "available_at",
+            "id",
+        ),
+        UniqueConstraint("event_key", name="uq_economy_event_outbox_event_key"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    event_key: Mapped[str] = mapped_column(String(160), nullable=False)
+    event_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    aggregate_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    aggregate_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    payload_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    available_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    claimed_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class NationLog(Base):

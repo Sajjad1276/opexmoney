@@ -46,3 +46,23 @@ async def get_user_sell_holdings(
         (active if nation.is_active else inactive).append(item)
 
     return active, inactive
+
+
+async def get_tradeable_nation(
+    session: AsyncSession,
+    nation_id: int,
+    *,
+    lock: bool = False,
+) -> Nation | None:
+    """Return a currently active market nation."""
+    statement = (
+        select(Nation)
+        .where(
+            Nation.nation_id == nation_id,
+            Nation.is_active.is_(True),
+        )
+        .limit(1)
+    )
+    if lock:
+        statement = statement.with_for_update()
+    return await session.scalar(statement)

@@ -39,6 +39,7 @@ from app.keyboards.reply import main_menu_keyboard, new_player_menu_keyboard
 from app.services.nation_service import get_active_nations, get_nation_rank
 from app.services.mission_service import check_permanent_missions, increment_mission
 from app.services.founder_service import cancel_draft
+from app.services.economy_events import enqueue_event
 from app.services.user_service import get_registration_status, get_user, is_fully_registered, sync_user_balance, username_exists
 from app.states.founder import FounderStates
 from app.states.onboarding import OnboardingStates
@@ -1004,6 +1005,303 @@ async def new_player_next_step(message: Message, state: FSMContext) -> None:
         parse_mode=ParseMode.HTML,
     )
     await remember_inline_panel(state, panel)
+
+
+async def confirm_nation(call: CallbackQuery, state: FSMContext, bot) -> None:
+    try:
+        nation_id = int((call.data or "").split(":", 1)[1])
+    except (TypeError, ValueError):
+        await call.answer("⚠️ ملت معتبر نیست.", show_alert=True)
+        return
+
+    data = await state.get_data()
+    username = (data.get("username") or "").strip()
+    if not username:
+        await call.answer("⏱ ثبت‌نام منقضی شد. /start بزن.", show_alert=True)
+        await state.clear()
+        return
+
+    async with async_session() as session:
+        async with session.begin():
+            user = await session.get(User, call.from_user.id, with_for_update=True)
+            if user is None:
+                user = User(
+                    user_id=call.from_user.id,
+                    username=username,
+                    home_nation_id=None,
+                    balance=Decimal("0"),
+                    xr_balance=Decimal("0"),
+                    role="player",
+                )
+                session.add(user)
+                await session.flush()
+            else:
+                user.username = username
+
+    try:
+        result_message, nation = await _join_user(
+            bot=bot,
+            user_id=call.from_user.id,
+            nation_id=nation_id,
+        )
+    except ValueError as exc:
+        await call.answer(str(exc), show_alert=True)
+        return
+
+    await state.clear()
+    if nation is None:
+        await call.answer("⚠️ اطلاعات ملت در دسترس نیست.", show_alert=True)
+        return
+
+    if "درخواست عضویت ارسال شد" in result_message or "قبلاً ثبت شده" in result_message:
+        await state.update_data(first_trade_available=False)
+        await _safe_edit_text(call, result_message)
+        await call.answer("📝 درخواست عضویت ثبت شد.")
+        return
+
+    async with async_session() as session:
+        async with session.begin():
+            user = await session.get(User, call.from_user.id)
+            nation = await session.get(Nation, nation_id)
+            holding = await session.scalar(
+                select(CurrencyHolding).where(
+                    CurrencyHolding.user_id == call.from_user.id,
+                    CurrencyHolding.nation_id == nation_id,
+                )
+            )
+
+    if user is None or nation is None or holding is None:
+        await call.answer("⚠️ حساب ملت ناقص است. /start بزن.", show_alert=True)
+        return
+
+    await state.update_data(first_trade_available=True)
+    text = (
+        f"{html.escape(nation.flag_emoji or '🏴')} <b>به {html.escape(nation.name)} خوش اومدی</b>\n"
+        "<blockquote>⁠</blockquote>"
+        f"💰 سرمایه شروع: <b>۵۰۰ <code>{html.escape(nation.currency_code)}</code></b>\n"
+        "💎 موجودی دلار: <b>۰</b>\n\n"
+        "⚡ <b>اولین حرکتت:</b> ۵۰ واحد از ارزت رو بفروش و نتیجه رو ببین."
+    )
+    await _safe_edit_text(call, text, first_trade_keyboard())
+    await call.answer()
+
+
+async def first_trade_tutorial(call: CallbackQuery, state: FSMContext) -> None:
+    data = await state.get_data()
+    if not data.get("first_trade_available"):
+        await call.answer()
+        return
+
+    async with async_session() as session:
+        async with session.begin():
+            user = await get_user(session, call.from_user.id)
+            nation = (
+                await session.get(Nation, user.home_nation_id)
+                if user and user.home_nation_id
+                else None
+            )
+    if user is None or nation is None:
+        await call.answer("⚠️ اطلاعات معامله پیدا نشد.", show_alert=True)
+        return
+
+    receive_xr = Decimal("50") * Decimal(str(nation.exchange_rate))
+    text = (
+        "⚡ <b>اولین معامله</b>\n"
+        "<blockquote>⁠</blockquote>"
+        f"📤 می‌فروشی: <b>۵۰ <code>{html.escape(nation.currency_code)}</code></b>\n"
+        f"📥 دریافت می‌کنی: <b>{fmt_amount(receive_xr)} دلار</b>\n\n"
+        f"💹 نرخ: <code>1 {html.escape(nation.currency_code)} = {fmt_rate(nation.exchange_rate)} دلار</code>"
+    )
+    await _safe_edit_text(call, text, trade_confirmation_keyboard())
+    await call.answer()
+
+
+@router.callback_query(F.data == "confirm_first_trade")
+async def confirm_first_trade(call: CallbackQuery, state: FSMContext) -> None:
+    data = await state.get_data()
+    if not data.get("first_trade_available"):
+        await call.answer()
+        return
+
+    async with async_session() as session:
+        async with session.begin():
+            user = (
+                await session.execute(
+                    select(User)
+                    .where(User.user_id == call.from_user.id)
+                    .with_for_update()
+                )
+            ).scalar_one_or_none()
+            if user is None or user.home_nation_id is None:
+                await call.answer("⚠️ حساب ملت پیدا نشد. /start بزن.", show_alert=True)
+                return
+
+            nation = await session.get(
+                Nation,
+                user.home_nation_id,
+                with_for_update=True,
+            )
+            holding = await session.scalar(
+                select(CurrencyHolding)
+                .where(
+                    CurrencyHolding.user_id == user.user_id,
+                    CurrencyHolding.nation_id == user.home_nation_id,
+                )
+                .with_for_update()
+            )
+
+            if nation is None or not nation.is_active or holding is None:
+                await call.answer("⚠️ موجودی معامله پیدا نشد.", show_alert=True)
+                return
+
+            amount = Decimal("50")
+            if holding.amount < amount:
+                await call.answer("🔴 موجودی کافی نیست.", show_alert=True)
+                return
+
+            rate = Decimal(str(nation.exchange_rate))
+            receive_xr = amount * rate
+            holding.amount -= amount
+            user.xr_balance += receive_xr
+            user.balance = holding.amount
+            nation.trade_volume_24h += receive_xr
+
+            transaction = Transaction(
+                user_id=user.user_id,
+                nation_id=nation.nation_id,
+                transaction_type="sell",
+                spend_xr=receive_xr,
+                amount=amount,
+                fee_xr=Decimal("0"),
+                rate=rate,
+            )
+            session.add(transaction)
+            await session.flush()
+            await enqueue_event(
+                session,
+                event_key=f"transaction:{transaction.id}",
+                event_type="trade.sell",
+                aggregate_type="transaction",
+                aggregate_id=transaction.id,
+                payload={
+                    "user_id": user.user_id,
+                    "nation_id": nation.nation_id,
+                    "side": "sell",
+                    "spend_xr": str(receive_xr),
+                    "amount": str(amount),
+                    "fee_xr": "0",
+                    "rate": str(rate),
+                    "source": "first_trade_tutorial",
+                },
+            )
+            session.add(
+                UserActivity(
+                    user_id=user.user_id,
+                    nation_id=nation.nation_id,
+                    activity_type="trade",
+                )
+            )
+            await sync_user_balance(session, user.user_id)
+
+            local_balance = holding.amount
+            xr_balance = user.xr_balance
+            currency_code = nation.currency_code
+
+    await state.clear()
+    await _safe_edit_text(
+        call,
+        (
+            "✅ <b>اولین معامله انجام شد!</b>\n"
+            "<blockquote>⁠</blockquote>"
+            f"📤 فروختی: <b>۵۰ {html.escape(currency_code)}</b>\n"
+            f"📥 دریافتی: <b>{fmt_amount(receive_xr)} دلار</b>\n\n"
+            f"💰 موجودی: <b>{fmt_amount(local_balance)} {html.escape(currency_code)}</b> "
+            f"+ <b>{fmt_amount(xr_balance)} دلار</b>\n\n"
+            "🎯 قدم بعدی: بازار رو باز کن و یک ارز دیگه رو بررسی کن."
+        ),
+        InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text="💹 رفتن به بازار",
+                        callback_data="market_main",
+                        style=ButtonStyle.SUCCESS,
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        text="🏠 دیدن داشبورد",
+                        callback_data="back_to_dashboard",
+                    )
+                ],
+            ]
+        ),
+    )
+    await call.answer("✅ اولین معامله ثبت شد")
+
+
+@router.callback_query(F.data == "skip_first_trade")
+async def skip_first_trade(call: CallbackQuery, state: FSMContext) -> None:
+    await state.clear()
+
+    async with async_session() as session:
+        async with session.begin():
+            user = await get_user(session, call.from_user.id)
+            nation = (
+                await session.get(Nation, user.home_nation_id)
+                if user and user.home_nation_id
+                else None
+            )
+
+    code = nation.currency_code if nation else "ارز"
+    balance = (
+        fmt_amount(
+            await _get_holding_amount(
+                call.from_user.id,
+                nation.nation_id,
+            )
+        )
+        if nation
+        else "500"
+    )
+    await _safe_edit_text(
+        call,
+        (
+            f"{html.escape(call.from_user.first_name or 'معامله‌گر')}، فعلاً از معامله رد شدی.\n\n"
+            f"💰 موجودی: {balance} <code>{html.escape(code)}</code>\n\n"
+            "هر وقت آماده شدی، از بازار شروع کن."
+        ),
+        InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text="💹 رفتن به بازار",
+                        callback_data="market_main",
+                        style=ButtonStyle.SUCCESS,
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        text="🏠 دیدن داشبورد",
+                        callback_data="back_to_dashboard",
+                    )
+                ],
+            ]
+        ),
+    )
+    await call.answer()
+
+
+async def _get_holding_amount(user_id: int, nation_id: int) -> Decimal:
+    async with async_session() as session:
+        async with session.begin():
+            holding = await session.scalar(
+                select(CurrencyHolding).where(
+                    CurrencyHolding.user_id == user_id,
+                    CurrencyHolding.nation_id == nation_id,
+                )
+            )
+            return holding.amount if holding else Decimal("500")
 
 
 @router.message(F.text == "💰 پول من")

@@ -21,6 +21,8 @@ from app.database.models import (
 )
 
 from app.services.nation_service import convert_holding_to_xr
+from app.services.wallet_service import reconcile_user_wallet
+from app.services.economy_events import enqueue_event
 
 
 TELEGRAM_ACTIVE_STATUSES = frozenset({
@@ -272,6 +274,8 @@ async def sync_telegram_membership(
             user_id=telegram_user_id,
         )
         user_registered = user is not None and bool((user.username or "").strip())
+        if user is not None:
+            await reconcile_user_wallet(session, user.user_id)
     elif user_registered:
         if became_inactive and telegram_status == "kicked":
             await convert_holding_to_xr(
@@ -322,6 +326,7 @@ async def sync_telegram_membership(
             user.home_nation_id = fallback_nation_id
             if fallback_nation_id is None:
                 user.role = "player"
+            await reconcile_user_wallet(session, user.user_id)
 
     action_type: str | None = None
     if became_active:
@@ -336,19 +341,33 @@ async def sync_telegram_membership(
         nation.member_count = max(0, int(nation.member_count or 0) - 1)
 
     if action_type is not None:
-        session.add(
-            NationLog(
-                nation_id=nation.nation_id,
-                actor_id=telegram_user_id,
-                action_type=action_type,
-                target_id=telegram_user_id,
-                event_metadata={
-                    "source": source,
-                    "telegram_status": telegram_status,
-                    "is_member": is_member,
-                    "telegram_user_id": telegram_user_id,
-                },
-            )
+        log = NationLog(
+            nation_id=nation.nation_id,
+            actor_id=telegram_user_id,
+            action_type=action_type,
+            target_id=telegram_user_id,
+            event_metadata={
+                "source": source,
+                "telegram_status": telegram_status,
+                "is_member": is_member,
+                "telegram_user_id": telegram_user_id,
+            },
+        )
+        session.add(log)
+        await session.flush()
+        await enqueue_event(
+            session,
+            event_key=f"nation-log:{log.id}",
+            event_type=action_type.lower(),
+            aggregate_type="nation",
+            aggregate_id=nation.nation_id,
+            payload={
+                "nation_id": nation.nation_id,
+                "telegram_user_id": telegram_user_id,
+                "action_type": action_type,
+                "source": source,
+                "telegram_status": telegram_status,
+            },
         )
 
     await session.flush()
