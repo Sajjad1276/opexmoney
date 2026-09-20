@@ -38,7 +38,7 @@ from app.services.academy_service import (
     save_ai_session,
 )
 from app.utils.formatting import fmt_amount, to_fa
-from app.utils.ui import close_inline_panel, remember_inline_panel
+from app.utils.ui import close_inline_panel, remember_inline_panel, send_submenu_panel
 
 router = Router(name="academy")
 logger = logging.getLogger(__name__)
@@ -261,7 +261,8 @@ async def open_academy(message: Message) -> None:
                     message.from_user.id,
                     user_xp.level,
                 )
-        await message.answer(
+        await send_submenu_panel(
+            message,
             build_academy_main_msg(user_xp),
             reply_markup=academy_keyboard(modules),
             parse_mode=ParseMode.HTML,
