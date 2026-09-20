@@ -129,7 +129,7 @@ async def increment_mission(
     if mission is None:
         return
 
-    now = datetime.utcnow()
+    now = datetime.now(UTC).replace(tzinfo=None)
     progress = await session.scalar(
         select(UserMissionProgress)
         .where(
