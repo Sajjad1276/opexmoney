@@ -24,6 +24,7 @@ CONTRACTS = {
                "market_chart", "market_history", "buy_", "buyq_", "cbuy_",
                "sell_", "sellq_", "csell_"],
     "founder": ["found_nation", "cancel_founder", "confirm_founder"],
+    "membership": ["chat_member", "sync_telegram_membership", "telegram_chat_member_state"],
     "nation": ["🌍 ملت‌ها"],
     "sections": ["📊 پورتفولیو", "⚡ مأموریت", "🏆 رتبه‌بندی", "⚙️ تنظیمات"],
     "governance": ["governance_main", "gov_active", "gov_new", "gov_voting",
@@ -31,7 +32,7 @@ CONTRACTS = {
 }
 
 EXPECTED_JOB_IDS = {
-    "rate_engine_15m", "nation_rank_hourly", "governance_cycle",
+    "rate_engine_15m", "nation_membership_reconciliation_15m", "nation_rank_hourly", "governance_cycle",
     "daily_market_reset", "nation_join_request_expiration",
     "nation_weekly_ai_report", "price_alert_checker_5m",
 }
