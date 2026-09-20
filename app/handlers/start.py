@@ -498,19 +498,12 @@ async def start(message: Message, state: FSMContext) -> None:
     date_text = to_fa(now.strftime("%Y/%m/%d"))
     time_text = to_fa(now.strftime("%H:%M"))
 
-    # /start is intentionally a simple welcome surface.
-    # Detailed player data belongs to dedicated sections such as the portfolio.
+    # Existing players keep the dashboard flow. The simple welcome is only for new users.
     if user is not None:
-        text = f"""🌐 <b>OPEX MONEY</b>
+        await show_dashboard(message, user)
+        return
 
-به اقتصاد زنده OPEX MONEY خوش اومدی.
-
-🎯 <b>تصمیم بگیر، معامله کن، رشد کن.</b>
-
-📅 {date_text}
-🕐 {time_text}"""
-    else:
-        text = f"""🌐 <b>به OPEX MONEY خوش اومدی</b>
+    text = f"""🌐 <b>به OPEX MONEY خوش اومدی</b>
 
 اقتصاد زنده است؛ تصمیم‌های تو مهم‌اند.
 
