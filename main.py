@@ -32,6 +32,7 @@ from app.handlers.governance import governance_router
 from app.handlers.academy import router as academy_router
 from app.handlers.chart import router as chart_router
 from app.handlers.market import router as market_router
+from app.handlers.membership import membership_router
 from app.handlers.missions import router as missions_router
 from app.handlers.portfolio import router as portfolio_router
 from app.handlers.ranking import router as ranking_router
@@ -363,6 +364,7 @@ async def main() -> None:
     dp.include_router(onboarding_fix_router)
     dp.include_router(start_router)
     dp.include_router(market_router)
+    dp.include_router(membership_router)
     dp.include_router(chart_router)
     dp.include_router(missions_router)
     dp.include_router(portfolio_router)
