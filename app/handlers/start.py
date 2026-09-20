@@ -307,6 +307,13 @@ async def show_dashboard(
                     CurrencyHolding.nation_id == nation.nation_id,
                 )
             )
+            trade_count = int(
+                await session.scalar(
+                    select(func.count(Transaction.id)).where(
+                        Transaction.user_id == user.user_id,
+                    )
+                ) or 0
+            )
 
     change = get_rate_change(nation)
     minutes = (
@@ -332,6 +339,9 @@ async def show_dashboard(
 🏆 رتبه #{7} از {8}
 👥 {9} عضو
 ⏱ <i>{10} دقیقه پیش</i>
+
+🎯 <b>هدف بازی:</b> ارزش دارایی‌هات رو بیشتر کن و رتبه‌ات رو بالا ببر.
+🚀 <b>حرکت بعدی:</b> {11}
 <blockquote>⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀</blockquote>
 """.format(
         user_mention(display_user or message.from_user),
@@ -345,6 +355,11 @@ async def show_dashboard(
         to_fa(total_nations),
         to_fa(nation.member_count),
         to_fa(minutes),
+        (
+            f"اولین معامله‌ات رو انجام بده؛ ۵۰ {html.escape(nation.currency_code)} رو به دلار تبدیل کن."
+            if trade_count == 0
+            else "بازار رو باز کن و یک ارز دیگه رو با قیمت و تغییرش مقایسه کن."
+        ),
     )
 
     if replace_inline and bot is not None:
@@ -1254,10 +1269,13 @@ async def confirm_nation(call: CallbackQuery, state: FSMContext, bot: Bot) -> No
 💎 موجودی دلار: <b>۰</b>
 📈 نرخ فعلی: <b>۱ {html.escape(nation.currency_code)} = {fmt_rate(nation.exchange_rate)} دلار</b>
 
-🎯 <b>اولین حرکتت:</b>
-۵۰ واحد از ارزت رو بفروش و بازار OPEX رو با یک معامله واقعی تجربه کن.
+🎯 <b>چرا این معامله؟</b>
+این یک آموزش عملی است: ارز ملتت را به دلار تبدیل می‌کنی تا بعداً بتوانی ارزهای دیگر را معامله کنی.
 
-<i>بعد از این معامله، قدم بعدی رو خود بازی بهت نشون می‌ده.</i>"""
+⚡ <b>اولین حرکتت:</b>
+۵۰ واحد از ارزت را بفروش و نتیجه را ببین.
+
+<i>بعد از معامله، بازی قدم بعدی را نشانت می‌دهد.</i>"""
     await _safe_edit_text(call, text, first_trade_keyboard())
     await call.answer()
 
