@@ -21,6 +21,7 @@ from app.database.models import (
 )
 
 from app.services.nation_service import convert_holding_to_xr
+from app.services.wallet_service import reconcile_user_wallet
 
 
 TELEGRAM_ACTIVE_STATUSES = frozenset({
@@ -272,6 +273,8 @@ async def sync_telegram_membership(
             user_id=telegram_user_id,
         )
         user_registered = user is not None and bool((user.username or "").strip())
+        if user is not None:
+            await reconcile_user_wallet(session, user.user_id)
     elif user_registered:
         if became_inactive and telegram_status == "kicked":
             await convert_holding_to_xr(
@@ -322,6 +325,7 @@ async def sync_telegram_membership(
             user.home_nation_id = fallback_nation_id
             if fallback_nation_id is None:
                 user.role = "player"
+            await reconcile_user_wallet(session, user.user_id)
 
     action_type: str | None = None
     if became_active:
