@@ -24,8 +24,16 @@ from app.database.models import CurrencyHolding, Nation, Transaction, User, User
 from app.database.session import async_session
 from app.handlers.nation_management import _join_user
 from app.filters.profanity import profanity_filter
-from app.utils.name_filter import TRADER_NAME_RE
-from app.keyboards.inline import cancel_keyboard, first_trade_keyboard, nation_selection_keyboard, trade_confirmation_keyboard, welcome_keyboard
+from app.utils.name_filter import TRADER_NAME_RE, is_blocked_trader_name, is_valid_trader_name
+from app.keyboards.inline import (
+    cancel_keyboard,
+    first_trade_keyboard,
+    more_menu_keyboard,
+    suggested_name_keyboard,
+    nation_selection_keyboard,
+    trade_confirmation_keyboard,
+    welcome_keyboard,
+)
 from app.keyboards.reply import main_menu_keyboard
 from app.services.nation_service import get_active_nations, get_nation_rank
 from app.services.mission_service import check_permanent_missions, increment_mission
@@ -39,7 +47,7 @@ router = Router(name="start")
 logger = logging.getLogger(__name__)
 
 RLM = "\u200f"
-ONBOARDING_TIMEOUT = 30
+ONBOARDING_TIMEOUT = 300
 NATIONS_PER_PAGE = 5
 INITIAL_BALANCE = Decimal("500.00")
 
@@ -79,7 +87,7 @@ async def _send_expired(message: Message) -> None:
             """
 ⏱ <b>فرآیند منقضی شد</b>
 
-30 ثانیه برای این مرحله فرصت داشتی.
+۵ دقیقه برای این مرحله فرصت داری.
 برای شروع دوباره، /start رو بزن.
 """
         ),
@@ -447,13 +455,18 @@ async def start(message: Message, state: FSMContext) -> None:
 
 
     text = """
-👋 <b>به OPEX MONEY خوش اومدی</b>
+🌐 <b>به OPEX MONEY خوش اومدی</b>
 
-اینجا وارد یک اقتصاد زنده می‌شی.
-ملتت رو انتخاب کن، ارز خودت رو داشته باش
-و با تصمیم‌های خودت مسیر ثروتت رو بساز.
+اینجا فقط پول جمع نمی‌کنی.
+ملتت رو انتخاب می‌کنی، ارز می‌خری و می‌فروشی
+و تصمیم‌هات روی اقتصاد زنده بازی اثر می‌ذاره.
 
-آماده‌ای؟
+<b>شروع بازی فقط ۳ قدمه:</b>
+۱) هویتت رو بساز
+۲) ۵۰۰ واحد سرمایه بگیر
+۳) اولین معامله‌ات رو انجام بده
+
+آماده‌ای وارد اقتصاد بشی؟
 """
 
     await message.answer(
