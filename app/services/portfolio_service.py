@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import CurrencyHolding, Nation, RateHistory, User
-from app.utils.formatting import imperial_datetime
+from app.utils.formatting import imperial_datetime, today_jalali
 
 
 async def get_portfolio_data(session: AsyncSession, user_id: int) -> dict:
@@ -114,4 +114,6 @@ async def get_portfolio_data(session: AsyncSession, user_id: int) -> dict:
         "holdings": holdings,
         "total_xr": total_xr,
         "today_imperial": imperial_datetime()[0],
+        # Backward-compatible key for existing consumers/tests.
+        "today_jalali": today_jalali(),
     }
