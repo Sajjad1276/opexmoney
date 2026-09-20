@@ -20,11 +20,10 @@ EVENT_KEY = "phase8-test-event-944001"
 async def test_economy_outbox_claim_publish_and_retry_are_idempotent():
     async with async_session() as session:
         async with session.begin():
-            await session.execute(
-                delete(EconomyEventOutbox).where(
-                    EconomyEventOutbox.event_key == EVENT_KEY
-                )
-            )
+            # This test owns the entire outbox fixture. Earlier integration
+            # tests legitimately emit membership/trade events, so isolate the
+            # lifecycle test from those rows rather than asserting global queue order.
+            await session.execute(delete(EconomyEventOutbox))
             row = await enqueue_event(
                 session,
                 event_key=EVENT_KEY,
@@ -70,8 +69,4 @@ async def test_economy_outbox_claim_publish_and_retry_are_idempotent():
                 payload={"ok": True},
             )
             assert duplicate.id == event_id
-            await session.execute(
-                delete(EconomyEventOutbox).where(
-                    EconomyEventOutbox.event_key == EVENT_KEY
-                )
-            )
+            await session.execute(delete(EconomyEventOutbox))
