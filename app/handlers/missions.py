@@ -74,12 +74,12 @@ def _progress_text(status: MissionStatus) -> str:
     if status.completed:
         return (
             f"🎁 {html.escape(status.title_fa)} — "
-            f"<u>آماده دریافت!</u> +{reward} ΩXR"
+            f"<u>آماده دریافت!</u> +{reward} دلار"
         )
 
     line = (
         f"⬜ {html.escape(status.title_fa)} — "
-        f"{progress}/{target} — جایزه: {reward} ΩXR"
+        f"{progress}/{target} — جایزه: {reward} دلار"
     )
     if status.progress > 0:
         line += f"\n  {progress_bar(status.progress, status.target_count)}"
@@ -261,7 +261,7 @@ async def claim_all_rewards(callback: CallbackQuery) -> None:
     if results:
         result_text = "🎁 جوایز دریافت شد:\n" + "\n".join(
             (
-                f"+{_reward_text(result['reward_xr'])} ΩXR — "
+                f"+{_reward_text(result['reward_xr'])} دلار — "
                 f"{html.escape(result['mission_title'])}"
             )
             for result in results
