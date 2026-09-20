@@ -9,6 +9,7 @@ from aiogram.types import ChatMember
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.database.session import async_session
 from app.database.models import (
     CurrencyHolding,
     Nation,
@@ -406,7 +407,7 @@ async def active_telegram_membership_count(
 
 async def reconcile_human_nation_member_counts(bot) -> int:
     """Refresh human-nation counts from Telegram without mutating membership rows."""
-    async with __import__("app.database.session", fromlist=["async_session"]).async_session() as session:
+    async with async_session() as session:
         result = await session.execute(
             select(Nation)
             .where(
@@ -424,7 +425,7 @@ async def reconcile_human_nation_member_counts(bot) -> int:
         except Exception:
             continue
 
-        async with __import__("app.database.session", fromlist=["async_session"]).async_session() as session:
+        async with async_session() as session:
             async with session.begin():
                 current = await session.get(
                     Nation,
