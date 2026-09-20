@@ -10,6 +10,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.session import async_session
+from app.services.user_service import sync_user_balance
 from app.database.models import (
     CurrencyHolding,
     Nation,
