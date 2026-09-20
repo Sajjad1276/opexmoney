@@ -32,6 +32,21 @@ async def _repair_membership(
     *,
     role: NationMemberRole,
 ) -> str:
+    if not nation.is_ai:
+        telegram_membership = await session.scalar(
+            select(NationTelegramMember)
+            .where(
+                NationTelegramMember.nation_id == nation.nation_id,
+                NationTelegramMember.telegram_user_id == user.user_id,
+                NationTelegramMember.is_active.is_(True),
+            )
+            .limit(1)
+        )
+        if telegram_membership is None:
+            raise ValueError(
+                "Human nation membership cannot be repaired without Telegram membership."
+            )
+
     member = await session.scalar(
         select(NationMember)
         .where(
