@@ -319,6 +319,7 @@ async def open_treasury_from_main_menu(
                     session,
                     message.from_user.id,
                     repair=True,
+                    lock=True,
                 )
 
                 if context is None:
@@ -961,6 +962,7 @@ async def treasury_back(
                             session,
                             callback.from_user.id,
                             repair=True,
+                    lock=True,
                         )
                         active_nation = context[0] if context is not None else None
                         active_role = context[1] if context is not None else None
