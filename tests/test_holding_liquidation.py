@@ -17,6 +17,7 @@ from app.database.models import (
 )
 from app.database.session import async_session
 from app.handlers import nation_management as nm
+from app.services.membership_service import sync_telegram_membership
 from app.services.nation_service import convert_holding_to_xr
 
 
@@ -27,6 +28,12 @@ GROUP_ID = -100932001
 
 class FakeBot:
     async def send_message(self, *args, **kwargs):
+        return SimpleNamespace()
+
+    async def ban_chat_member(self, group_id, user_id):
+        return SimpleNamespace()
+
+    async def unban_chat_member(self, group_id, user_id, **kwargs):
         return SimpleNamespace()
 
 
@@ -191,7 +198,7 @@ async def test_convert_holding_uses_current_rate_and_preserves_audit():
 
 
 @pytest.mark.asyncio
-async def test_kick_liquidates_holding_before_membership_is_deactivated(monkeypatch):
+async def test_kick_liquidates_holding_on_telegram_kick_transition(monkeypatch):
     nation_id = await seed_nation(rate=Decimal("1.50"))
     bot = FakeBot()
 
@@ -203,6 +210,17 @@ async def test_kick_liquidates_holding_before_membership_is_deactivated(monkeypa
 
     call = FakeCall(FOUNDER_ID, f"nm:kick:{nation_id}:{USER_ID}")
     await nm.kick_member(call, bot)
+
+    async with async_session() as session:
+        async with session.begin():
+            await sync_telegram_membership(
+                session,
+                group_id=GROUP_ID,
+                telegram_user_id=USER_ID,
+                telegram_status="kicked",
+                is_member=False,
+                source="test:chat_member",
+            )
 
     async with async_session() as session:
         user = await session.get(User, USER_ID)
