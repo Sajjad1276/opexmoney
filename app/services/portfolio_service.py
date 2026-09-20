@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import CurrencyHolding, Nation, RateHistory, User
-from app.utils.formatting import today_jalali
+from app.utils.formatting import imperial_datetime
 
 
 async def get_portfolio_data(session: AsyncSession, user_id: int) -> dict:
@@ -113,5 +113,5 @@ async def get_portfolio_data(session: AsyncSession, user_id: int) -> dict:
         "home_nation_id": user.home_nation_id,
         "holdings": holdings,
         "total_xr": total_xr,
-        "today_jalali": today_jalali(),
+        "today_imperial": imperial_datetime()[0],
     }
