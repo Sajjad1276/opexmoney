@@ -13,7 +13,6 @@ from aiogram.types import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     Message,
-    ReplyKeyboardRemove,
 )
 
 from app.database.models import Mission, UserMissionProgress
@@ -105,7 +104,7 @@ def _permanent_text(status: MissionStatus) -> str:
 def build_missions_text(data: dict[str, list[MissionStatus]]) -> str:
     lines = [
         "⚡ <b>مأموریت‌ها</b>",
-        "━━━━━━━━━━━━━━━━━━",
+        "<blockquote>⁠</blockquote>",
         "",
         "🌅 <b>مأموریت‌های امروز</b>",
     ]
@@ -174,7 +173,6 @@ async def show_missions(message: Message) -> None:
         await message.answer(MISSIONS_ERROR, parse_mode=ParseMode.HTML)
         return
 
-    await message.answer("⁠", reply_markup=ReplyKeyboardRemove())
     await message.answer(
         text,
         reply_markup=markup,
