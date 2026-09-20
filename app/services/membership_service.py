@@ -19,6 +19,8 @@ from app.database.models import (
     User,
 )
 
+from app.services.nation_service import convert_holding_to_xr
+
 
 TELEGRAM_ACTIVE_STATUSES = frozenset({
     "member",
@@ -264,6 +266,13 @@ async def sync_telegram_membership(
         )
         user_registered = user is not None and bool((user.username or "").strip())
     elif user_registered:
+        if became_inactive and telegram_status == "kicked":
+            await convert_holding_to_xr(
+                user,
+                nation,
+                session,
+            )
+
         member = await session.scalar(
             select(NationMember)
             .where(
