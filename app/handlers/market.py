@@ -81,32 +81,6 @@ def market_keyboard_for_nation(nation_id: int) -> InlineKeyboardMarkup:
     )
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
-def market_intelligence_keyboard(nations: list[Nation]) -> InlineKeyboardMarkup:
-    rows: list[list[InlineKeyboardButton]] = []
-    for nation in nations:
-        rows.append(
-            [
-                InlineKeyboardButton(
-                    text=f"📈 {nation.currency_code}",
-                    callback_data=f"market_chart:{nation.nation_id}",
-                ),
-                InlineKeyboardButton(
-                    text="🔔 هشدار",
-                    callback_data=f"alert:set:{nation.currency_code}",
-                ),
-            ]
-        )
-
-    rows.append([
-        InlineKeyboardButton(
-            text="🔔 هشدارهای من",
-            callback_data="alert:list",
-        )
-    ])
-    rows.extend([list(row) for row in market_keyboard().inline_keyboard])
-    return InlineKeyboardMarkup(inline_keyboard=rows)
-
-
 async def safe_edit(call, text, markup=None):
     try:
         if call.message is None or not hasattr(call.message, "edit_text"):
@@ -299,11 +273,7 @@ async def render_market(
                     else market_text(user, overview, active)
                 )
 
-    markup = (
-        market_buy_keyboard(nations_for_keyboard[:6])
-        if beginner_mode
-        else market_intelligence_keyboard(nations_for_keyboard)
-    )
+    markup = market_keyboard()
     if edit_call:
         await safe_edit(edit_call, text, markup)
     else:
@@ -341,6 +311,155 @@ async def market_refresh(call: CallbackQuery):
     except Exception:
         logger.exception("Market refresh failed for user=%s", call.from_user.id)
         await call.answer("⚠️ بازار موقتاً در دسترس نیست.", show_alert=True)
+
+
+def _currency_selector_prompt(action: str) -> str:
+    if action == "alert":
+        return (
+            "🔔 <b>ثبت هشدار قیمت</b>\n\n"
+            "کد ارز را بنویس.\n"
+            "مثال: <code>OPX</code>"
+        )
+    return (
+        "📊 <b>نمودار ارز</b>\n\n"
+        "کد ارز را بنویس.\n"
+        "مثال: <code>OPX</code>"
+    )
+
+
+async def _resolve_active_currency(
+    session,
+    raw_code: str,
+) -> Nation | None:
+    code = raw_code.strip().upper()
+    if not code or len(code) > 16:
+        return None
+    return await session.scalar(
+        select(Nation)
+        .where(
+            Nation.currency_code == code,
+            Nation.is_active.is_(True),
+        )
+        .limit(1)
+    )
+
+
+@router.callback_query(F.data == "alert_create")
+async def alert_create_callback(call: CallbackQuery, state: FSMContext):
+    await state.clear()
+    await state.set_state(MarketStates.WAITING_ALERT_CURRENCY)
+    await remember_inline_panel(state, call.message)
+    if call.message:
+        await call.message.edit_text(
+            _currency_selector_prompt("alert"),
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="❌ انصراف", callback_data="market_main")]
+            ]),
+            parse_mode="HTML",
+        )
+    await call.answer()
+
+
+@router.message(MarketStates.WAITING_ALERT_CURRENCY, F.text)
+async def alert_currency_message(message: Message, state: FSMContext):
+    code = (message.text or "").strip().upper()
+    async with async_session() as session:
+        async with session.begin():
+            nation = await _resolve_active_currency(session, code)
+
+    if nation is None:
+        await message.answer(
+            "⚠️ این ارز در بازار فعال نیست. کد ارز را دوباره وارد کن.",
+            parse_mode="HTML",
+        )
+        return
+
+    await state.set_state(MarketStates.WAITING_ALERT_PRICE)
+    await state.update_data(alert_currency=nation.currency_code)
+    await message.answer(
+        f"🔔 <b>قیمت هدف {html.escape(nation.currency_code)}</b>\n\n"
+        f"قیمت فعلی: <b>{fmt_rate(nation.exchange_rate)} OPX</b>\n"
+        "قیمت موردنظر برای هشدار را بنویس.\n"
+        "مثال: <code>1.5</code>",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="❌ انصراف", callback_data="market_main")]
+        ]),
+        parse_mode="HTML",
+    )
+
+
+@router.callback_query(F.data == "market_chart_select")
+async def market_chart_select_callback(call: CallbackQuery, state: FSMContext):
+    await state.clear()
+    await state.set_state(MarketStates.WAITING_CHART_CURRENCY)
+    await remember_inline_panel(state, call.message)
+    if call.message:
+        await call.message.edit_text(
+            _currency_selector_prompt("chart"),
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="❌ انصراف", callback_data="market_main")]
+            ]),
+            parse_mode="HTML",
+        )
+    await call.answer()
+
+
+@router.message(MarketStates.WAITING_CHART_CURRENCY, F.text)
+async def chart_currency_message(message: Message, state: FSMContext):
+    code = (message.text or "").strip().upper()
+    async with async_session() as session:
+        async with session.begin():
+            nation = await _resolve_active_currency(session, code)
+
+    if nation is None:
+        await message.answer(
+            "⚠️ این ارز در بازار فعال نیست. کد ارز را دوباره وارد کن.",
+            parse_mode="HTML",
+        )
+        return
+
+    await close_inline_panel(state, message.bot)
+    await state.clear()
+
+    from app.handlers.chart import show_chart_for_nation
+
+    # The chart handler owns photo rendering and timeframe controls.
+    proxy = CallbackQuery(
+        id="market-chart-input",
+        from_user=message.from_user,
+        chat_instance="market",
+        message=None,
+        data=f"market_chart:{nation.nation_id}",
+    )
+    await message.answer(
+        f"📊 <b>{html.escape(nation.currency_code)}</b> نمودار در حال آماده‌سازی است...",
+        parse_mode="HTML",
+    )
+    try:
+        await message.bot.delete_message(message.chat.id, message.message_id)
+    except Exception:
+        pass
+
+    # Direct rendering requires the original callback message. Create a small
+    # callback-compatible adapter around the user's latest market message.
+    from app.handlers.chart import get_chart_data, _build_photo, chart_keyboard, build_chart_caption
+    async with async_session() as session:
+        async with session.begin():
+            chart_data = await get_chart_data(session, nation.nation_id, "24h")
+            chart_data["window"] = "24h"
+    if not chart_data["enough_data"]:
+        await message.answer(
+            build_chart_caption(chart_data),
+            reply_markup=chart_keyboard(nation.nation_id, "24h"),
+            parse_mode="HTML",
+        )
+        return
+    await message.answer_photo(
+        photo=await _build_photo(chart_data),
+        caption=build_chart_caption(chart_data),
+        reply_markup=chart_keyboard(nation.nation_id, "24h"),
+        parse_mode="HTML",
+    )
 
 
 @router.message(Command("alert"))
