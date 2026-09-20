@@ -177,6 +177,6 @@ def test_required_main_menu_sections_exist():
         "🎯 مأموریت",
         "🌍 ملت من",
         "🏆 رتبه‌بندی",
-        "⚙️ تنظیمات",
+        "☰ بیشتر",
     }
     assert required.issubset(set(texts))
