@@ -170,6 +170,14 @@ def _nation_page_keyboard(
     if navigation:
         rows.append(navigation)
 
+    rows.append([
+        InlineKeyboardButton(
+            text="🏛 تأسیس ملت",
+            callback_data="start_founder",
+            style=ButtonStyle.SUCCESS,
+        )
+    ])
+
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -815,7 +823,17 @@ async def _render_nation_page(
 
 می‌تونی بعداً برگردی و یک ملت فعال انتخاب کنی.
 """
-        keyboard = None
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text="🏛 تأسیس ملت",
+                        callback_data="start_founder",
+                        style=ButtonStyle.SUCCESS,
+                    )
+                ]
+            ]
+        )
     else:
         text = """
 🌍 <b>ملتت رو انتخاب کن</b>
