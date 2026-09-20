@@ -127,6 +127,31 @@ def today_jalali() -> str:
     return to_fa(f"{y:04d}/{m:02d}/{d:02d}")
 
 
+def imperial_datetime(now=None) -> tuple[str, str]:
+    """Return the game-local date/time in the Iranian Imperial calendar.
+
+    The Imperial year is the Solar Hijri year plus 1180, so 1405 SH is
+    displayed as 2585 Imperial. The clock itself is unchanged and uses the
+    game's configured timezone.
+    """
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    if now is None:
+        now = datetime.now(ZoneInfo("Asia/Tehran"))
+
+    jalali_year, jalali_month, jalali_day = gregorian_to_jalali(
+        now.year,
+        now.month,
+        now.day,
+    )
+    imperial_year = jalali_year + 1180
+    return (
+        to_fa(f"{imperial_year:04d}/{jalali_month:02d}/{jalali_day:02d}"),
+        to_fa(now.strftime("%H:%M")),
+    )
+
+
 def progress_bar(current: int, total: int, length: int = 6) -> str:
     if total <= 0:
         return "░" * length
