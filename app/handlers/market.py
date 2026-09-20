@@ -251,10 +251,19 @@ def market_text(user, overview: dict, active: int) -> str:
     return "\n".join(lines)
 
 
-async def render_market(message: Message, edit_call=None):
+async def render_market(
+    message: Message,
+    edit_call=None,
+    *,
+    request_user_id: int | None = None,
+):
     async with async_session() as session:
         async with session.begin():
-            user_id = edit_call.from_user.id if edit_call is not None else message.from_user.id
+            user_id = (
+                edit_call.from_user.id
+                if edit_call is not None
+                else request_user_id if request_user_id is not None else message.from_user.id
+            )
             user = await session.get(User, user_id)
             if not user or user.home_nation_id is None:
                 text = "🔴 حساب پیدا نشد. /start بزن."
