@@ -494,28 +494,30 @@ async def start(message: Message, state: FSMContext) -> None:
     if preferred_nation_id is not None:
         await state.update_data(preferred_nation_id=preferred_nation_id)
 
+    now = datetime.now()
+    date_text = to_fa(now.strftime("%Y/%m/%d"))
+    time_text = to_fa(now.strftime("%H:%M"))
+
+    # /start is intentionally a simple welcome surface.
+    # Detailed player data belongs to dedicated sections such as the portfolio.
     if user is not None:
-        await show_dashboard(message, user)
-        return
+        text = f"""🌐 <b>OPEX MONEY</b>
 
+به اقتصاد زنده OPEX MONEY خوش اومدی.
 
-    text = """
-🌐 <b>به OPEX MONEY خوش اومدی</b>
+🎯 <b>تصمیم بگیر، معامله کن، رشد کن.</b>
 
-اینجا فقط پول جمع نمی‌کنی.
-ملتت رو انتخاب می‌کنی، ارز می‌خری و می‌فروشی
-و تصمیم‌هات روی اقتصاد زنده بازی اثر می‌ذاره.
+📅 {date_text}
+🕐 {time_text}"""
+    else:
+        text = f"""🌐 <b>به OPEX MONEY خوش اومدی</b>
 
-🎯 <b>هدف ساده‌ست:</b> با تصمیم‌های بهتر، ارزش دارایی‌هات رو بیشتر کن؛
-بعد رتبه‌ات رو بالا ببر و وقتی آماده شدی، وارد بازی ملت‌سازی شو.
+اقتصاد زنده است؛ تصمیم‌های تو مهم‌اند.
 
-<b>شروع بازی فقط ۳ قدمه:</b>
-۱) هویتت رو بساز
-۲) ۵۰۰ واحد سرمایه بگیر
-۳) اولین معامله‌ات رو انجام بده
+🎯 <b>تصمیم بگیر، معامله کن، رشد کن.</b>
 
-آماده‌ای وارد اقتصاد بشی؟
-"""
+📅 {date_text}
+🕐 {time_text}"""
 
     await message.answer(
         rtl_html(text),
