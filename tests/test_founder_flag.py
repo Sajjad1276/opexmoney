@@ -31,3 +31,4 @@ def test_nation_selection_keyboard_uses_persisted_flag():
 
     assert button.text.startswith("🇯🇵 Sakura")
     assert button.callback_data == "confirm_nation:42"
+    assert keyboard.inline_keyboard[-1][0].callback_data == "start_founder"
