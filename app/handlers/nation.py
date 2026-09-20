@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import html
+
 from aiogram import F, Router
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from sqlalchemy import select
@@ -9,7 +11,8 @@ from app.database.session import async_session
 from app.handlers.start import show_dashboard
 from app.keyboards.inline import nation_panel_keyboard
 from app.services.user_service import is_fully_registered
-from app.services.nation_service import get_user_active_nation_context
+from app.utils.formatting import fmt_pct, fmt_rate, get_rate_change, get_rate_emoji
+from app.services.nation_service import get_nation_rank, get_user_active_nation_context
 from app.utils.ui import send_submenu_panel
 
 nation_router = Router(name="nation")
@@ -59,6 +62,56 @@ async def open_nations(message: Message) -> None:
         reply_markup=nation_panel_keyboard(is_manager, nation_id),
         parse_mode="HTML",
     )
+
+
+@nation_router.callback_query(F.data.regexp(r"^nation_stats_\d+$"))
+async def nation_stats_callback(call: CallbackQuery) -> None:
+    nation_id = int((call.data or "").rsplit("_", 1)[1])
+    async with async_session() as session:
+        async with session.begin():
+            nation = await session.get(Nation, nation_id)
+            if nation is None or not nation.is_active:
+                await call.answer("⚠️ این ملت دیگر فعال نیست.", show_alert=True)
+                return
+            rank = nation.nation_rank or await get_nation_rank(session, nation.nation_id)
+
+    text = (
+        f"{html.escape(nation.flag_emoji or '🏴')} <b>آمار ملت «{html.escape(nation.name)}»</b>\n"
+        "<blockquote>⁠</blockquote>\n"
+        f"👥 اعضا: <b>{nation.member_count}</b> نفر\n"
+        f"💱 ارز: <code>{html.escape(nation.currency_code)}</code>\n"
+        f"📈 نرخ: <b>{fmt_rate(nation.exchange_rate)} دلار</b>\n"
+        f"🏆 رتبه جهانی: <b>#{rank}</b>\n"
+        f"📊 حجم ۲۴ ساعت: <b>{nation.trade_volume_24h}</b> دلار\n"
+        f"🟢 فعالیت ۲۴ ساعت: <b>{nation.active_members_24h}</b> عضو"
+    )
+    if call.message:
+        await call.message.edit_text(text, parse_mode="HTML")
+    await call.answer()
+
+
+@nation_router.callback_query(F.data.regexp(r"^nation_rate_\d+$"))
+async def nation_rate_callback(call: CallbackQuery) -> None:
+    nation_id = int((call.data or "").rsplit("_", 1)[1])
+    async with async_session() as session:
+        async with session.begin():
+            nation = await session.get(Nation, nation_id)
+            if nation is None or not nation.is_active:
+                await call.answer("⚠️ این ملت دیگر فعال نیست.", show_alert=True)
+                return
+
+    change = get_rate_change(nation)
+    text = (
+        f"{html.escape(nation.flag_emoji or '🏴')} <b>نرخ لحظه‌ای «{html.escape(nation.name)}»</b>\n"
+        "<blockquote>⁠</blockquote>\n"
+        f"💱 <code>1 {html.escape(nation.currency_code)}</code> = <b>{fmt_rate(nation.exchange_rate)} دلار</b>\n"
+        f"{get_rate_emoji(change)} تغییر ۲۴ ساعت: <b>{fmt_pct(change)}</b>\n"
+        f"↔️ نرخ قبلی: <b>{fmt_rate(nation.rate_prev)} دلار</b>\n"
+        "⏱ نرخ با فعالیت اقتصاد ملت به‌روزرسانی می‌شود."
+    )
+    if call.message:
+        await call.message.edit_text(text, parse_mode="HTML")
+    await call.answer()
 
 
 @nation_router.callback_query(F.data == "back_to_dashboard")
@@ -129,9 +182,9 @@ async def my_nations(call: CallbackQuery) -> None:
             f"{nation.flag_emoji or '🏴'} <b>{nation.name}</b>\n"
             "<blockquote>⁠</blockquote>\n"
             f"💱 ارز: <b>{nation.currency_code}</b>\n"
-            f"📈 نرخ: <b>{nation.exchange_rate}</b> ΩXR\n"
+            f"📈 نرخ: <b>{fmt_rate(nation.exchange_rate)}</b> دلار\n"
             f"👥 اعضا: <b>{nation.member_count}</b>\n"
-            f"🏦 خزانه: <b>{nation.treasury}</b> ΩXR\n\n"
+            f"🏦 خزانه: <b>{nation.treasury}</b> دلار\n\n"
             "از دکمه‌های زیر وارد بخش‌های ملت شو."
         )
         markup = nation_panel_keyboard(manager, nation.nation_id)
