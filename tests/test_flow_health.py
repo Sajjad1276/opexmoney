@@ -128,7 +128,7 @@ def test_dynamic_keyboard_callbacks_are_not_empty():
     markup = nation_selection_keyboard(
         [SimpleNamespace(name="Test", currency_code="TST", nation_id=101, member_count=1)]
     )
-    assert _button_callback_values(markup) == ["confirm_nation:101"]
+    assert _button_callback_values(markup) == ["confirm_nation:101", "start_founder"]
 
     markup = trade_preview_keyboard(101, "100", "buy")
     assert "cbuy_101_100" in _button_callback_values(markup)
