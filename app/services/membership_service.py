@@ -10,6 +10,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.session import async_session
+from app.services.user_service import sync_user_balance
 from app.database.models import (
     CurrencyHolding,
     Nation,
@@ -192,6 +193,9 @@ async def _ensure_registered_user_projection(
     if user.home_nation_id is None:
         user.home_nation_id = nation.nation_id
 
+    if user.home_nation_id == nation.nation_id:
+        await sync_user_balance(session, user.user_id)
+
     return user, created
 
 
@@ -204,6 +208,7 @@ async def sync_telegram_membership(
     is_member: bool,
     observed_at: datetime | None = None,
     source: str = "chat_member",
+    project_game_membership: bool = True,
 ) -> MembershipSyncResult | None:
     observed_at = observed_at or datetime.utcnow()
 
@@ -235,7 +240,7 @@ async def sync_telegram_membership(
         observed_at=observed_at,
     )
 
-    previous_active = bool(row.is_active)
+    previous_active = False if created else bool(row.is_active)
     active_now = telegram_status_is_active(telegram_status, is_member)
     previously_active = previous_active or (
         created and legacy_member is not None
@@ -260,12 +265,13 @@ async def sync_telegram_membership(
     user_registered = user is not None and bool((user.username or "").strip())
 
     if active_now:
-        user, _created_projection = await _ensure_registered_user_projection(
-            session,
-            nation=nation,
-            user_id=telegram_user_id,
-        )
-        user_registered = user is not None and bool((user.username or "").strip())
+        if project_game_membership:
+            user, _created_projection = await _ensure_registered_user_projection(
+                session,
+                nation=nation,
+                user_id=telegram_user_id,
+            )
+            user_registered = user is not None and bool((user.username or "").strip())
     elif user_registered:
         if became_inactive and telegram_status == "kicked":
             await convert_holding_to_xr(
@@ -314,6 +320,8 @@ async def sync_telegram_membership(
                 .limit(1)
             )
             user.home_nation_id = fallback_nation_id
+            if fallback_nation_id is None:
+                user.role = "player"
 
     action_type: str | None = None
     if became_active:

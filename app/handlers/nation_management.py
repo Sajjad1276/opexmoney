@@ -575,27 +575,126 @@ async def _join_user(
                 if nation is None or not nation.is_active:
                     raise ValueError("⚠️ این ملت فعال نیست.")
 
-                result = await sync_telegram_membership(
-                    session,
-                    group_id=nation.group_id,
-                    telegram_user_id=user_id,
-                    telegram_status=status,
-                    is_member=is_member,
-                    observed_at=datetime.utcnow(),
-                    source="private_join_verification",
-                )
-                if result is None or not result.active:
+                if (
+                    user.home_nation_id is not None
+                    and user.home_nation_id != nation.nation_id
+                ):
+                    raise ValueError("⚠️ تو همین الان عضو یک ملت دیگه هستی.")
+
+                policy = (nation.join_policy or "OPEN").upper()
+
+                if policy == "INVITE_ONLY" and invite_code != nation.invite_code:
                     raise ValueError(
-                        "⚠️ عضویت تلگرامی این ملت تأیید نشد."
+                        "🔐 این ملت فقط با کد دعوت عضو جدید می‌پذیره.\n"
+                        f"کد رو با این قالب بفرست: /join_nation {nation_id} CODE"
                     )
 
-                joined_user = user
-                joined_confirmed = result.became_active
-                result_message = (
-                    f"🎉 به «{nation.name}» پیوستی!"
-                    if result.became_active
-                    else f"✅ عضویتت در «{nation.name}» تأیید شد."
-                )
+                if policy == "APPROVAL":
+                    result = await sync_telegram_membership(
+                        session,
+                        group_id=nation.group_id,
+                        telegram_user_id=user_id,
+                        telegram_status=status,
+                        is_member=is_member,
+                        observed_at=datetime.utcnow(),
+                        source="private_join_verification_approval",
+                        project_game_membership=False,
+                    )
+                    if result is None or not result.active:
+                        raise ValueError("⚠️ عضویت تلگرامی این ملت تأیید نشد.")
+
+                    pending = await session.scalar(
+                        select(NationJoinRequest)
+                        .where(
+                            NationJoinRequest.nation_id == nation_id,
+                            NationJoinRequest.user_id == user_id,
+                            NationJoinRequest.status == "pending",
+                        )
+                        .with_for_update()
+                        .limit(1)
+                    )
+                    if pending is not None:
+                        result_message = "📝 درخواستت قبلاً ثبت شده و هنوز در حال بررسیه."
+                    else:
+                        request = NationJoinRequest(
+                            nation_id=nation_id,
+                            user_id=user_id,
+                            status="pending",
+                            expires_at=_now() + timedelta(hours=48),
+                        )
+                        session.add(request)
+                        await session.flush()
+
+                        admin_rows = (
+                            await session.execute(
+                                select(NationMember.user_id).where(
+                                    NationMember.nation_id == nation_id,
+                                    NationMember.is_active.is_(True),
+                                    NationMember.role.in_(
+                                        [
+                                            NationMemberRole.FOUNDER,
+                                            NationMemberRole.MINISTER,
+                                        ]
+                                    ),
+                                )
+                            )
+                        ).scalars().all()
+                        pending_admin_ids = list(admin_rows)
+                        result_message = "✅ درخواست عضویت ارسال شد. تا 48 ساعت فرصت بررسی دارد."
+
+                    joined_user = user
+                else:
+                    result = await sync_telegram_membership(
+                        session,
+                        group_id=nation.group_id,
+                        telegram_user_id=user_id,
+                        telegram_status=status,
+                        is_member=is_member,
+                        observed_at=datetime.utcnow(),
+                        source="private_join_verification",
+                        project_game_membership=True,
+                    )
+                    if result is None or not result.active:
+                        raise ValueError("⚠️ عضویت تلگرامی این ملت تأیید نشد.")
+
+                    joined_user = user
+                    joined_confirmed = result.became_active
+                    result_message = (
+                        f"🎉 به «{nation.name}» پیوستی!"
+                        if result.became_active
+                        else f"✅ عضویتت در «{nation.name}» تأیید شد."
+                    )
+
+        if pending_admin_ids and nation is not None and joined_user is not None:
+            for admin_id in pending_admin_ids:
+                try:
+                    await bot.send_message(
+                        admin_id,
+                        (
+                            f"📝 <b>درخواست عضویت جدید</b>\n"
+                            f"🏛 ملت: <b>{html.escape(nation.name)}</b>\n"
+                            f"👤 کاربر: <b>{_safe_name(joined_user, joined_user.user_id)}</b>\n"
+                            "⏳ اعتبار درخواست: 48 ساعت"
+                        ),
+                        reply_markup=InlineKeyboardMarkup(
+                            inline_keyboard=[
+                                [
+                                    InlineKeyboardButton(
+                                        text="✅ تأیید",
+                                        callback_data=f"nm:approve:{nation_id}:{joined_user.user_id}",
+                                    ),
+                                    InlineKeyboardButton(
+                                        text="❌ رد",
+                                        callback_data=f"nm:reject:{nation_id}:{joined_user.user_id}",
+                                    ),
+                                ]
+                            ]
+                        ),
+                        parse_mode="HTML",
+                    )
+                except Exception:
+                    logger.exception("Could not notify join approver %s", admin_id)
+            return result_message, nation
 
         if joined_confirmed and joined_user is not None:
             try:
