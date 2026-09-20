@@ -116,25 +116,42 @@ def _callback_handler_specs() -> list[tuple[str, str, Path]]:
                 continue
             if not _dotted(node.func).endswith(".callback_query"):
                 continue
+
+            # Callback filters can be wrapped alongside StateFilter or other
+            # filters. Walk each decorator argument recursively so the health
+            # check sees the actual F.data predicate instead of only the first
+            # AST level.
             for filter_node in node.args:
-                if isinstance(filter_node, ast.Compare) and len(filter_node.ops) == 1:
-                    if _dotted(filter_node.left) == "F.data" and isinstance(
-                        filter_node.comparators[0], ast.Constant
-                    ):
-                        value = filter_node.comparators[0].value
-                        if isinstance(value, str) and isinstance(filter_node.ops[0], ast.Eq):
-                            specs.append(("exact", value, path))
-                if isinstance(filter_node, ast.Call):
-                    func = _dotted(filter_node.func)
-                    if func in {"F.data.regexp", "F.data.startswith", "F.data.in_"}:
-                        if filter_node.args:
-                            arg = filter_node.args[0]
-                            if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
-                                specs.append((func.split(".")[-1], arg.value, path))
-                            elif isinstance(arg, (ast.Set, ast.List, ast.Tuple)):
-                                for element in arg.elts:
-                                    if isinstance(element, ast.Constant) and isinstance(element.value, str):
-                                        specs.append(("exact", element.value, path))
+                for candidate in ast.walk(filter_node):
+                    if isinstance(candidate, ast.Compare) and len(candidate.ops) == 1:
+                        if _dotted(candidate.left) == "F.data" and isinstance(
+                            candidate.comparators[0], ast.Constant
+                        ):
+                            value = candidate.comparators[0].value
+                            if isinstance(value, str):
+                                if isinstance(candidate.ops[0], ast.Eq):
+                                    specs.append(("exact", value, path))
+                                elif isinstance(candidate.ops[0], ast.NotEq):
+                                    continue
+
+                    if not isinstance(candidate, ast.Call):
+                        continue
+
+                    func = _dotted(candidate.func)
+                    if func not in {"F.data.regexp", "F.data.startswith", "F.data.in_"}:
+                        continue
+
+                    if not candidate.args:
+                        continue
+
+                    arg = candidate.args[0]
+                    if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+                        specs.append((func.split(".")[-1], arg.value, path))
+                    elif isinstance(arg, (ast.Set, ast.List, ast.Tuple)):
+                        for element in arg.elts:
+                            if isinstance(element, ast.Constant) and isinstance(element.value, str):
+                                specs.append(("exact", element.value, path))
+
     return specs
 
 
