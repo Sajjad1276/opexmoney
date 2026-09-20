@@ -120,7 +120,13 @@ async def run_startup_smoke_test(
     try:
         phase2_tables = ("proposals", "votes", "rule_overrides", "governance_ledger",
                          "player_temporal_profiles", "behavior_snapshots")
-        nation_tables = ("nation_members", "nation_logs", "nation_join_requests", "nation_wars")
+        nation_tables = (
+            "nation_members",
+            "nation_logs",
+            "nation_join_requests",
+            "nation_wars",
+            "nation_telegram_members",
+        )
         missing_phase2 = [x for x in phase2_tables if not await _table_exists(x)]
         missing_nation = [x for x in nation_tables if not await _table_exists(x)]
         if missing_phase2:
