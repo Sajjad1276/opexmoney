@@ -132,7 +132,7 @@ def _nation_page_keyboard(
         rows.append(
             [
                 InlineKeyboardButton(
-                    text="{0} {1} | 💰 نرخ: {2} ΩXR | 👥 {3} نفر".format(
+                    text="{0} {1} | 💰 نرخ: {2} دلار | 👥 {3} نفر".format(
                         html.escape(nation.flag_emoji or "🏴"),
                         html.escape(nation.name),
                         fmt_rate(nation.exchange_rate),
@@ -227,7 +227,7 @@ def nation_list_text(user, trader_name: str, nations: list[Nation]) -> str:
         lines.extend(
             [
                 f"{html.escape(nation.flag_emoji or '🏴')} <b>{html.escape(nation.name)} · {html.escape(nation.currency_code)}</b>",
-                f"{get_rate_emoji(change)} <b>{fmt_rate(nation.exchange_rate)} ΩXR</b> · <i>{fmt_pct(change)} امروز</i>",
+                f"{get_rate_emoji(change)} <b>{fmt_rate(nation.exchange_rate)} دلار</b> · <i>{fmt_pct(change)} امروز</i>",
                 f"👥 {to_fa(nation.active_members_24h)} عضو · 🏆 رتبه #{to_fa(nation.nation_rank or 0)}",
             ]
         )
@@ -318,9 +318,9 @@ async def show_dashboard(
 
 {1}
 💰 <code>{2}</code>: <b>{3}</b>
-💎 <code>ΩXR</code>: <b>{4}</b>
+💎 <code>دلار</code>: <b>{4}</b>
 
-{5} نرخ ارز: <b>{6} ΩXR</b>
+{5} نرخ ارز: <b>{6} دلار</b>
 🏆 رتبه #{7} از {8}
 👥 {9} عضو
 ⏱ <i>{10} دقیقه پیش</i>
@@ -626,7 +626,7 @@ async def render_nation_profile(nation: Nation) -> str:
     🏴 <b>نام ملت</b>
     ─────────────────
     💰 <b>واحد پول:</b> {symbol}
-    📈 <b>نرخ ارز:</b> {rate} ΩXR  <u>(آپدیت 15 دقیقه پیش)</u>
+    📈 <b>نرخ ارز:</b> {rate} دلار  <u>(آپدیت 15 دقیقه پیش)</u>
     👥 <b>اعضا:</b> {member_count} نفر
     🏆 <b>رتبه جهانی:</b> #{rank}
     ⚔️ <b>وضعیت:</b> {status_emoji} {status_text}
@@ -689,7 +689,7 @@ async def render_nation_profile(nation: Nation) -> str:
 {0}
 ─────────────────
 💰 <b>واحد پول:</b> {1}
-📈 <b>نرخ ارز:</b> {2} ΩXR  <u>(آپدیت {3} دقیقه پیش)</u>
+📈 <b>نرخ ارز:</b> {2} دلار  <u>(آپدیت {3} دقیقه پیش)</u>
 👥 <b>اعضا:</b> {4} نفر
 🏆 <b>رتبه جهانی:</b> #{5}
 ⚔️ <b>وضعیت:</b> {6} {7}
@@ -807,7 +807,7 @@ async def _generate_personalized_welcome(
 نام بازیکن: {0}
 نام ملت: {1}
 واحد پول: {2}
-نرخ ارز: {3} ΩXR
+نرخ ارز: {3} دلار
 تعداد اعضا: {4}
 
 قواعد:
@@ -1161,10 +1161,10 @@ async def confirm_nation(call: CallbackQuery, state: FSMContext, bot: Bot) -> No
 {user_mention(call.from_user)}، شهروند رسمی این ملت شدی.
 
 💰 موجودی اولیه:
-<b>500 <code>{html.escape(nation.currency_code)}</code> ≈ {fmt_amount(initial_omx)} ΩXR</b>
+<b>500 <code>{html.escape(nation.currency_code)}</code> ≈ {fmt_amount(initial_omx)} دلار</b>
 
 ─────────────────
-{get_rate_emoji(get_rate_change(nation))} نرخ <code>{html.escape(nation.currency_code)}</code>: <b>{fmt_rate(nation.exchange_rate)} ΩXR</b>
+{get_rate_emoji(get_rate_change(nation))} نرخ <code>{html.escape(nation.currency_code)}</code>: <b>{fmt_rate(nation.exchange_rate)} دلار</b>
 <i>{fmt_pct(get_rate_change(nation))} نسبت به دیروز</i>
 
 🏆 رتبه #{to_fa(rank)} از {to_fa(total_nations)}
@@ -1189,7 +1189,7 @@ async def first_trade_tutorial(call: CallbackQuery, state: FSMContext) -> None:
         return
     receive_omx = Decimal("50") * nation.exchange_rate
     change = get_rate_change(nation)
-    text = ("⚡ <b>اولین معامله</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" f"📤 می‌فروشی:   <b>50 <code>{html.escape(nation.currency_code)}</code></b>\n" f"📥 دریافت می‌کنی: <b>{fmt_amount(receive_omx)} <code>ΩXR</code></b>\n\n─────────────────\n" f"💹 نرخ: <code>1 {html.escape(nation.currency_code)} = {fmt_rate(nation.exchange_rate)} ΩXR</code>\n" f"{get_rate_emoji(change)} تغییر 24h: <b>{fmt_pct(change)}</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    text = ("⚡ <b>اولین معامله</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" f"📤 می‌فروشی:   <b>50 <code>{html.escape(nation.currency_code)}</code></b>\n" f"📥 دریافت می‌کنی: <b>{fmt_amount(receive_omx)} <code>دلار</code></b>\n\n─────────────────\n" f"💹 نرخ: <code>1 {html.escape(nation.currency_code)} = {fmt_rate(nation.exchange_rate)} دلار</code>\n" f"{get_rate_emoji(change)} تغییر 24h: <b>{fmt_pct(change)}</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     await _safe_edit_text(call, text, trade_confirmation_keyboard())
     await call.answer()
 
@@ -1251,10 +1251,10 @@ async def confirm_first_trade(call: CallbackQuery, state: FSMContext) -> None:
     text = (
         "✅ <b>معامله انجام شد.</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"📤 فروختی:   <s>50 {html.escape(nation.currency_code)}</s>\n"
-        f"📥 دریافتی:  <b>{fmt_amount(receive_omx)} ΩXR</b>\n\n"
+        f"📥 دریافتی:  <b>{fmt_amount(receive_omx)} دلار</b>\n\n"
         "─────────────────\n"
         f"💰 موجودی:\n<code>{html.escape(nation.currency_code)}</code>: <b>{fmt_amount(holding.amount)}</b>\n"
-        f"<code>ΩXR</code>: <b>{fmt_amount(user.xr_balance)}</b>\n\n"
+        f"<code>دلار</code>: <b>{fmt_amount(user.xr_balance)}</b>\n\n"
         "─────────────────\n✨ <b>«اولین قدم در بازارهای OPEX» باز شد.</b>\n"
         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     )
