@@ -63,7 +63,7 @@ def test_listed_currencies_keyboard_paginates_with_previous_and_next():
     first_callbacks = _callbacks(first)
     assert "market_listed:1" in first_callbacks
     assert "market_listed:-1" not in first_callbacks
-    assert first.inline_keyboard[0][1].text == "صفحه 1 از 10"
+    assert first.inline_keyboard[0][0].text == "صفحه 1 از 10"
 
     last = listed_currencies_keyboard(page=9, total_pages=10)
     last_callbacks = _callbacks(last)
