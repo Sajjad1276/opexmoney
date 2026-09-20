@@ -13,6 +13,7 @@ from aiogram.types import (
     Message,
 )
 
+from app.database.models import User
 from app.database.session import async_session
 from app.services.portfolio_service import get_portfolio_data
 from app.utils.formatting import fmt_amount, to_fa
