@@ -70,12 +70,13 @@ async def get_portfolio_data(session: AsyncSession, user_id: int) -> dict:
         value_in_xr = amount * exchange_rate
 
         if yesterday_rate is None or Decimal(str(yesterday_rate)) == 0:
+            previous_rate_for_total = exchange_rate
             rate_change_pct = Decimal("0.0")
         else:
-            yesterday_rate = Decimal(str(yesterday_rate))
+            previous_rate_for_total = Decimal(str(yesterday_rate))
             rate_change_pct = (
-                (exchange_rate - yesterday_rate)
-                / yesterday_rate
+                (exchange_rate - previous_rate_for_total)
+                / previous_rate_for_total
                 * Decimal("100")
             )
 
@@ -87,8 +88,7 @@ async def get_portfolio_data(session: AsyncSession, user_id: int) -> dict:
             rate_emoji = "➡️"
 
         total_xr += value_in_xr
-        if yesterday_rate is not None:
-            previous_total_xr += amount * Decimal(str(yesterday_rate))
+        previous_total_xr += amount * previous_rate_for_total
         holdings.append(
             {
                 "nation_id": int(nation_id),
