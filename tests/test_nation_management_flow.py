@@ -34,6 +34,19 @@ class FakeBot:
         self.messages.append((user_id, text))
         return SimpleNamespace()
 
+    async def get_chat_member(self, group_id, user_id):
+        return SimpleNamespace(
+            status="member",
+            is_member=True,
+            user=SimpleNamespace(id=user_id),
+        )
+
+    async def ban_chat_member(self, group_id, user_id):
+        return SimpleNamespace()
+
+    async def unban_chat_member(self, group_id, user_id, **kwargs):
+        return SimpleNamespace()
+
 
 class FakeCall:
     def __init__(self, user_id: int, data: str):
