@@ -28,7 +28,7 @@ from app.keyboards.inline import (
     trade_preview_keyboard,
     welcome_keyboard,
 )
-from app.keyboards.reply import main_menu_keyboard
+from app.keyboards.reply import main_menu_keyboard, new_player_menu_keyboard
 
 
 def _button_callback_values(markup):
@@ -135,6 +135,20 @@ def test_dynamic_keyboard_callbacks_are_not_empty():
 
     markup = trade_preview_keyboard(101, "100", "sell")
     assert "csell_101_100" in _button_callback_values(markup)
+
+
+def test_new_player_reply_keyboard_is_focused():
+    texts = [
+        button.text
+        for row in new_player_menu_keyboard().keyboard
+        for button in row
+    ]
+    assert texts == ["🎯 قدم بعدی", "💰 پول من", "🌍 ملت من"]
+
+
+def test_first_trade_keyboard_starts_the_trade_directly():
+    callbacks = _button_callback_values(first_trade_keyboard())
+    assert callbacks == ["confirm_first_trade", "skip_first_trade"]
 
 
 def test_main_reply_keyboard_has_only_text_buttons():
