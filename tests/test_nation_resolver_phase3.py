@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from uuid import uuid4
 
 import pytest
 from sqlalchemy import delete, select
@@ -73,9 +74,13 @@ async def _seed_human(*, telegram_active: bool, game_member: bool = True):
                 xr_balance=Decimal("0"),
                 role="player",
             )
+            currency_code = "".join(
+                chr(65 + int(uuid4().hex[offset:offset + 2], 16) % 26)
+                for offset in range(0, 8, 2)
+            )
             nation = Nation(
                 name="Resolver Republic",
-                currency_code="R941",
+                currency_code=currency_code,
                 group_id=HUMAN_GROUP_ID,
                 founder_user_id=HUMAN_USER_ID,
                 exchange_rate=Decimal("1"),
