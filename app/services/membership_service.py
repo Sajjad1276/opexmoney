@@ -402,3 +402,38 @@ async def active_telegram_membership_count(
         )
         or 0
     )
+
+
+async def reconcile_human_nation_member_counts(bot) -> int:
+    """Refresh human-nation counts from Telegram without mutating membership rows."""
+    async with __import__("app.database.session", fromlist=["async_session"]).async_session() as session:
+        result = await session.execute(
+            select(Nation)
+            .where(
+                Nation.group_id.is_not(None),
+                Nation.is_active.is_(True),
+                Nation.is_ai.is_(False),
+            )
+        )
+        nations = list(result.scalars().all())
+
+    updated = 0
+    for nation in nations:
+        try:
+            telegram_count = await bot.get_chat_member_count(nation.group_id)
+        except Exception:
+            continue
+
+        async with __import__("app.database.session", fromlist=["async_session"]).async_session() as session:
+            async with session.begin():
+                current = await session.get(
+                    Nation,
+                    nation.nation_id,
+                    with_for_update=True,
+                )
+                if current is None or not current.is_active or current.is_ai:
+                    continue
+                current.member_count = max(0, int(telegram_count))
+                updated += 1
+
+    return updated
