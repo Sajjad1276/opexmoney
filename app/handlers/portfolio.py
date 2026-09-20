@@ -104,7 +104,7 @@ def build_portfolio_text(data: dict) -> str:
     return "\n".join(f"{RLM}{line}" for line in lines)
 
 
-@router.message(F.text == "📊 پورتفولیو")
+@router.message(F.text.in_({"📊 پورتفولیو", "💼 دارایی‌های من"}))
 async def show_portfolio(message: Message) -> None:
     try:
         async with async_session() as session:
