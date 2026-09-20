@@ -192,6 +192,10 @@ async def _ensure_registered_user_projection(
     if user.home_nation_id is None:
         user.home_nation_id = nation.nation_id
 
+    # Keep the legacy User.balance field synchronized with the canonical
+    # nation CurrencyHolding ledger.
+    user.balance = holding.amount
+
     return user, created
 
 
