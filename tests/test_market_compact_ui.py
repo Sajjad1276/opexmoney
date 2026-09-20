@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from app.keyboards.inline import market_keyboard
+from aiogram.enums import ButtonStyle
+
+from app.keyboards.inline import (
+    listed_currencies_keyboard,
+    market_keyboard,
+)
 
 
 def _callbacks(markup):
@@ -13,7 +18,12 @@ def _callbacks(markup):
 
 
 def test_market_keyboard_uses_compact_market_tools():
-    callbacks = _callbacks(market_keyboard())
+    markup = market_keyboard()
+    callbacks = _callbacks(markup)
+
+    assert markup.inline_keyboard[0][0].text == "📋 ارزهای لیست شده"
+    assert markup.inline_keyboard[0][0].callback_data == "market_listed_currencies"
+    assert markup.inline_keyboard[0][0].style == ButtonStyle.PRIMARY
 
     assert "market_chart_select" in callbacks
     assert "alert_create" in callbacks
@@ -47,3 +57,16 @@ def test_legacy_market_keyboard_wrapper_is_also_compact():
         callback.startswith("market_chart:")
         for callback in callbacks
     )
+
+def test_listed_currencies_keyboard_paginates_with_previous_and_next():
+    first = listed_currencies_keyboard(page=0, total_pages=10)
+    first_callbacks = _callbacks(first)
+    assert "market_listed:1" in first_callbacks
+    assert "market_listed:-1" not in first_callbacks
+    assert first.inline_keyboard[0][1].text == "صفحه 1 از 10"
+
+    last = listed_currencies_keyboard(page=9, total_pages=10)
+    last_callbacks = _callbacks(last)
+    assert "market_listed:8" in last_callbacks
+    assert "market_listed:10" not in last_callbacks
+    assert last.inline_keyboard[0][1].text == "صفحه 10 از 10"
