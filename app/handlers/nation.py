@@ -10,6 +10,7 @@ from app.handlers.start import show_dashboard
 from app.keyboards.inline import nation_panel_keyboard
 from app.services.user_service import is_fully_registered
 from app.services.nation_service import get_user_active_nation_context
+from app.utils.ui import send_submenu_panel
 
 nation_router = Router(name="nation")
 
@@ -51,10 +52,10 @@ async def open_nations(message: Message) -> None:
         )
         return
 
-    await message.answer(
-        "🌍 <b>ملت‌ها</b>\n"
-        "اینجا می‌تونی ملت‌ها رو بررسی کنی.\n"
-        "از گزینه‌ها برای ادامه استفاده کن.",
+    await send_submenu_panel(
+        message,
+        "🌍 <b>ملت من</b>\n"
+        "اینجا می‌تونی ملت خودت رو بررسی کنی و بعداً وارد بخش‌های عمیق‌تر بشی.",
         reply_markup=nation_panel_keyboard(is_manager, nation_id),
         parse_mode="HTML",
     )
