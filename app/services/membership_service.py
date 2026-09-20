@@ -310,7 +310,7 @@ async def sync_telegram_membership(
         nation_id=nation.nation_id,
         telegram_user_id=telegram_user_id,
         active=active_now,
-        changed=created or became_active or became_inactive,
+        changed=became_active or became_inactive,
         became_active=became_active or (created and active_now),
         became_inactive=became_inactive,
         action_type=action_type,
