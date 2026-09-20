@@ -151,6 +151,9 @@ async def bind_group(
             draft.status = "EXPIRED"
             raise ValueError("فرآیند تأسیس منقضی شده. دوباره شروع کن.")
 
+        if draft.group_id not in (None, group_id):
+            raise ValueError("این فرآیند از قبل به یک گروه دیگر متصل شده است.")
+
         existing_draft = await session.scalar(
             select(NationFoundingDraft)
             .where(
@@ -325,3 +328,65 @@ async def finalize_draft(
         await session.flush()
 
         return nation, int(draft.group_id)
+
+
+
+async def reset_group(
+    session: AsyncSession,
+    *,
+    founder_user_id: int,
+) -> NationFoundingDraft:
+    async with session.begin():
+        draft = await session.scalar(
+            select(NationFoundingDraft)
+            .where(
+                NationFoundingDraft.founder_user_id == founder_user_id,
+                NationFoundingDraft.status.in_(ACTIVE_DRAFT_STATUSES),
+            )
+            .with_for_update()
+            .limit(1)
+        )
+        if draft is None:
+            raise ValueError("فرآیند تأسیس فعالی پیدا نشد.")
+
+        draft.group_id = None
+        draft.group_title = None
+        draft.group_username = None
+        draft.group_type = None
+        draft.nation_name = None
+        draft.currency_code = None
+        draft.flag_emoji = "🏴"
+        draft.launch_token = token_urlsafe(24)
+        draft.status = "WAITING_GROUP"
+        draft.expires_at = _utcnow() + DRAFT_TTL
+        await session.flush()
+        return draft
+
+
+async def refresh_currency_code(
+    session: AsyncSession,
+    *,
+    founder_user_id: int,
+    currency_code: str,
+) -> NationFoundingDraft:
+    async with session.begin():
+        draft = await session.scalar(
+            select(NationFoundingDraft)
+            .where(
+                NationFoundingDraft.founder_user_id == founder_user_id,
+                NationFoundingDraft.status == "REVIEW",
+            )
+            .with_for_update()
+            .limit(1)
+        )
+        if draft is None:
+            raise ValueError("صفحه تأیید پیدا نشد.")
+
+        if _is_expired(draft):
+            draft.status = "EXPIRED"
+            raise ValueError("فرآیند تأسیس منقضی شده. دوباره شروع کن.")
+
+        draft.currency_code = currency_code
+        draft.expires_at = _utcnow() + DRAFT_TTL
+        await session.flush()
+        return draft
