@@ -13,7 +13,6 @@ from aiogram.types import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     Message,
-    ReplyKeyboardRemove,
 )
 from sqlalchemy import select
 
@@ -169,13 +168,13 @@ def _format_mover(code: str | None, pct: float) -> str:
 def market_text(user, overview: dict, active: int) -> str:
     lines = [
         "💹 <b>بازار OPEX</b>",
-        "━━━━━━━━━━━━━━━━━━━━━━━━",
+        "<blockquote>⁠</blockquote>",
         f"💰 دلار: <b>{fmt_amount(user.xr_balance)}</b> · "
         f"{html.escape(user.home_nation_id and overview['currencies'][0]['nation'].currency_code or '—')}",
         "",
-        "━━━━━━━━━━━━━━━",
+        "<blockquote>⁠</blockquote>",
         overview["mood"],
-        "━━━━━━━━━━━━━━━",
+        "<blockquote>⁠</blockquote>",
     ]
 
     winner_code, winner_pct = overview["top_mover"]["winner"]
@@ -215,7 +214,7 @@ def market_text(user, overview: dict, active: int) -> str:
 
     lines.extend(
         [
-            "━━━━━━━━━━━━━━━━━━━━━━━━",
+            "<blockquote>⁠</blockquote>",
             f"⏱ بروزرسانی نرخ‌ها هر ۱۵ دقیقه · 👥 {to_fa(active)} عضو فعال ملت اصلی",
         ]
     )
@@ -252,7 +251,6 @@ async def render_market(message: Message, edit_call=None):
     if edit_call:
         await safe_edit(edit_call, text, markup)
     else:
-        await message.answer("\u2060", reply_markup=ReplyKeyboardRemove())
         await message.answer(
             text,
             reply_markup=markup,
@@ -448,7 +446,7 @@ async def alert_list_callback(
 
     lines = [
         "🔔 <b>هشدارهای قیمت من</b>",
-        "━━━━━━━━━━━━━━━━━━━━",
+        "<blockquote>⁠</blockquote>",
     ]
     rows: list[list[InlineKeyboardButton]] = []
     if not alerts:
@@ -529,7 +527,7 @@ async def market_buy(call: CallbackQuery, state: FSMContext):
 
         text = (
             "📈 <b>خرید ارز</b>\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>⁠</blockquote>\n"
             f"💰 دلار موجود: <b>{fmt_amount(user.xr_balance)}</b>\n\n"
             "<b>کدوم ارز می‌خوای بخری؟</b>"
         )
@@ -632,22 +630,22 @@ async def make_buy_preview(
             )
             text = (
                 "📈 <b>تأیید خرید</b>\n"
-                "━━━━━━━━━━━━━━━━━━━━\n"
+                "<blockquote>⁠</blockquote>\n"
                 f"📤 پرداخت:   <b>{fmt_amount(spend)} دلار</b>\n"
                 f"📥 دریافت:   <b>{fmt_amount(calc['receive'])} "
                 f"{html.escape(nation.currency_code)}</b>\n\n"
-                "─────────────────\n"
+                "<blockquote>⁠</blockquote>\n"
                 f"💹 نرخ: <code>1 {html.escape(nation.currency_code)} = "
                 f"{fmt_rate(nation.exchange_rate)} دلار</code>\n"
                 f"📋 کارمزد: <b>{fmt_amount(calc['fee'])} دلار</b> "
                 f"({_fmt_rule_percent(fee_rate)})\n"
                 f"{peak_signal}\n"
-                "─────────────────\n"
+                "<blockquote>⁠</blockquote>\n"
                 "<b>موجودی بعد از معامله:</b>\n"
                 f"دلار: <b>{fmt_amount(user.xr_balance - spend)}</b>\n"
                 f"{html.escape(nation.currency_code)}: "
                 f"<b>{fmt_amount(current + calc['receive'])}</b>\n"
-                "━━━━━━━━━━━━━━━━━━━━"
+                "<blockquote>⁠</blockquote>"
             )
 
     await close_inline_panel(state, message.bot)
@@ -673,7 +671,7 @@ async def buy_currency(call, state):
 
         text = (
             f"📈 <b>خرید <code>{html.escape(nation.currency_code)}</code></b>\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>⁠</blockquote>\n"
             f"💹 نرخ: <code>1 {html.escape(nation.currency_code)} = "
             f"{fmt_rate(nation.exchange_rate)} دلار</code>\n"
             f"💰 موجودی: <b>{fmt_amount(user.xr_balance)} دلار</b>\n\n"
@@ -832,12 +830,12 @@ async def confirm_buy(call, state=None):
             )
             text = (
                 "✅ <b>خرید انجام شد.</b>\n"
-                "━━━━━━━━━━━━━━━━━━━━\n"
+                "<blockquote>⁠</blockquote>\n"
                 f"📤 پرداختی: <s>{fmt_amount(spend)} دلار</s>\n"
                 f"📥 دریافتی: <b>{fmt_amount(calc['receive'])} "
                 f"{html.escape(nation.currency_code)}</b>\n"
                 f"{peak_signal}\n"
-                "─────────────────\n"
+                "<blockquote>⁠</blockquote>\n"
                 "💰 موجودی:\n"
                 f"دلار: <b>{fmt_amount(user.xr_balance)}</b>\n"
                 f"{html.escape(nation.currency_code)}: "
@@ -882,7 +880,7 @@ async def market_sell(call, state):
         await safe_edit(
             call,
             "📉 <b>فروش ارز</b>\n"
-            "─────────────────\n"
+            "<blockquote>⁠</blockquote>\n"
             "هنوز ارزی برای فروش نداری.\n\n"
             "از 📈 خرید ارز شروع کن.",
             sell_currency_keyboard([]),
@@ -892,7 +890,7 @@ async def market_sell(call, state):
 
     text_lines = [
         "📉 <b>فروش ارز</b>",
-        "━━━━━━━━━━━━━━━━━━━━",
+        "<blockquote>⁠</blockquote>",
     ]
     if active_holdings:
         text_lines.append("<b>ارزهای قابل فروش:</b>")
@@ -957,7 +955,7 @@ async def sell_currency(call, state):
     await remember_inline_panel(state, call.message)
     text = (
         f"📉 <b>فروش <code>{html.escape(nation.currency_code)}</code></b>\n"
-        "━━━━━━━━━━━━━━━━━━━━\n"
+        "<blockquote>⁠</blockquote>\n"
         f"💹 نرخ: <code>1 {html.escape(nation.currency_code)} = "
         f"{fmt_rate(nation.exchange_rate)} دلار</code>\n"
         f"💰 موجودی: <b>{fmt_amount(holding.amount)} "
@@ -1053,22 +1051,22 @@ async def make_sell_preview(
             )
             text = (
                 "📉 <b>تأیید فروش</b>\n"
-                "━━━━━━━━━━━━━━━━━━━━\n"
+                "<blockquote>⁠</blockquote>\n"
                 f"📤 فروش:     <b>{fmt_amount(amount)} "
                 f"{html.escape(nation.currency_code)}</b>\n"
                 f"📥 دریافت:   <b>{fmt_amount(calc['receive'])} دلار</b>\n\n"
-                "─────────────────\n"
+                "<blockquote>⁠</blockquote>\n"
                 f"💹 نرخ: <code>1 {html.escape(nation.currency_code)} = "
                 f"{fmt_rate(nation.exchange_rate)} دلار</code>\n"
                 f"📋 کارمزد: <b>{fmt_amount(calc['fee'])} دلار</b> "
                 f"({_fmt_rule_percent(fee_rate)})\n"
                 f"{peak_signal}\n"
-                "─────────────────\n"
+                "<blockquote>⁠</blockquote>\n"
                 "<b>موجودی بعد از معامله:</b>\n"
                 f"دلار: <b>{fmt_amount(xr_after)}</b>\n"
                 f"{html.escape(nation.currency_code)}: "
                 f"<b>{fmt_amount(currency_after)}</b>\n"
-                "━━━━━━━━━━━━━━━━━━━━"
+                "<blockquote>⁠</blockquote>"
             )
 
     await close_inline_panel(state, message.bot)
@@ -1242,12 +1240,12 @@ async def confirm_sell(call, state=None):
             )
             text = (
                 "✅ <b>فروش انجام شد.</b>\n"
-                "━━━━━━━━━━━━━━━━━━━━\n"
+                "<blockquote>⁠</blockquote>\n"
                 f"📤 فروختی:  <b>{fmt_amount(amount)} "
                 f"{html.escape(nation.currency_code)}</b>\n"
                 f"📥 دریافتی: <b>{fmt_amount(calc['receive'])} دلار</b>\n"
                 f"{peak_signal}\n"
-                "─────────────────\n"
+                "<blockquote>⁠</blockquote>\n"
                 "💰 موجودی:\n"
                 f"دلار: <b>{fmt_amount(user.xr_balance)}</b>\n"
                 f"{html.escape(nation.currency_code)}: "
@@ -1296,7 +1294,7 @@ async def market_history(call):
 
     lines = [
         "📜 <b>تاریخچه</b>",
-        "━━━━━━━━━━━━━━━━━━━━",
+        "<blockquote>⁠</blockquote>",
     ]
     if not rows:
         lines.append("هنوز معامله‌ای انجام ندادی.")
