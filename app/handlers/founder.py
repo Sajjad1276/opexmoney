@@ -896,7 +896,7 @@ async def receive_currency_code(
     message: Message,
     state: FSMContext,
 ) -> None:
-    value = (message.text or "").strip().upper()
+    value = (message.text or "").strip()
     async with async_session() as session:
         try:
             draft = await set_currency_code(
