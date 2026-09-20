@@ -206,6 +206,12 @@ def founder_review_keyboard() -> InlineKeyboardMarkup:
             ],
             [
                 InlineKeyboardButton(
+                    text="🔄 تغییر گروه",
+                    callback_data="founder_edit_group",
+                )
+            ],
+            [
+                InlineKeyboardButton(
                     text="❌ انصراف",
                     callback_data="cancel_founder",
                     style=ButtonStyle.DANGER,
