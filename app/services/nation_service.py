@@ -572,18 +572,6 @@ async def create_nation(
                 )
             )
         session.add(
-            NationTelegramMember(
-                nation_id=nation.nation_id,
-                telegram_user_id=founder_user_id,
-                telegram_status="administrator",
-                is_member=True,
-                is_active=True,
-                joined_at=datetime.utcnow(),
-                left_at=None,
-                last_seen_at=datetime.utcnow(),
-            )
-        )
-        session.add(
             NationLog(
                 nation_id=nation.nation_id,
                 actor_id=founder_user_id,
