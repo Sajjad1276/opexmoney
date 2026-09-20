@@ -105,9 +105,7 @@ async def _has_active_telegram_membership(
     stmt = (
         select(NationTelegramMember.id)
         .where(
-            NationTelegramMember.user_id == user_id
-            if hasattr(NationTelegramMember, "user_id")
-            else NationTelegramMember.telegram_user_id == user_id,
+            NationTelegramMember.telegram_user_id == user_id,
             NationTelegramMember.nation_id == nation_id,
             NationTelegramMember.is_active.is_(True),
         )
