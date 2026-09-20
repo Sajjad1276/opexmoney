@@ -28,6 +28,45 @@ def confirm_trade_keyboard() -> InlineKeyboardMarkup:
     return trade_confirmation_keyboard()
 
 
+def suggested_name_keyboard(name: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(
+                text=f"✅ استفاده از «{name[:30]}»",
+                callback_data="use_suggested_name",
+                style=ButtonStyle.SUCCESS,
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="✏️ خودم نام انتخاب می‌کنم",
+                callback_data="choose_custom_name",
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="❌ انصراف",
+                callback_data="cancel_start",
+                style=ButtonStyle.DANGER,
+            )
+        ],
+    ])
+
+
+def more_menu_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="⚡ مأموریت‌ها", callback_data="missions_open"),
+            InlineKeyboardButton(text="🏦 خزانه", callback_data="treasury_open"),
+        ],
+        [
+            InlineKeyboardButton(text="📜 قوانین", callback_data="governance_main"),
+            InlineKeyboardButton(text="⚙️ تنظیمات", callback_data="settings:back"),
+        ],
+        [InlineKeyboardButton(text="↩️ بازگشت", callback_data="back_to_dashboard")],
+    ])
+
+
 def welcome_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🎮 شروع بازی", callback_data="start_game", style=ButtonStyle.SUCCESS)],
