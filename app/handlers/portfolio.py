@@ -56,7 +56,7 @@ def _format_rate_change(value) -> str:
 
 def build_portfolio_text(data: dict) -> str:
     lines = [
-        f"📊 <b>پورتفولیو {html.escape(data['username'])}</b>",
+        f"💼 <b>دارایی‌های {html.escape(data['username'])}</b>",
         "<blockquote>⁠</blockquote>",
         "💎 <b>دلار (ذخیره جهانی)</b>",
         f"   موجودی: <code>{_format_amount(data['xr_balance'])}</code> دلار",
