@@ -10,6 +10,7 @@ from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.session import async_session
+from app.services.nation_control import require_nation_control
 from app.database.models import (
     Nation,
     NationLog,
@@ -122,20 +123,19 @@ async def declare_war(
         if actor_user_id is None:
             raise ValueError("⛔ بنیان‌گذار ملت مشخص نیست.")
 
-        actor = await session.scalar(
-            select(NationMember)
-            .where(
-                NationMember.nation_id == declaring_nation_id,
-                NationMember.user_id == actor_user_id,
-                NationMember.is_active.is_(True),
+        try:
+            await require_nation_control(
+                session,
+                user_id=actor_user_id,
+                nation_id=declaring_nation_id,
+                allowed_roles={
+                    NationMemberRole.FOUNDER,
+                    NationMemberRole.MINISTER,
+                },
+                lock=True,
             )
-            .with_for_update()
-        )
-        if actor is None or _role_value(actor.role) not in {
-            NationMemberRole.FOUNDER.value,
-            NationMemberRole.MINISTER.value,
-        }:
-            raise ValueError("⛔ فقط بنیان‌گذار و وزیر می‌توانند جنگ اعلام کنند.")
+        except ValueError as exc:
+            raise ValueError("⛔ " + str(exc)) from exc
 
         existing_war = await session.scalar(
             select(NationWar)
