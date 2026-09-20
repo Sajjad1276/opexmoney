@@ -3,6 +3,7 @@ from __future__ import annotations
 from decimal import Decimal, ROUND_HALF_UP
 
 from app.services.rules.effects import apply_trade_benefit, calculate_trade_fee
+from config import settings
 
 _FA_DIGITS = str.maketrans("0123456789.-", "۰۱۲۳۴۵۶۷۸۹٫−")
 _FA_TO_LATIN = str.maketrans("۰۱۲۳۴۵۶۷۸۹٫٬−", "0123456789.,-")
@@ -128,17 +129,17 @@ def today_jalali() -> str:
 
 
 def imperial_datetime(now=None) -> tuple[str, str]:
-    """Return the game-local date/time in the Iranian Imperial calendar.
+    """Return the canonical game date/time for every user-facing timestamp.
 
-    The Imperial year is the Solar Hijri year plus 1180, so 1405 SH is
-    displayed as 2585 Imperial. The clock itself is unchanged and uses the
-    game's configured timezone.
+    The date uses the Iranian Imperial calendar (Solar Hijri year + 1180).
+    The clock is the game's configured local time and is not offset by the
+    Imperial calendar.
     """
     from datetime import datetime
     from zoneinfo import ZoneInfo
 
     if now is None:
-        now = datetime.now(ZoneInfo("Asia/Tehran"))
+        now = datetime.now(ZoneInfo(settings.temporal_timezone))
 
     jalali_year, jalali_month, jalali_day = gregorian_to_jalali(
         now.year,
