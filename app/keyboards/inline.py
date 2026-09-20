@@ -86,6 +86,13 @@ def welcome_keyboard() -> InlineKeyboardMarkup:
 def market_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [
+            InlineKeyboardButton(
+                text="📋 ارزهای لیست شده",
+                callback_data="market_listed_currencies",
+                style=ButtonStyle.PRIMARY,
+            ),
+        ],
+        [
             InlineKeyboardButton(text="🟢 خرید", callback_data="market_buy", style=ButtonStyle.SUCCESS),
             InlineKeyboardButton(text="🔴 فروش", callback_data="market_sell", style=ButtonStyle.DANGER),
         ],
@@ -100,6 +107,49 @@ def market_keyboard() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="🔄 بروزرسانی", callback_data="market_refresh")],
         [InlineKeyboardButton(text="🏠 منوی اصلی", callback_data="back_to_dashboard")],
     ])
+
+
+
+def listed_currencies_keyboard(page: int, total_pages: int) -> InlineKeyboardMarkup:
+    """Keyboard for 100-item currency tabs."""
+    safe_total_pages = max(1, int(total_pages))
+    safe_page = max(0, min(int(page), safe_total_pages - 1))
+
+    navigation: list[InlineKeyboardButton] = []
+    if safe_page > 0:
+        navigation.append(
+            InlineKeyboardButton(
+                text="‹ قبلی",
+                callback_data=f"market_listed:{safe_page - 1}",
+            )
+        )
+
+    navigation.append(
+        InlineKeyboardButton(
+            text=f"صفحه {safe_page + 1} از {safe_total_pages}",
+            callback_data=f"market_listed:{safe_page}",
+        )
+    )
+
+    if safe_page < safe_total_pages - 1:
+        navigation.append(
+            InlineKeyboardButton(
+                text="بعدی ›",
+                callback_data=f"market_listed:{safe_page + 1}",
+            )
+        )
+
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            navigation,
+            [
+                InlineKeyboardButton(
+                    text="↩️ بازگشت به بازار",
+                    callback_data="market_main",
+                )
+            ],
+        ]
+    )
 
 
 
