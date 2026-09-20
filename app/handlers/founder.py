@@ -1122,6 +1122,25 @@ async def confirm_founder(
 ) -> None:
     await call.answer("در حال تأسیس ملت...")
 
+    async with async_session() as session:
+        draft = await get_active_draft(
+            session,
+            call.from_user.id,
+            lock=False,
+        )
+    if draft is None or draft.group_id is None:
+        await call.answer("فرآیند تأسیس منقضی شده یا گروه دیگر متصل نیست.", show_alert=True)
+        return
+
+    verified, verification_error = await _verify_group(
+        bot,
+        group_id=int(draft.group_id),
+        founder_user_id=call.from_user.id,
+    )
+    if not verified:
+        await call.answer(verification_error, show_alert=True)
+        return
+
     try:
         async with async_session() as session:
             nation, group_id = await finalize_draft(
