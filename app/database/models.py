@@ -207,7 +207,10 @@ class CurrencyHolding(Base):
 
 class Transaction(Base):
     __tablename__ = "transactions"
-    __table_args__ = (Index("ix_transactions_user_created", "user_id", "created_at"),)
+    __table_args__ = (
+        Index("ix_transactions_user_created", "user_id", "created_at"),
+        Index("ix_transactions_nation_created_type", "nation_id", "created_at", "transaction_type"),
+    )
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.user_id"), nullable=False)
     nation_id: Mapped[int] = mapped_column(ForeignKey("nations.nation_id"), nullable=False)
@@ -273,7 +276,17 @@ class RateHistory(Base):
 
 class TradePreview(Base):
     __tablename__ = "trade_previews"
-    __table_args__ = (Index("ix_trade_previews_user_created", "user_id", "created_at"),)
+    __table_args__ = (
+        Index("ix_trade_previews_user_created", "user_id", "created_at"),
+        Index(
+            "ix_trade_previews_lookup",
+            "user_id",
+            "nation_id",
+            "side",
+            "spend",
+            "created_at",
+        ),
+    )
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
     nation_id: Mapped[int] = mapped_column(ForeignKey("nations.nation_id", ondelete="CASCADE"), nullable=False)
