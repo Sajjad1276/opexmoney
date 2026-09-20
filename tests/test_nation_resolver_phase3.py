@@ -75,7 +75,7 @@ async def _seed_human(*, telegram_active: bool, game_member: bool = True):
             )
             nation = Nation(
                 name="Resolver Republic",
-                currency_code="R940001",
+                currency_code="R941",
                 group_id=HUMAN_GROUP_ID,
                 founder_user_id=HUMAN_USER_ID,
                 exchange_rate=Decimal("1"),
