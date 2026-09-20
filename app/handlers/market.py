@@ -68,8 +68,18 @@ router = Router(name="market")
 logger = logging.getLogger(__name__)
 
 def market_keyboard_for_nation(nation_id: int) -> InlineKeyboardMarkup:
-    """Compatibility wrapper: all market screens use the compact action layout."""
-    return market_keyboard()
+    keyboard = market_keyboard()
+    rows = [list(row) for row in keyboard.inline_keyboard]
+    rows.insert(
+        1,
+        [
+            InlineKeyboardButton(
+                text="📈 نمودار",
+                callback_data=f"market_chart:{nation_id}",
+            )
+        ],
+    )
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 async def safe_edit(call, text, markup=None):
     try:
@@ -411,22 +421,32 @@ async def chart_currency_message(message: Message, state: FSMContext):
     await close_inline_panel(state, message.bot)
     await state.clear()
 
-    from app.handlers.chart import (
-        build_chart_caption,
-        build_chart_photo,
-        chart_keyboard,
-    )
-    from app.services.chart_service import get_chart_data
+    from app.handlers.chart import show_chart_for_nation
 
+    # The chart handler owns photo rendering and timeframe controls.
+    proxy = CallbackQuery(
+        id="market-chart-input",
+        from_user=message.from_user,
+        chat_instance="market",
+        message=None,
+        data=f"market_chart:{nation.nation_id}",
+    )
+    await message.answer(
+        f"📊 <b>{html.escape(nation.currency_code)}</b> نمودار در حال آماده‌سازی است...",
+        parse_mode="HTML",
+    )
+    try:
+        await message.bot.delete_message(message.chat.id, message.message_id)
+    except Exception:
+        pass
+
+    # Direct rendering requires the original callback message. Create a small
+    # callback-compatible adapter around the user's latest market message.
+    from app.handlers.chart import get_chart_data, _build_photo, chart_keyboard, build_chart_caption
     async with async_session() as session:
         async with session.begin():
-            chart_data = await get_chart_data(
-                session,
-                nation.nation_id,
-                "24h",
-            )
+            chart_data = await get_chart_data(session, nation.nation_id, "24h")
             chart_data["window"] = "24h"
-
     if not chart_data["enough_data"]:
         await message.answer(
             build_chart_caption(chart_data),
@@ -434,9 +454,8 @@ async def chart_currency_message(message: Message, state: FSMContext):
             parse_mode="HTML",
         )
         return
-
     await message.answer_photo(
-        photo=await build_chart_photo(chart_data),
+        photo=await _build_photo(chart_data),
         caption=build_chart_caption(chart_data),
         reply_markup=chart_keyboard(nation.nation_id, "24h"),
         parse_mode="HTML",
