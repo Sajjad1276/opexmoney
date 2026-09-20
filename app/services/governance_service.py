@@ -24,7 +24,7 @@ from app.database.models import (
 )
 from app.services.economy_metrics import get_player_net_worth, get_player_net_worths
 from app.services.economic_event_service import record_economic_event
-from app.services.nation_service import get_user_active_nation_context
+from app.services.nation_service import get_user_active_nation_context, is_user_active_in_nation
 from app.services.rules.registry import clamp_rule_value, get_rule
 from app.services.rules.resolver import invalidate_rule_cache
 from app.services.temporal_service import rotate_due_profiles
@@ -238,6 +238,17 @@ async def cast_vote(
         raise ValueError("این طرح الان در حال رأی‌گیری نیست.")
     if now < proposal.voting_opens_at or now >= proposal.voting_closes_at:
         raise ValueError("مهلت رأی‌گیری این طرح تمام شده.")
+
+    if proposal.target_scope == "nation" and proposal.target_id is not None:
+        eligible_member = await is_user_active_in_nation(
+            session,
+            player_id,
+            proposal.target_id,
+            lock=False,
+        )
+        if not eligible_member:
+            raise ValueError("برای رأی دادن به قانون این ملت باید عضو فعال همان ملت باشی.")
+
     if not await is_active_voter(session, player_id, now=now):
         raise ValueError("برای رأی دادن باید در ۷ روز اخیر حداقل یک معامله داشته باشی.")
 
