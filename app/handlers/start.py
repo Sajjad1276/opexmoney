@@ -297,8 +297,8 @@ async def show_dashboard(
     text = (
         "⛃ <b>بازگشت به منوی OPEXMONEY</b>\n\n"
         "🎯 <b>تصمیم بگیر، معامله کن، رشد کن!</b>\n"
-        f"📅 تاریخ شاهنشاهی: {imperial_date}\n"
-        f"🕐 ساعت شاهنشاهی: {imperial_time}"
+        f"📅 {imperial_date}\n"
+        f"🕐 {imperial_time}"
     )
     await message.answer(
         rtl_html(text),
