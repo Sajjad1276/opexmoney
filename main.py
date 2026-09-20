@@ -5,7 +5,8 @@ import logging
 import sys
 from pathlib import Path
 
-from aiogram import Bot, Dispatcher
+from aiogram import BaseMiddleware, Bot, Dispatcher
+from aiogram.types import Message
 from aiogram.types.error_event import ErrorEvent
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
@@ -50,12 +51,40 @@ from app.services.governance_service import governance_cycle
 from app.services.war_service import resolve_expired_wars
 from app.schedulers.alert_checker import register_price_alert_job
 from config import settings
+from app.utils.ui import hide_reply_keyboard
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
 )
 logger = logging.getLogger("opexmoney")
+
+MAIN_MENU_BUTTONS = frozenset(
+    {
+        "💹 بازار",
+        "📊 پورتفولیو",
+        "⚡ مأموریت",
+        "⚡ مأموریت‌ها",
+        "🌍 ملت‌ها",
+        "🏆 رتبه‌بندی",
+        "🎓 آکادمی",
+        "🏦 خزانه",
+        "📜 قوانین",
+        "⚙️ تنظیمات",
+    }
+)
+
+
+class ReplyKeyboardSwitchMiddleware(BaseMiddleware):
+    async def __call__(self, handler, event, data):
+        if (
+            isinstance(event, Message)
+            and event.chat
+            and event.text in MAIN_MENU_BUTTONS
+        ):
+            await hide_reply_keyboard(data["bot"], event.chat.id)
+        return await handler(event, data)
+
 
 
 async def ensure_database_schema() -> None:
@@ -279,6 +308,7 @@ async def main() -> None:
     dp["redis"] = ranking_redis
     flow_trace = FlowTraceMiddleware()
     dp.message.middleware(flow_trace)
+    dp.message.middleware(ReplyKeyboardSwitchMiddleware())
     dp.callback_query.middleware(flow_trace)
 
     @dp.errors()
