@@ -203,7 +203,7 @@ def founder_cancel_keyboard() -> InlineKeyboardMarkup:
             [
                 InlineKeyboardButton(
                     text="❌ انصراف",
-                    callback_data="cancel_founder",
+                    callback_data="cancel_start",
                     style=ButtonStyle.DANGER,
                 )
             ]
