@@ -20,7 +20,7 @@ def _can_manage(user: User | None) -> bool:
     }
 
 
-@nation_router.message(F.text == "🌍 ملت‌ها")
+@nation_router.message(F.text.in_({"🌍 ملت‌ها", "🌍 ملت من"}))
 async def open_nations(message: Message) -> None:
     async with async_session() as session:
         async with session.begin():
