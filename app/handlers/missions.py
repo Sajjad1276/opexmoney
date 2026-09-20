@@ -291,8 +291,10 @@ async def claim_all_rewards(callback: CallbackQuery) -> None:
             )
 
 
-router.message.register(show_missions, F.text == "⚡ مأموریت‌ها")
-router.message.register(show_missions, F.text == "⚡ مأموریت")
+router.message.register(
+    show_missions,
+    F.text.in_({"⚡ مأموریت‌ها", "⚡ مأموریت", "🎯 مأموریت"}),
+)
 router.callback_query.register(
     refresh_missions,
     F.data == "missions_refresh",
