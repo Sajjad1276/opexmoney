@@ -41,6 +41,8 @@ class FakeMessage:
             username="healthtester",
         )
         self.text = text
+        self.message_id = 100
+        self.chat = SimpleNamespace(id=user_id)
         self.edits: list[str] = []
         self.answers: list[str] = []
 
