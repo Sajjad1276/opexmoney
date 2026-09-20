@@ -192,6 +192,19 @@ jobs:
       - name: Nation management journey
         run: pytest -q tests/test_nation_management_flow.py
 
+      - name: Rebuild phase regression suite
+        run: >
+          pytest -q
+          tests/test_founder_lifecycle_phase4.py
+          tests/test_nation_resolver_phase3.py
+          tests/test_wallet_membership_consistency_phase6.py
+          tests/test_market_integration_phase7.py
+          tests/test_economy_events_phase8.py
+          tests/test_ai_separation_phase9.py
+          tests/test_governance_treasury_war_phase10.py
+          tests/test_ux_phase11.py
+          tests/test_resilience_phase12.py
+
       - name: Core integration tests
         run: pytest -q tests/test_ai_layer.py tests/test_architecture.py tests/test_founder_integration.py tests/test_governance_phase2.py
 
