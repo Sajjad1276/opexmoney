@@ -4,7 +4,6 @@ import html
 import logging
 import re
 from datetime import datetime, timedelta
-from datetime import datetime, timedelta
 
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
@@ -149,6 +148,7 @@ async def _set_state_for_draft(state: FSMContext, status: str) -> None:
         logger.error("Unsupported founder draft status: %r", status)
         raise ValueError(f"Unsupported founder draft status: {status!r}")
     await state.set_state(target)
+
 
 def _group_link(bot_username: str, token: str) -> str:
     return (
@@ -825,6 +825,8 @@ async def confirm_founder(
             nation.nation_id,
             group_id,
         )
+
+
 @founder_router.callback_query(
     F.data == "cancel_founder",
     StateFilter(
