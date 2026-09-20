@@ -202,6 +202,21 @@ def _username_step_text(user_mention: str) -> str:
     )
 
 
+def _group_identified_text(draft, member_count: int) -> str:
+    return (
+        "✅ <b>گروه شناسایی شد!</b>\n"
+        "<blockquote>⁠</blockquote>\n"
+        f"📍 گروه: <b>{html.escape(draft.group_title or 'گروه')}</b>\n"
+        f"👥 اعضا: <b>{member_count}</b> نفر\n"
+        f"🆔 شناسه: <code>{draft.group_id}</code>\n\n"
+        "<blockquote>⁠</blockquote>\n"
+        "حالا باید واحد پول ملتت رو نام‌گذاری کنی.\n\n"
+        "<b>یه کد کوتاه ۳ تا ۴ حرفی انگلیسی:</b>\n"
+        "<i>مثال: AZD — IRN — PRS — GLX — VLT — GOLD</i>\n\n"
+        "⚠️ بعد از ثبت قابل تغییر نیست."
+    )
+
+
 def _currency_step_text(draft) -> str:
     return (
         "💰 <b>کد ارز ملت</b>\n"
@@ -515,39 +530,89 @@ async def founder_group_status_changed(
     if event.chat.type not in {"group", "supergroup"}:
         return
 
-    new_status = _status_value(event.new_chat_member)
-    if new_status not in {"administrator", "creator"}:
-        return
-
     actor = event.from_user
     if actor is None:
         return
 
-    async with async_session() as session:
-        async with session.begin():
-            draft = await get_active_draft(session, actor.id, lock=False)
+    new_status = _status_value(event.new_chat_member)
 
-    if draft is None or draft.status != "WAITING_GROUP":
+    async with async_session() as session:
+        draft = await get_active_draft(session, actor.id, lock=False)
+
+    if draft is None:
+        return
+
+    if draft.group_id not in (None, event.chat.id):
+        return
+
+    if new_status not in {"administrator", "creator"}:
+        if draft.group_id in (None, event.chat.id):
+            try:
+                await bot.send_message(
+                    event.chat.id,
+                    f"⚠️ برای راه‌اندازی OPEX MONEY باید ربات را ادمین کنی.",
+                )
+            except Exception:
+                logger.debug("Could not send non-admin group warning", exc_info=True)
+        return
+
+    if draft.founder_user_id != actor.id:
+        return
+
+    ok, error = await _verify_group(
+        bot,
+        group_id=event.chat.id,
+        founder_user_id=actor.id,
+    )
+    if not ok:
+        try:
+            await bot.send_message(event.chat.id, error)
+        except Exception:
+            logger.debug("Could not send founder group verification error", exc_info=True)
         return
 
     try:
-        me = await bot.get_me()
+        async with async_session() as session:
+            bound = await bind_group(
+                session,
+                founder_user_id=actor.id,
+                token=draft.launch_token,
+                group_id=event.chat.id,
+                group_title=event.chat.title or "گروه بدون نام",
+                group_username=getattr(event.chat, "username", None),
+                group_type=event.chat.type,
+            )
+            bound.nation_name = bound.group_title or "گروه"
+            bound.status = "NAMING"
+            await session.flush()
+
+        member_count = await bot.get_chat_member_count(event.chat.id)
+    except Exception as exc:
+        logger.exception("Founder auto-bind failed | founder=%s group=%s", actor.id, event.chat.id)
+        try:
+            await bot.send_message(event.chat.id, f"⚠️ راه‌اندازی ملت انجام نشد: {html.escape(str(exc))}", parse_mode="HTML")
+        except Exception:
+            logger.debug("Could not report founder auto-bind failure", exc_info=True)
+        return
+
+    private_state = dispatcher.fsm.get_context(
+        bot=bot,
+        chat_id=actor.id,
+        user_id=actor.id,
+    )
+    await private_state.set_state(FounderStates.SET_CURRENCY_CODE)
+    await private_state.update_data(founder_group_id=event.chat.id)
+
+    try:
         await bot.send_message(
             actor.id,
-            (
-                "✅ <b>ربات ادمین شد.</b>\n\n"
-                "برای اتصال همین گروه، همین دکمه رو دوباره بزن و همین گروه رو انتخاب کن."
-            ),
-            reply_markup=add_to_group_keyboard(
-                _group_link(me.username or "", draft.launch_token)
-            ),
+            _group_identified_text(bound, member_count),
+            reply_markup=founder_cancel_keyboard(),
             parse_mode="HTML",
         )
     except Exception:
-        logger.debug(
-            "Could not resend founder group link after bot promotion",
-            exc_info=True,
-        )
+        logger.debug("Could not notify founder after group promotion", exc_info=True)
+
 
 @founder_router.message(
     F.chat.type.in_({"group", "supergroup"}),
@@ -713,23 +778,33 @@ async def check_founder_group(
         await call.answer(conflict_message, show_alert=True)
         return
 
-    await state.set_state(FounderStates.SET_NATION_NAME)
+    # The Telegram group title is the canonical nation name for this flow.
+    draft.nation_name = draft.group_title or "گروه"
+    draft.status = "NAMING"
+    await state.set_state(FounderStates.SET_CURRENCY_CODE)
     await state.update_data(founder_group_id=group_id)
-    await call.answer("✅ گروه تأیید شد.")
+    await call.answer("✅ گروه شناسایی شد.")
+
+    try:
+        member_count = await bot.get_chat_member_count(group_id)
+    except Exception:
+        member_count = 0
 
     if call.message:
         await _edit_panel(
             call,
             state,
-            _name_step_text(draft.group_title or "گروه"),
-            founder_name_step_keyboard(),
+            _group_identified_text(draft, member_count),
+            founder_cancel_keyboard(),
         )
 
 
 @founder_router.message(
     StateFilter(
         FounderStates.WAITING_GROUP_ADMIN,
+        FounderStates.SET_USERNAME_FOUNDER,
         FounderStates.SET_NATION_NAME,
+        FounderStates.SET_CURRENCY_CODE,
         FounderStates.SELECT_FLAG,
         FounderStates.CONFIRM,
     ),
@@ -898,7 +973,7 @@ async def select_founder_flag(
 
 @founder_router.callback_query(
     F.data == "founder_edit_name",
-    StateFilter(FounderStates.SELECT_FLAG, FounderStates.CONFIRM),
+    StateFilter(None, FounderStates.SELECT_FLAG, FounderStates.CONFIRM),
 )
 async def founder_edit_name(
     call: CallbackQuery,
@@ -926,7 +1001,7 @@ async def founder_edit_name(
 
 @founder_router.callback_query(
     F.data == "founder_edit_flag",
-    StateFilter(FounderStates.CONFIRM),
+    StateFilter(None, FounderStates.CONFIRM),
 )
 async def founder_edit_flag(
     call: CallbackQuery,
@@ -954,7 +1029,7 @@ async def founder_edit_flag(
 
 @founder_router.callback_query(
     F.data == "founder_edit_group",
-    StateFilter(FounderStates.CONFIRM),
+    StateFilter(None, FounderStates.CONFIRM),
 )
 async def founder_edit_group(
     call: CallbackQuery,
@@ -979,7 +1054,7 @@ async def founder_edit_group(
 
 @founder_router.callback_query(
     F.data == "confirm_found",
-    StateFilter(FounderStates.CONFIRM),
+    StateFilter(None, FounderStates.CONFIRM),
 )
 async def confirm_founder(
     call: CallbackQuery,
@@ -1044,7 +1119,7 @@ async def confirm_founder(
 
 
 @founder_router.callback_query(
-    F.data == "cancel_founder",
+    F.data.in_({"cancel_founder", "cancel_start"}),
     StateFilter(
         FounderStates.WAITING_GROUP_ADMIN,
         FounderStates.SET_NATION_NAME,
