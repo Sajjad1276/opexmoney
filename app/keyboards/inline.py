@@ -86,7 +86,7 @@ def nation_panel_keyboard(
             )
     else:
         buttons.append(
-            [InlineKeyboardButton(text="📜 قانون اساسی", callback_data="governance_main", style=ButtonStyle.PRIMARY)]
+            [InlineKeyboardButton(text="📜 قانون اساسی", callback_data="governance_main")]
         )
 
     buttons.append(
@@ -187,7 +187,6 @@ def market_buy_keyboard(nations) -> InlineKeyboardMarkup:
             InlineKeyboardButton(
                 text=f"خرید {nation.currency_code}",
                 callback_data=f"buy_{nation.nation_id}",
-                style=ButtonStyle.SUCCESS,
             )
         ]
         for nation in nations
@@ -235,7 +234,6 @@ def sell_currency_keyboard(holdings) -> InlineKeyboardMarkup:
             InlineKeyboardButton(
                 text=f"فروش {holding.currency_code}",
                 callback_data=f"sell_{holding.currency_code}",
-                style=ButtonStyle.DANGER,
             )
         ]
         for holding in holdings
@@ -317,7 +315,7 @@ def governance_history_keyboard(offset: int, has_next: bool) -> InlineKeyboardMa
         rows.append([InlineKeyboardButton(text="⬅️ قبلی", callback_data=f"gov_history:{max(0, offset - 8)}")])
     if has_next:
         rows.append([InlineKeyboardButton(text="بعدی ➡️", callback_data=f"gov_history:{offset + 8}")])
-    rows.append([InlineKeyboardButton(text="↩️ قوانین", callback_data="governance_main", style=ButtonStyle.PRIMARY)])
+    rows.append([InlineKeyboardButton(text="↩️ قوانین", callback_data="governance_main")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
