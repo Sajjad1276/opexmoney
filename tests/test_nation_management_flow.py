@@ -17,6 +17,7 @@ from app.database.models import (
     User,
 )
 from app.database.session import async_session
+from app.services.membership_service import sync_telegram_membership
 
 
 FOUNDER_ID = 931001
@@ -316,6 +317,17 @@ async def test_founder_can_promote_and_kick_member(monkeypatch):
 
     call = FakeCall(FOUNDER_ID, f"nm:kick:{nation_id}:{PLAYER_A_ID}")
     await nm.kick_member(call, bot)
+
+    async with async_session() as session:
+        async with session.begin():
+            await sync_telegram_membership(
+                session,
+                group_id=GROUP_ID,
+                telegram_user_id=PLAYER_A_ID,
+                telegram_status="kicked",
+                is_member=False,
+                source="test:chat_member",
+            )
 
     async with async_session() as session:
         member = await session.scalar(
