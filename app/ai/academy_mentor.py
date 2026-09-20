@@ -44,7 +44,7 @@ async def ask_mentor(
   نام: {user_username}
   سطح: {user_level}
   ملت: {nation_name or "بدون ملت"}
-  موجودی ΩXR: {xr_balance}
+  موجودی دلار: {xr_balance}
 
 درس فعلی: {lesson_title}
 محتوا: {lesson_content[:500]}
