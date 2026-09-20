@@ -3,6 +3,8 @@ from decimal import Decimal
 from aiogram.enums import ButtonStyle
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
+from app.ui.navigation import HOME_CALLBACK
+
 
 def cancel_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[
@@ -72,7 +74,7 @@ def more_menu_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="📜 قوانین", callback_data="governance_main"),
             InlineKeyboardButton(text="⚙️ تنظیمات", callback_data="settings:back"),
         ],
-        [InlineKeyboardButton(text="🏠 منوی اصلی", callback_data="back_to_dashboard")],
+        [InlineKeyboardButton(text="🏠 منوی اصلی", callback_data=HOME_CALLBACK)],
     ])
 
 
