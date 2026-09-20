@@ -949,18 +949,26 @@ async def open_more_menu(message: Message) -> None:
 
 @router.callback_query(F.data == "missions_open")
 async def open_missions_from_more(call: CallbackQuery) -> None:
-    await call.answer()
     if call.message:
+        try:
+            await call.message.delete()
+        except Exception:
+            logger.debug("Could not delete more-menu panel", exc_info=True)
         from app.handlers.missions import show_missions
         await show_missions(call.message)
+    await call.answer()
 
 
 @router.callback_query(F.data == "treasury_open")
 async def open_treasury_from_more(call: CallbackQuery, state: FSMContext) -> None:
-    await call.answer()
     if call.message:
+        try:
+            await call.message.delete()
+        except Exception:
+            logger.debug("Could not delete more-menu panel", exc_info=True)
         from app.handlers.treasury import open_treasury_from_main_menu
         await open_treasury_from_main_menu(call.message, state)
+    await call.answer()
 
 
 @router.message(OnboardingStates.ONBOARDING_NAME, F.text)
