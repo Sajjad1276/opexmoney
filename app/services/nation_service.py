@@ -18,6 +18,7 @@ from app.database.models import (
     NationLog,
     NationMember,
     NationMemberRole,
+    NationTelegramMember,
     Transaction,
     User,
     UserActivity,
@@ -446,6 +447,18 @@ async def create_nation(
                 user_id=founder_user_id,
                 role=NationMemberRole.FOUNDER,
                 is_active=True,
+            )
+        )
+        session.add(
+            NationTelegramMember(
+                nation_id=nation.nation_id,
+                telegram_user_id=founder_user_id,
+                telegram_status="administrator",
+                is_member=True,
+                is_active=True,
+                joined_at=datetime.utcnow(),
+                left_at=None,
+                last_seen_at=datetime.utcnow(),
             )
         )
         session.add(
