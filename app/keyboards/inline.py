@@ -26,7 +26,7 @@ def trade_confirmation_keyboard() -> InlineKeyboardMarkup:
 def welcome_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🎮 شروع بازی", callback_data="start_game", style=ButtonStyle.SUCCESS)],
-        [InlineKeyboardButton(text="❓ راهنما", callback_data="show_help", style=ButtonStyle.PRIMARY)],
+        [InlineKeyboardButton(text="❓ راهنما", callback_data="show_help")],
     ])
 
 
@@ -36,8 +36,8 @@ def market_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="🟢 خرید", callback_data="market_buy", style=ButtonStyle.SUCCESS),
             InlineKeyboardButton(text="🔴 فروش", callback_data="market_sell", style=ButtonStyle.DANGER),
         ],
-        [InlineKeyboardButton(text="📜 تاریخچه", callback_data="market_history", style=ButtonStyle.PRIMARY)],
-        [InlineKeyboardButton(text="🔄 بروزرسانی", callback_data="market_refresh", style=ButtonStyle.PRIMARY)],
+        [InlineKeyboardButton(text="📜 تاریخچه", callback_data="market_history")],
+        [InlineKeyboardButton(text="🔄 بروزرسانی", callback_data="market_refresh")],
         [InlineKeyboardButton(text="↩️ بازگشت", callback_data="back_to_dashboard")],
     ])
 
@@ -51,8 +51,8 @@ def nation_panel_keyboard(
 ) -> InlineKeyboardMarkup:
     can_manage = is_founder if is_manager is None else is_manager
     buttons = [
-        [InlineKeyboardButton(text="🌍 ملت‌های من", callback_data="my_nations", style=ButtonStyle.PRIMARY)],
-        [InlineKeyboardButton(text="🔍 کاوش ملت‌ها", callback_data="explore_nations", style=ButtonStyle.PRIMARY)],
+        [InlineKeyboardButton(text="🌍 ملت‌های من", callback_data="my_nations")],
+        [InlineKeyboardButton(text="🔍 کاوش ملت‌ها", callback_data="explore_nations")],
         [InlineKeyboardButton(text="🏛 تأسیس ملت", callback_data="found_nation", style=ButtonStyle.SUCCESS)],
     ]
 
@@ -67,7 +67,6 @@ def nation_panel_keyboard(
                 InlineKeyboardButton(
                     text="📜 قانون اساسی",
                     callback_data="governance_main",
-                    style=ButtonStyle.PRIMARY,
                 ),
             ]
         )
@@ -77,7 +76,6 @@ def nation_panel_keyboard(
                     InlineKeyboardButton(
                         text="👑 پنل مدیریت",
                         callback_data=f"nm:panel:{nation_id}",
-                        style=ButtonStyle.PRIMARY,
                     ),
                     InlineKeyboardButton(
                         text="⚔️ جنگ",
@@ -110,7 +108,6 @@ def add_to_group_keyboard(url: str) -> InlineKeyboardMarkup:
             InlineKeyboardButton(
                 text="🔎 بررسی و دریافت اطلاعات",
                 callback_data="founder_check_group",
-                style=ButtonStyle.SUCCESS,
             )
         ],
         [
@@ -153,8 +150,7 @@ def founder_flag_selection_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton(
                 text=f"{flag} {label}",
                 callback_data=f"founder_flag:{flag}",
-                style=ButtonStyle.PRIMARY,
-            )
+                )
             for flag, label in flags[index:index + 3]
         ]
         for index in range(0, len(flags), 3)
@@ -163,7 +159,6 @@ def founder_flag_selection_keyboard() -> InlineKeyboardMarkup:
         InlineKeyboardButton(
             text="🏴 پیش‌فرض",
             callback_data="founder_flag:default",
-            style=ButtonStyle.PRIMARY,
         )
     ])
     rows.append([
@@ -180,8 +175,7 @@ def nation_selection_keyboard(nations) -> InlineKeyboardMarkup:
         [InlineKeyboardButton(
             text=f"{getattr(nation, 'flag_emoji', None) or '🏴'} {nation.name} ({nation.currency_code}) · {nation.member_count} نفر",
             callback_data=f"join_nation:{nation.nation_id}",
-            style=ButtonStyle.PRIMARY,
-        )]
+            )]
         for nation in nations
     ]
     return InlineKeyboardMarkup(inline_keyboard=rows)
@@ -205,12 +199,12 @@ def market_buy_keyboard(nations) -> InlineKeyboardMarkup:
 def buy_amount_keyboard(nation_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="100", callback_data=f"buyq_100_{nation_id}", style=ButtonStyle.PRIMARY),
-            InlineKeyboardButton(text="500", callback_data=f"buyq_500_{nation_id}", style=ButtonStyle.PRIMARY),
+            InlineKeyboardButton(text="100", callback_data=f"buyq_100_{nation_id}"),
+            InlineKeyboardButton(text="500", callback_data=f"buyq_500_{nation_id}"),
         ],
         [
-            InlineKeyboardButton(text="1000", callback_data=f"buyq_1000_{nation_id}", style=ButtonStyle.PRIMARY),
-            InlineKeyboardButton(text="همه", callback_data=f"buyq_all_{nation_id}", style=ButtonStyle.PRIMARY),
+            InlineKeyboardButton(text="1000", callback_data=f"buyq_1000_{nation_id}"),
+            InlineKeyboardButton(text="همه", callback_data=f"buyq_all_{nation_id}"),
         ],
         [InlineKeyboardButton(text="❌ انصراف", callback_data="market_buy", style=ButtonStyle.DANGER)],
     ])
@@ -253,12 +247,12 @@ def sell_currency_keyboard(holdings) -> InlineKeyboardMarkup:
 def sell_amount_keyboard(currency_code: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="25%", callback_data=f"sellq_25_{currency_code}", style=ButtonStyle.PRIMARY),
-            InlineKeyboardButton(text="50%", callback_data=f"sellq_50_{currency_code}", style=ButtonStyle.PRIMARY),
+            InlineKeyboardButton(text="25%", callback_data=f"sellq_25_{currency_code}"),
+            InlineKeyboardButton(text="50%", callback_data=f"sellq_50_{currency_code}"),
         ],
         [
-            InlineKeyboardButton(text="75%", callback_data=f"sellq_75_{currency_code}", style=ButtonStyle.PRIMARY),
-            InlineKeyboardButton(text="همه", callback_data=f"sellq_100_{currency_code}", style=ButtonStyle.PRIMARY),
+            InlineKeyboardButton(text="75%", callback_data=f"sellq_75_{currency_code}"),
+            InlineKeyboardButton(text="همه", callback_data=f"sellq_100_{currency_code}"),
         ],
         [InlineKeyboardButton(text="❌ انصراف", callback_data="market_sell", style=ButtonStyle.DANGER)],
     ])
@@ -266,10 +260,10 @@ def sell_amount_keyboard(currency_code: str) -> InlineKeyboardMarkup:
 
 def governance_main_keyboard(is_founder: bool = False) -> InlineKeyboardMarkup:
     rows = [
-        [InlineKeyboardButton(text="📜 قوانین فعال", callback_data="gov_active", style=ButtonStyle.PRIMARY)],
+        [InlineKeyboardButton(text="📜 قوانین فعال", callback_data="gov_active")],
         [InlineKeyboardButton(text="📝 ثبت طرح جدید", callback_data="gov_new", style=ButtonStyle.SUCCESS)],
-        [InlineKeyboardButton(text="🗳 رأی‌گیری‌های جاری", callback_data="gov_voting", style=ButtonStyle.PRIMARY)],
-        [InlineKeyboardButton(text="📚 تاریخ قوانین", callback_data="gov_history:0", style=ButtonStyle.PRIMARY)],
+        [InlineKeyboardButton(text="🗳 رأی‌گیری‌های جاری", callback_data="gov_voting")],
+        [InlineKeyboardButton(text="📚 تاریخ قوانین", callback_data="gov_history:0")],
     ]
     if is_founder:
         rows.append([InlineKeyboardButton(text="👑 لغو فوری قانون", callback_data="gov_revoke_list", style=ButtonStyle.DANGER)])
@@ -279,7 +273,7 @@ def governance_main_keyboard(is_founder: bool = False) -> InlineKeyboardMarkup:
 
 def governance_rule_keyboard(rules: list[tuple[str, str]]) -> InlineKeyboardMarkup:
     rows = [
-        [InlineKeyboardButton(text=title, callback_data=f"gov_rule:{key}", style=ButtonStyle.PRIMARY)]
+        [InlineKeyboardButton(text=title, callback_data=f"gov_rule:{key}")]
         for key, title in rules
     ]
     rows.append([InlineKeyboardButton(text="❌ انصراف", callback_data="gov_cancel")])
@@ -310,20 +304,19 @@ def governance_proposal_list_keyboard(proposals) -> InlineKeyboardMarkup:
         [InlineKeyboardButton(
             text=f"🗳 {RULE_REGISTRY.get(proposal.rule_key).title_fa if proposal.rule_key in RULE_REGISTRY else proposal.rule_key} · #{proposal.id}",
             callback_data=f"gov_proposal:{proposal.id}",
-            style=ButtonStyle.PRIMARY,
         )]
         for proposal in proposals
     ]
-    rows.append([InlineKeyboardButton(text="↩️ قوانین", callback_data="governance_main", style=ButtonStyle.PRIMARY)])
+    rows.append([InlineKeyboardButton(text="↩️ قوانین", callback_data="governance_main")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def governance_history_keyboard(offset: int, has_next: bool) -> InlineKeyboardMarkup:
     rows = []
     if offset > 0:
-        rows.append([InlineKeyboardButton(text="⬅️ قبلی", callback_data=f"gov_history:{max(0, offset - 8)}", style=ButtonStyle.PRIMARY)])
+        rows.append([InlineKeyboardButton(text="⬅️ قبلی", callback_data=f"gov_history:{max(0, offset - 8)}")])
     if has_next:
-        rows.append([InlineKeyboardButton(text="بعدی ➡️", callback_data=f"gov_history:{offset + 8}", style=ButtonStyle.PRIMARY)])
+        rows.append([InlineKeyboardButton(text="بعدی ➡️", callback_data=f"gov_history:{offset + 8}")])
     rows.append([InlineKeyboardButton(text="↩️ قوانین", callback_data="governance_main", style=ButtonStyle.PRIMARY)])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
