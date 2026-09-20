@@ -334,6 +334,15 @@ async def _execute_buy(
             activity_type=ActivityType.TRADE,
         )
     )
+    record_economic_event(
+        session,
+        nation_id=nation.nation_id,
+        event_type="TRADE_BUY",
+        actor_id=user.user_id,
+        amount_xr=spend,
+        amount_local=calc["receive"],
+        metadata={"ai": True, "fee_xr": str(calc["fee"]), "rate": str(nation.exchange_rate)},
+    )
     return True
 
 
@@ -398,6 +407,15 @@ async def _execute_sell(
             nation_id=nation.nation_id,
             activity_type=ActivityType.TRADE,
         )
+    )
+    record_economic_event(
+        session,
+        nation_id=nation.nation_id,
+        event_type="TRADE_SELL",
+        actor_id=user.user_id,
+        amount_xr=calc["receive"],
+        amount_local=amount,
+        metadata={"ai": True, "fee_xr": str(calc["fee"]), "rate": str(nation.exchange_rate)},
     )
 
     if user.home_nation_id == nation.nation_id:
