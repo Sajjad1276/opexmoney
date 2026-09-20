@@ -54,6 +54,7 @@ async def get_portfolio_data(session: AsyncSession, user_id: int) -> dict:
 
     xr_balance = Decimal(str(user.xr_balance or Decimal("0")))
     total_xr = xr_balance
+    previous_total_xr = xr_balance
     holdings = []
 
     for (
@@ -86,6 +87,8 @@ async def get_portfolio_data(session: AsyncSession, user_id: int) -> dict:
             rate_emoji = "➡️"
 
         total_xr += value_in_xr
+        if yesterday_rate is not None:
+            previous_total_xr += amount * Decimal(str(yesterday_rate))
         holdings.append(
             {
                 "nation_id": int(nation_id),
@@ -107,13 +110,22 @@ async def get_portfolio_data(session: AsyncSession, user_id: int) -> dict:
         )
     )
 
+    portfolio_change_pct = (
+        Decimal("0")
+        if previous_total_xr == 0
+        else (total_xr - previous_total_xr) / previous_total_xr * Decimal("100")
+    )
+    imperial_date, imperial_time = imperial_datetime()
+
     return {
         "username": str(user.username),
         "xr_balance": xr_balance,
         "home_nation_id": user.home_nation_id,
         "holdings": holdings,
         "total_xr": total_xr,
-        "today_imperial": imperial_datetime()[0],
+        "today_imperial": imperial_date,
+        "current_time": imperial_time,
+        "portfolio_change_pct": portfolio_change_pct,
         # Backward-compatible key for existing consumers/tests.
         "today_jalali": today_jalali(),
     }
