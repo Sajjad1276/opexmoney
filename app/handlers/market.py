@@ -49,6 +49,7 @@ from app.services.market_intelligence import (
     get_risk_label,
 )
 from app.services.mission_service import increment_mission
+from app.services.nation_service import get_user_active_nation_context
 from app.services.user_service import sync_user_balance
 from app.services.rules.resolver import resolve
 from app.services.temporal_service import get_peak_multiplier
@@ -124,6 +125,19 @@ async def safe_edit(call, text, markup=None):
 def _fmt_rule_percent(value: Decimal) -> str:
     normalized = Decimal(str(value)).normalize()
     return to_fa(f"{normalized:f}") + "٪"
+
+
+async def _require_active_trader(session, user_id: int, *, lock: bool = False):
+    context = await get_user_active_nation_context(
+        session,
+        user_id,
+        repair=False,
+        lock=lock,
+    )
+    if context is None:
+        return None, None
+    nation, role, _source = context
+    return nation, role
 
 
 async def _trade_parameters(
@@ -265,8 +279,9 @@ async def render_market(
                 else request_user_id if request_user_id is not None else message.from_user.id
             )
             user = await session.get(User, user_id)
-            if not user or user.home_nation_id is None:
-                text = "🔴 حساب پیدا نشد. /start بزن."
+            active_nation, _role = await _require_active_trader(session, user_id)
+            if not user or active_nation is None:
+                text = "🔴 ملت فعالی برای معامله پیدا نشد. /start بزن."
                 if edit_call:
                     await edit_call.answer(text, show_alert=True)
                 else:
@@ -275,7 +290,7 @@ async def render_market(
 
             overview = await get_market_overview(
                 session,
-                user.home_nation_id,
+                active_nation.nation_id,
                 limit=20,
             )
             trade_count = int(
@@ -291,7 +306,7 @@ async def render_market(
                 beginner_mode = False
             else:
                 nations_for_keyboard = [item["nation"] for item in overview["currencies"]]
-                active = await get_active_members(session, user.home_nation_id)
+                active = await get_active_members(session, active_nation.nation_id)
                 beginner_mode = trade_count < 2
                 text = (
                     beginner_market_text(user, overview)
@@ -569,6 +584,10 @@ async def market_buy(call: CallbackQuery, state: FSMContext):
     async with async_session() as session:
         async with session.begin():
             user = await session.get(User, call.from_user.id)
+            active_nation, _role = await _require_active_trader(
+                session,
+                call.from_user.id,
+            )
             nations = (
                 await session.execute(
                     select(Nation)
@@ -578,8 +597,8 @@ async def market_buy(call: CallbackQuery, state: FSMContext):
                 )
             ).scalars().all()
 
-        if not user:
-            await call.answer("🔴 حساب پیدا نشد. /start بزن.", show_alert=True)
+        if not user or active_nation is None:
+            await call.answer("🔴 ملت فعالی برای معامله پیدا نشد. /start بزن.", show_alert=True)
             return
 
         text = (
@@ -630,10 +649,15 @@ async def make_buy_preview(
 
     async with async_session() as session:
         async with session.begin():
-            user = await session.get(User, actor_user_id)
-            nation = await session.get(Nation, nation_id)
+            user = await session.get(User, actor_user_id, with_for_update=True)
+            actor_nation, _role = await _require_active_trader(
+                session,
+                actor_user_id,
+                lock=True,
+            )
+            nation = await session.get(Nation, nation_id, with_for_update=True)
 
-            if not user or not nation:
+            if not user or actor_nation is None or not nation:
                 await message.answer(
                     "⚠️ اطلاعات معامله پیدا نشد.",
                     parse_mode="HTML",
@@ -805,9 +829,14 @@ async def confirm_buy(call, state=None):
                 else None
             )
 
-            if not user or not nation or not preview:
+            actor_nation, _role = await _require_active_trader(
+                session,
+                call.from_user.id,
+                lock=True,
+            )
+            if not user or actor_nation is None or not nation or not preview:
                 await call.answer(
-                    "⏱ پیش‌نمایش منقضی شد. دوباره مقدار رو وارد کن.",
+                    "⏱ پیش‌نمایش منقضی شد یا عضویت ملتت فعال نیست. دوباره وارد بازار شو.",
                     show_alert=True,
                 )
                 return
@@ -1053,15 +1082,20 @@ async def make_sell_preview(
 
     async with async_session() as session:
         async with session.begin():
-            nation = await session.get(Nation, nation_id)
-            user = await session.get(User, actor_user_id)
+            nation = await session.get(Nation, nation_id, with_for_update=True)
+            user = await session.get(User, actor_user_id, with_for_update=True)
+            actor_nation, _role = await _require_active_trader(
+                session,
+                actor_user_id,
+                lock=True,
+            )
             holding = await session.scalar(
                 select(CurrencyHolding).where(
                     CurrencyHolding.user_id == actor_user_id,
                     CurrencyHolding.nation_id == nation_id,
                 )
             )
-            if not nation or not user or not holding:
+            if not nation or actor_nation is None or not user or not holding:
                 await message.answer(
                     "⚠️ موجودی این ارز پیدا نشد.",
                     parse_mode="HTML",
@@ -1343,11 +1377,15 @@ async def market_history(call):
                 )
             ).all()
 
-    if not user or user.home_nation_id is None:
+    active_nation, _role = await _require_active_trader(
+        session,
+        call.from_user.id,
+    )
+    if not user or active_nation is None:
         await call.answer("🔴 حساب یا ملت فعال پیدا نشد. /start بزن.", show_alert=True)
         return
 
-    market_markup = market_keyboard_for_nation(user.home_nation_id)
+    market_markup = market_keyboard_for_nation(active_nation.nation_id)
 
     lines = [
         "📜 <b>تاریخچه</b>",
