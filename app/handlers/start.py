@@ -269,133 +269,19 @@ async def show_dashboard(
     bot: Bot | None = None,
     display_user=None,
 ) -> None:
-    async with async_session() as session:
-        async with session.begin():
-            try:
-                await increment_mission(session, user.user_id, "DAILY_LOGIN")
-                await check_permanent_missions(session, user.user_id)
-            except Exception:
-                logger.exception(
-                    "Mission trigger failed while loading dashboard for user %s",
-                    user.user_id,
-                )
+    """Return to the existing main menu without sending the old dashboard card.
 
-            nation = await session.get(Nation, user.home_nation_id) if user.home_nation_id else None
-            if nation is None:
-                dashboard_text = rtl_html(
-                    """
-👋 {0}
-
-حساب تو آماده‌ست، اما هنوز ملت اصلی نداری.
-""".format(user_mention(display_user or message.from_user))
-                )
-                if replace_inline and bot is not None:
-                    try:
-                        await message.delete()
-                    except Exception:
-                        logger.debug("Could not delete previous inline panel", exc_info=True)
-                    await bot.send_message(
-                        user.user_id,
-                        dashboard_text,
-                        reply_markup=main_menu_keyboard(),
-                        parse_mode=ParseMode.HTML,
-                    )
-                else:
-                    await message.answer(
-                        dashboard_text,
-                        reply_markup=main_menu_keyboard(),
-                        parse_mode=ParseMode.HTML,
-                    )
-                return
-
-            rank = nation.nation_rank or await get_nation_rank(session, nation.nation_id)
-            total_nations = await session.scalar(
-                select(func.count(Nation.nation_id)).where(Nation.is_active.is_(True))
-            ) or 0
-            holding = await session.scalar(
-                select(CurrencyHolding).where(
-                    CurrencyHolding.user_id == user.user_id,
-                    CurrencyHolding.nation_id == nation.nation_id,
-                )
-            )
-            trade_count = int(
-                await session.scalar(
-                    select(func.count(Transaction.id)).where(
-                        Transaction.user_id == user.user_id,
-                    )
-                ) or 0
-            )
-
-    change = get_rate_change(nation)
-    minutes = (
-        max(
-            0,
-            int((datetime.utcnow() - nation.last_rate_update).total_seconds() // 60),
-        )
-        if nation.last_rate_update
-        else 0
-    )
-    balance = holding.amount if holding else user.balance
-
-    text = """
-🌐 <b>OPEX MONEY</b>
-<blockquote>⁠</blockquote>
-{0}
-
-{1}
-💰 <code>{2}</code>: <b>{3}</b>
-💎 <code>دلار</code>: <b>{4}</b>
-
-{5} نرخ ارز: <b>{6} دلار</b>
-🏆 رتبه #{7} از {8}
-👥 {9} عضو
-⏱ <i>{10} دقیقه پیش</i>
-
-🎯 <b>هدف بازی:</b> ارزش دارایی‌هات رو بیشتر کن و رتبه‌ات رو بالا ببر.
-🚀 <b>حرکت بعدی:</b> {11}
-<blockquote>⁠</blockquote>
-""".format(
-        user_mention(display_user or message.from_user),
-        f"{html.escape(nation.flag_emoji or '🏴')} <b>{html.escape(nation.name)}</b>",
-        html.escape(nation.currency_code),
-        fmt_amount(balance),
-        fmt_amount(user.xr_balance),
-        get_rate_emoji(change),
-        fmt_rate(nation.exchange_rate),
-        to_fa(rank),
-        to_fa(total_nations),
-        to_fa(nation.member_count),
-        to_fa(minutes),
-        (
-            f"اولین معامله‌ات رو انجام بده؛ ۵۰ {html.escape(nation.currency_code)} رو به دلار تبدیل کن."
-            if trade_count == 0
-            else "بازار رو باز کن و یک ارز دیگه رو با قیمت و تغییرش مقایسه کن."
-        ),
-    )
-
-    dashboard_markup = (
-        new_player_menu_keyboard()
-        if trade_count == 0
-        else main_menu_keyboard()
-    )
-
-    if replace_inline and bot is not None:
+    The detailed player dashboard is intentionally not rendered here.
+    Balances, assets, rates, rank, and similar data belong to their
+    dedicated menu sections. Telegram's ReplyKeyboard is already persistent,
+    so returning from an inline panel does not require another text message.
+    """
+    if replace_inline:
         try:
             await message.delete()
         except Exception:
             logger.debug("Could not delete previous inline panel", exc_info=True)
-        await bot.send_message(
-            user.user_id,
-            rtl_html(text),
-            reply_markup=dashboard_markup,
-            parse_mode=ParseMode.HTML,
-        )
-    else:
-        await message.answer(
-            rtl_html(text),
-            reply_markup=dashboard_markup,
-            parse_mode=ParseMode.HTML,
-        )
+    return
 
 
 async def continue_registration(
