@@ -6,6 +6,7 @@ import re
 from datetime import datetime, timedelta
 
 from aiogram import Bot, Dispatcher, F, Router
+from aiogram.enums import ButtonStyle
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from aiogram.filters import CommandStart
 from aiogram.filters.state import StateFilter
@@ -141,7 +142,7 @@ async def _set_state_for_draft(state: FSMContext, status: str) -> None:
     mapping = {
         "WAITING_GROUP": FounderStates.WAITING_GROUP_ADMIN,
         "GROUP_READY": FounderStates.SET_NATION_NAME,
-        "NAMING": FounderStates.SET_NATION_NAME,
+        "NAMING": FounderStates.SET_CURRENCY_CODE,
         "FLAG": FounderStates.SELECT_FLAG,
         "REVIEW": FounderStates.CONFIRM,
     }
@@ -407,12 +408,12 @@ async def start_founder(
                 InlineKeyboardButton(
                     text="✅ بله، گروه دارم",
                     callback_data="founder_has_group",
-                    style="success",
+                    style=ButtonStyle.SUCCESS,
                 ),
                 InlineKeyboardButton(
                     text="❌ گروه ندارم",
                     callback_data="founder_no_group",
-                    style="danger",
+                    style=ButtonStyle.DANGER,
                 ),
             ],
             [
@@ -446,7 +447,7 @@ async def founder_no_group(call: CallbackQuery) -> None:
                 InlineKeyboardButton(
                     text="💹 فعلاً Player میشم",
                     callback_data="start_player",
-                    style="primary",
+                    style=ButtonStyle.PRIMARY,
                 ),
             ]
         ],
@@ -747,6 +748,84 @@ async def founder_start_command(
 
 
 @founder_router.message(
+    FounderStates.SET_USERNAME_FOUNDER,
+    F.text,
+)
+async def receive_founder_username(
+    message: Message,
+    state: FSMContext,
+    bot: Bot,
+) -> None:
+    value = (message.text or "").strip()
+    if " " in value or "@" in value or not is_valid_trader_name(value) or is_blocked_trader_name(value):
+        await _send_panel(
+            message,
+            state,
+            "🔴 <b>نام قابل قبول نیست.</b>\n\n۳ تا ۲۰ کاراکتر، بدون فاصله و @.",
+            founder_cancel_keyboard(),
+        )
+        return
+
+    async with async_session() as session:
+        async with session.begin():
+            user = await session.get(User, message.from_user.id, with_for_update=True)
+            if user is None:
+                user = User(
+                    user_id=message.from_user.id,
+                    username=value,
+                    home_nation_id=None,
+                    balance=0,
+                    xr_balance=0,
+                    role="player",
+                )
+                session.add(user)
+                await session.flush()
+            else:
+                user.username = value
+
+    await state.set_state(FounderStates.WAITING_GROUP_ADMIN)
+    await state.update_data(founder_pending_group=None)
+    async with async_session() as session:
+        draft = await get_or_create_draft(session, message.from_user.id)
+    await _show_group_step(message, state, bot, draft)
+
+
+@founder_router.message(
+    FounderStates.SET_CURRENCY_CODE,
+    F.text,
+)
+async def receive_currency_code(
+    message: Message,
+    state: FSMContext,
+) -> None:
+    value = (message.text or "").strip().upper()
+    async with async_session() as session:
+        try:
+            draft = await set_currency_code(
+                session,
+                founder_user_id=message.from_user.id,
+                currency_code=value,
+            )
+        except ValueError as exc:
+            await message.answer(
+                str(exc),
+                reply_markup=founder_cancel_keyboard(),
+                parse_mode="HTML",
+            )
+            return
+
+    await state.clear()
+    await message.answer(
+        _f5_text(
+            draft,
+            f'<a href="tg://user?id={message.from_user.id}">{html.escape(message.from_user.first_name or "بنیان‌گذار")}</a>',
+        ),
+        reply_markup=founder_review_keyboard(),
+        parse_mode="HTML",
+    )
+
+
+@founder_router.message(
     FounderStates.SET_NATION_NAME,
     F.text,
 )
@@ -776,8 +855,13 @@ async def receive_nation_name(
         await message.answer(str(exc))
         return
 
-    await state.set_state(FounderStates.SELECT_FLAG)
-    await _show_flag_step(message, state, draft)
+    await state.set_state(FounderStates.SET_CURRENCY_CODE)
+    await _send_panel(
+        message,
+        state,
+        _currency_step_text(draft),
+        founder_cancel_keyboard(),
+    )
 
 
 @founder_router.callback_query(
