@@ -678,8 +678,6 @@ async def group_founder_start(
         chat_id=message.from_user.id,
         user_id=message.from_user.id,
     )
-    bound.nation_name = bound.group_title or "گروه"
-    bound.status = "NAMING"
     await private_state.set_state(FounderStates.SET_CURRENCY_CODE)
     await private_state.update_data(founder_group_id=bound.group_id)
 
