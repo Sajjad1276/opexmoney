@@ -89,7 +89,14 @@ def market_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="🟢 خرید", callback_data="market_buy", style=ButtonStyle.SUCCESS),
             InlineKeyboardButton(text="🔴 فروش", callback_data="market_sell", style=ButtonStyle.DANGER),
         ],
-        [InlineKeyboardButton(text="📜 تاریخچه", callback_data="market_history")],
+        [
+            InlineKeyboardButton(text="📊 نمودار ارز", callback_data="market_chart_select"),
+            InlineKeyboardButton(text="🔔 ثبت هشدار", callback_data="alert_create"),
+        ],
+        [
+            InlineKeyboardButton(text="🔔 هشدارهای من", callback_data="alert:list"),
+            InlineKeyboardButton(text="📜 تاریخچه", callback_data="market_history"),
+        ],
         [InlineKeyboardButton(text="🔄 بروزرسانی", callback_data="market_refresh")],
         [InlineKeyboardButton(text="🏠 منوی اصلی", callback_data="back_to_dashboard")],
     ])
