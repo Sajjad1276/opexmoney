@@ -120,7 +120,7 @@ def clean_nation_list_text(user, trader_name: str, nations) -> str:
     for nation in nations[:4]:
         lines.append(
             f"{html.escape(nation.flag_emoji or '🏴')} <b>{html.escape(nation.name)}</b> | "
-            f"💰 {fmt_rate(nation.exchange_rate)} ΩXR | "
+            f"💰 {fmt_rate(nation.exchange_rate)} دلار | "
             f"👥 {to_fa(nation.member_count)} نفر"
         )
 
