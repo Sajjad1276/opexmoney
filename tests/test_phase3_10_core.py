@@ -3,6 +3,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 import pytest
+import secrets
 from sqlalchemy import delete, select
 
 from app.database.models import (
@@ -79,7 +80,7 @@ async def _seed_human_nations() -> tuple[int, int]:
             )
             nation_a = Nation(
                 name="Phase Three One",
-                currency_code=CURRENCY_A,
+                currency_code=f"P{USER_ID % 1000:03d}",
                 group_id=GROUP_A,
                 founder_user_id=None,
                 exchange_rate=Decimal("1"),
@@ -97,7 +98,7 @@ async def _seed_human_nations() -> tuple[int, int]:
             )
             nation_b = Nation(
                 name="Phase Three Two",
-                currency_code=CURRENCY_B,
+                currency_code=f"Q{USER_ID % 1000:03d}",
                 group_id=GROUP_B,
                 founder_user_id=None,
                 exchange_rate=Decimal("1"),
