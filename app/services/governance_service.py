@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal, ROUND_CEILING
 from math import isfinite
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,6 +13,8 @@ from app.database.models import (
     BehaviorSnapshot,
     GovernanceLedger,
     Nation,
+    NationMember,
+    NationTelegramMember,
     PlayerTemporalProfile,
     Proposal,
     RuleOverride,
@@ -21,6 +23,7 @@ from app.database.models import (
     Vote,
 )
 from app.services.economy_metrics import get_player_net_worth, get_player_net_worths
+from app.services.nation_service import get_user_active_nation_context
 from app.services.rules.registry import clamp_rule_value, get_rule
 from app.services.rules.resolver import invalidate_rule_cache
 from app.services.temporal_service import rotate_due_profiles
@@ -48,19 +51,45 @@ async def is_proposer_eligible(session: AsyncSession, player_id: int) -> bool:
     user = await session.get(User, player_id)
     if user is None:
         return False
-    if user.role == "founder":
-        return True
-    if user.home_nation_id is None:
-        return False
 
-    players = (
-        await session.execute(
-            select(User.user_id)
-            .where(
-                User.home_nation_id == user.home_nation_id,
-                User.username != "",
-            )
+    context = await get_user_active_nation_context(
+        session,
+        player_id,
+        repair=False,
+        lock=False,
+    )
+    if context is None:
+        return False
+    nation, role, _source = context
+
+    players_stmt = (
+        select(User.user_id)
+        .join(
+            NationMember,
+            NationMember.user_id == User.user_id,
         )
+        .join(
+            Nation,
+            Nation.nation_id == NationMember.nation_id,
+        )
+        .where(
+            NationMember.nation_id == nation.nation_id,
+            NationMember.is_active.is_(True),
+            User.username != "",
+            or_(
+                Nation.is_ai.is_(True),
+                select(NationTelegramMember.id)
+                .where(
+                    NationTelegramMember.nation_id == Nation.nation_id,
+                    NationTelegramMember.telegram_user_id == User.user_id,
+                    NationTelegramMember.is_active.is_(True),
+                )
+                .exists(),
+            ),
+        )
+    )
+    players = (
+        await session.execute(players_stmt)
     ).scalars().all()
     if not players:
         return False
@@ -97,6 +126,15 @@ async def is_active_voter(
     now = now or utcnow()
     user = await session.get(User, player_id)
     if user is None:
+        return False
+
+    context = await get_user_active_nation_context(
+        session,
+        player_id,
+        repair=False,
+        lock=False,
+    )
+    if context is None:
         return False
 
     cutoff = now - timedelta(days=settings.governance_voter_activity_days)
