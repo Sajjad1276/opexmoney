@@ -34,7 +34,7 @@ from app.keyboards.inline import (
     trade_preview_keyboard,
 )
 from app.services.economic_engine import get_active_members
-from app.services.market_service import get_user_sell_holdings
+from app.services.market_service import get_tradeable_nation, get_user_sell_holdings
 from app.services.alert_service import (
     create_price_alert,
     delete_price_alert,
@@ -631,7 +631,7 @@ async def make_buy_preview(
     async with async_session() as session:
         async with session.begin():
             user = await session.get(User, actor_user_id)
-            nation = await session.get(Nation, nation_id)
+            nation = await get_tradeable_nation(session, nation_id)
 
             if not user or not nation:
                 await message.answer(
@@ -788,7 +788,7 @@ async def confirm_buy(call, state=None):
                     .with_for_update()
                 )
             ).scalar_one_or_none()
-            nation = await session.get(Nation, nation_id, with_for_update=True)
+            nation = await get_tradeable_nation(session, nation_id, lock=True)
             preview = (
                 await session.scalar(
                     select(TradePreview)
