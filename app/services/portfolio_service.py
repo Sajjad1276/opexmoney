@@ -126,6 +126,7 @@ async def get_portfolio_data(session: AsyncSession, user_id: int) -> dict:
         "today_imperial": imperial_date,
         "current_time": imperial_time,
         "portfolio_change_pct": portfolio_change_pct,
+        "live_update_seconds": 10,
         # Backward-compatible key for existing consumers/tests.
         "today_jalali": today_jalali(),
     }
