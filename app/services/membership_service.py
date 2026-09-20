@@ -185,17 +185,23 @@ async def _ensure_registered_user_projection(
         session.add(holding)
         await session.flush()
 
-    if role == NationMemberRole.FOUNDER:
-        user.role = "founder"
-    elif user.role in {"player", "citizen"}:
-        user.role = "citizen"
-
     if user.home_nation_id is None:
         user.home_nation_id = nation.nation_id
 
-    # Keep the legacy User.balance field synchronized with the canonical
-    # nation CurrencyHolding ledger.
-    user.balance = holding.amount
+    # User.role and User.balance are compatibility projections for the
+    # current home nation. They must not be overwritten when the same
+    # Telegram user joins a second nation.
+    if user.home_nation_id == nation.nation_id:
+        if role == NationMemberRole.FOUNDER:
+            user.role = "founder"
+        elif role == NationMemberRole.MINISTER:
+            user.role = "minister"
+        elif role == NationMemberRole.TRADER:
+            user.role = "trader"
+        else:
+            user.role = "citizen"
+
+        user.balance = holding.amount
 
     return user, created
 
