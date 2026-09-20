@@ -176,6 +176,11 @@ async def _ensure_registered_user_projection(
         session.add(holding)
         await session.flush()
 
+    if role == NationMemberRole.FOUNDER:
+        user.role = "founder"
+    elif user.role in {"player", "citizen"}:
+        user.role = "citizen"
+
     if user.home_nation_id is None:
         user.home_nation_id = nation.nation_id
 
