@@ -273,6 +273,14 @@ async def get_user_active_nation_context(
     return None
 
 
+def is_human_nation(nation: Nation) -> bool:
+    return not bool(nation.is_ai)
+
+
+def is_ai_nation(nation: Nation) -> bool:
+    return bool(nation.is_ai)
+
+
 async def is_user_active_in_nation(
     session: AsyncSession,
     user_id: int,
