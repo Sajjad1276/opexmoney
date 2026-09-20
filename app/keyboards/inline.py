@@ -148,6 +148,55 @@ def nation_panel_keyboard(
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
+def founder_intro_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="✅ بله، گروه دارم",
+                    callback_data="founder_has_group",
+                    style=ButtonStyle.SUCCESS,
+                ),
+                InlineKeyboardButton(
+                    text="❌ گروه ندارم",
+                    callback_data="founder_no_group",
+                    style=ButtonStyle.DANGER,
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text="↩️ بازگشت",
+                    callback_data="back_to_dashboard",
+                )
+            ],
+        ]
+    )
+
+
+def nation_founder_announcement_keyboard(bot_username: str, nation_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="🚀 شروع بازی",
+                    url=f"https://t.me/{bot_username}?start=nation_{nation_id}",
+                    style=ButtonStyle.PRIMARY,
+                ),
+                InlineKeyboardButton(
+                    text="📊 آمار ملت",
+                    callback_data=f"nation_stats_{nation_id}",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text="💹 نرخ لحظه‌ای",
+                    callback_data=f"nation_rate_{nation_id}",
+                )
+            ],
+        ]
+    )
+
+
 def founder_cancel_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -286,6 +335,13 @@ def nation_selection_keyboard(nations) -> InlineKeyboardMarkup:
             )]
         for nation in nations
     ]
+    rows.append([
+        InlineKeyboardButton(
+            text="🏛 تأسیس ملت",
+            callback_data="start_founder",
+            style=ButtonStyle.SUCCESS,
+        )
+    ])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
