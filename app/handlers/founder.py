@@ -145,7 +145,7 @@ async def _set_state_for_draft(state: FSMContext, status: str) -> None:
     mapping = {
         "WAITING_GROUP": FounderStates.WAITING_GROUP_ADMIN,
         "GROUP_READY": FounderStates.SET_NATION_NAME,
-        "NAMING": FounderStates.SET_CURRENCY_CODE,
+        "NAMING": FounderStates.SET_NATION_NAME,
         "FLAG": FounderStates.SELECT_FLAG,
         "REVIEW": FounderStates.CONFIRM,
     }
@@ -612,17 +612,18 @@ async def founder_group_status_changed(
         chat_id=actor.id,
         user_id=actor.id,
     )
-    await private_state.set_state(FounderStates.SET_CURRENCY_CODE)
+    await private_state.set_state(FounderStates.SET_NATION_NAME)
     await private_state.update_data(founder_group_id=event.chat.id)
     await FounderPanel(private_state, bot).delete(actor.id)
 
     try:
-        await bot.send_message(
+        panel = await bot.send_message(
             actor.id,
-            _group_identified_text(bound, member_count),
-            reply_markup=founder_cancel_keyboard(),
+            _name_step_text(bound.group_title or "گروه"),
+            reply_markup=founder_name_step_keyboard(),
             parse_mode="HTML",
         )
+        await private_state.update_data(founder_panel_message_id=panel.message_id)
     except Exception:
         logger.debug("Could not notify founder after group promotion", exc_info=True)
 
@@ -796,21 +797,16 @@ async def check_founder_group(
         await call.answer(conflict_message, show_alert=True)
         return
 
-    await state.set_state(FounderStates.SET_CURRENCY_CODE)
+    await state.set_state(FounderStates.SET_NATION_NAME)
     await state.update_data(founder_group_id=group_id)
     await call.answer("✅ گروه شناسایی شد.")
 
-    try:
-        member_count = await bot.get_chat_member_count(group_id)
-    except Exception:
-        member_count = 0
-
     if call.message:
-        await _edit_panel(
-            call,
+        await _show_name_step(
+            call.message,
             state,
-            _group_identified_text(draft, member_count),
-            founder_cancel_keyboard(),
+            draft,
+            edit_call=call,
         )
 
 
