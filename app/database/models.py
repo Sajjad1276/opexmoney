@@ -27,6 +27,11 @@ class Base(DeclarativeBase):
     pass
 
 
+class NationBackingType(StrEnum):
+    HUMAN = "human"
+    AI = "ai"
+
+
 class ActivityType(StrEnum):
     TRADE = "trade"
     LOGIN = "login"
@@ -66,6 +71,10 @@ class Nation(Base):
     invite_code: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
     treasury: Mapped[Decimal] = mapped_column(Numeric(20, 2), default=Decimal("0.00"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    @property
+    def backing_type(self) -> NationBackingType:
+        return NationBackingType.AI if self.is_ai else NationBackingType.HUMAN
 
 
 class BotGroup(Base):
@@ -465,6 +474,59 @@ class NationLog(Base):
         nullable=True,
     )
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class NationEconomicEvent(Base):
+    __tablename__ = "nation_economic_events"
+    __table_args__ = (
+        Index(
+            "ix_nation_economic_events_nation_created",
+            "nation_id",
+            "created_at",
+        ),
+        Index(
+            "ix_nation_economic_events_nation_type_created",
+            "nation_id",
+            "event_type",
+            "created_at",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    nation_id: Mapped[int] = mapped_column(
+        ForeignKey("nations.nation_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    event_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    actor_id: Mapped[int | None] = mapped_column(
+        BigInteger,
+        ForeignKey("users.user_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    target_nation_id: Mapped[int | None] = mapped_column(
+        ForeignKey("nations.nation_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    amount_xr: Mapped[Decimal] = mapped_column(
+        Numeric(20, 6),
+        nullable=False,
+        default=Decimal("0"),
+    )
+    amount_local: Mapped[Decimal] = mapped_column(
+        Numeric(20, 6),
+        nullable=False,
+        default=Decimal("0"),
+    )
+    event_metadata: Mapped[dict | None] = mapped_column(
+        "metadata",
+        postgresql.JSONB,
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        server_default=func.now(),
+        nullable=False,
+    )
 
 
 class NationJoinRequest(Base):

@@ -7,7 +7,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import Nation, NationMember, NationMemberRole, NationTreasury, TreasuryLog, User
-from app.services.nation_service import get_user_active_nation
+from app.services.nation_service import get_user_active_nation, is_user_active_in_nation
+from app.services.economic_event_service import record_economic_event
 from app.services.user_service import sync_user_balance
 
 
@@ -19,6 +20,12 @@ async def get_member_role(
     user_id: int,
     nation_id: int,
 ) -> str | None:
+    if not await is_user_active_in_nation(
+        session,
+        user_id,
+        nation_id,
+    ):
+        return None
     role = await session.scalar(
         select(NationMember.role)
         .where(
@@ -66,11 +73,7 @@ async def get_treasury(
     session: AsyncSession,
     nation_id: int,
 ) -> dict | None:
-    treasury = await _ensure_treasury(session, nation_id)
-
-    if treasury is None:
-        return None
-
+    # Read paths must not create a treasury row.
     row = (
         await session.execute(
             select(
@@ -81,11 +84,15 @@ async def get_treasury(
                 NationTreasury.total_deposited,
                 NationTreasury.last_deposit_at,
             )
-            .join(
-                Nation,
-                Nation.nation_id == NationTreasury.nation_id,
+            .select_from(Nation)
+            .outerjoin(
+                NationTreasury,
+                NationTreasury.nation_id == Nation.nation_id,
             )
-            .where(NationTreasury.nation_id == nation_id)
+            .where(
+                Nation.nation_id == nation_id,
+                Nation.is_active.is_(True),
+            )
         )
     ).one_or_none()
 
@@ -95,9 +102,9 @@ async def get_treasury(
     return {
         "nation_name": str(row.name),
         "currency_code": str(row.currency_code),
-        "balance_xr": Decimal(str(row.balance_xr)),
-        "balance_local": Decimal(str(row.balance_local)),
-        "total_deposited": Decimal(str(row.total_deposited)),
+        "balance_xr": Decimal(str(row.balance_xr or Decimal("0"))),
+        "balance_local": Decimal(str(row.balance_local or Decimal("0"))),
+        "total_deposited": Decimal(str(row.total_deposited or Decimal("0"))),
         "last_deposit_at": row.last_deposit_at,
     }
 
@@ -161,6 +168,14 @@ async def deposit_to_treasury(
     if user is None:
         return {"ok": False, "reason": "user_not_found"}
 
+    if not await is_user_active_in_nation(
+        session,
+        user_id,
+        nation_id,
+        lock=True,
+    ):
+        return {"ok": False, "reason": "membership_required"}
+
     if user.xr_balance < amount_xr:
         return {
             "ok": False,
@@ -194,6 +209,14 @@ async def deposit_to_treasury(
             amount_xr=amount_xr,
         )
     )
+    record_economic_event(
+        session,
+        nation_id=nation_id,
+        event_type="TREASURY_DEPOSIT",
+        actor_id=user_id,
+        amount_xr=amount_xr,
+        metadata={"source": "treasury"},
+    )
 
     await sync_user_balance(session, user_id)
 
@@ -219,6 +242,14 @@ async def withdraw_from_treasury(
     nation = await session.get(Nation, nation_id, with_for_update=True)
     if nation is None or not nation.is_active:
         return {"ok": False, "reason": "nation_not_found"}
+
+    if not await is_user_active_in_nation(
+        session,
+        actor_id,
+        nation_id,
+        lock=True,
+    ):
+        return {"ok": False, "reason": "membership_required"}
 
     member = await session.scalar(
         select(NationMember)
@@ -270,6 +301,14 @@ async def withdraw_from_treasury(
             amount_xr=amount_xr,
             note=note,
         )
+    )
+    record_economic_event(
+        session,
+        nation_id=nation_id,
+        event_type="TREASURY_WITHDRAW",
+        actor_id=actor_id,
+        amount_xr=amount_xr,
+        metadata={"source": "treasury", "note": note},
     )
 
     await sync_user_balance(session, actor_id)

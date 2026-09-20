@@ -12,6 +12,7 @@ from app.database.models import (
     NationLog,
     NationMember,
     NationMemberRole,
+    NationTelegramMember,
     Transaction,
     User,
 )
@@ -74,6 +75,11 @@ async def cleanup():
                 await session.execute(
                     delete(NationMember).where(NationMember.nation_id.in_(nation_ids))
                 )
+                await session.execute(
+                    delete(NationTelegramMember).where(
+                        NationTelegramMember.nation_id.in_(nation_ids)
+                    )
+                )
             await session.execute(
                 delete(User).where(User.user_id.in_([USER_ID, FOUNDER_ID]))
             )
@@ -131,6 +137,20 @@ async def seed_nation(*, rate: Decimal, prev: Decimal = Decimal("1")) -> int:
                         nation_id=nation.nation_id,
                         user_id=FOUNDER_ID,
                         role=NationMemberRole.FOUNDER,
+                        is_active=True,
+                    ),
+                    NationTelegramMember(
+                        nation_id=nation.nation_id,
+                        telegram_user_id=USER_ID,
+                        telegram_status="member",
+                        is_member=True,
+                        is_active=True,
+                    ),
+                    NationTelegramMember(
+                        nation_id=nation.nation_id,
+                        telegram_user_id=FOUNDER_ID,
+                        telegram_status="administrator",
+                        is_member=True,
                         is_active=True,
                     ),
                     CurrencyHolding(

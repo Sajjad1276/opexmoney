@@ -13,6 +13,9 @@ from app.database.models import (
     CurrencyHolding,
     GovernanceLedger,
     Nation,
+    NationMember,
+    NationMemberRole,
+    NationTelegramMember,
     PlayerTemporalProfile,
     Proposal,
     RuleOverride,
@@ -162,6 +165,29 @@ async def seed_nation_user(
             session.add_all([nation, user])
             await session.flush()
             user.home_nation_id = nation.nation_id
+            member_role = (
+                NationMemberRole.CITIZEN
+                if role == "player"
+                else NationMemberRole(role)
+            )
+            session.add(
+                NationMember(
+                    nation_id=nation.nation_id,
+                    user_id=user_id,
+                    role=member_role,
+                    is_active=True,
+                )
+            )
+            session.add(
+                NationTelegramMember(
+                    nation_id=nation.nation_id,
+                    telegram_user_id=user_id,
+                    telegram_status="administrator" if role == "founder" else "member",
+                    is_member=True,
+                    is_active=True,
+                )
+            )
+            await session.flush()
             return nation.nation_id, user.user_id
 
 

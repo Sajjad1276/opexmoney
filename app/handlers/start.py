@@ -36,8 +36,9 @@ from app.keyboards.inline import (
     welcome_keyboard,
 )
 from app.keyboards.reply import main_menu_keyboard, new_player_menu_keyboard
-from app.services.nation_service import get_active_nations, get_nation_rank
+from app.services.nation_service import get_active_nations, get_nation_rank, get_user_active_nation_context
 from app.services.mission_service import check_permanent_missions, increment_mission
+from app.services.economic_event_service import record_economic_event
 from app.services.founder_service import cancel_draft
 from app.services.user_service import get_registration_status, get_user, is_fully_registered, sync_user_balance, username_exists
 from app.states.founder import FounderStates
@@ -336,24 +337,35 @@ async def continue_registration(
 
     # A persisted home nation means the user is not really at the nation
     # selection step. Repair the missing holding from the existing balance.
-    if user.home_nation_id is not None:
-        async with async_session() as session:
-            async with session.begin():
-                nation = await session.get(Nation, user.home_nation_id)
+    async with async_session() as session:
+        async with session.begin():
+            context = await get_user_active_nation_context(
+                session,
+                user.user_id,
+                repair=False,
+                lock=True,
+            )
+            if context is not None:
+                nation = context[0]
                 holding = await session.scalar(
                     select(CurrencyHolding).where(
                         CurrencyHolding.user_id == user.user_id,
-                        CurrencyHolding.nation_id == user.home_nation_id,
+                        CurrencyHolding.nation_id == nation.nation_id,
                     )
                 )
-                if nation is not None and holding is None:
+                if holding is None:
                     session.add(
                         CurrencyHolding(
                             user_id=user.user_id,
-                            nation_id=user.home_nation_id,
+                            nation_id=nation.nation_id,
                             amount=user.balance,
                         )
                     )
+                await session.flush()
+            else:
+                nation = None
+
+    if nation is not None:
         await state.clear()
         await show_dashboard(message, user)
         return
@@ -985,10 +997,20 @@ async def new_player_next_step(message: Message, state: FSMContext) -> None:
     async with async_session() as session:
         async with session.begin():
             user = await session.get(User, message.from_user.id)
-            if user is None or user.home_nation_id is None:
-                await message.answer("⚠️ هنوز ملتت مشخص نشده. /start بزن.")
+            context = (
+                await get_user_active_nation_context(
+                    session,
+                    message.from_user.id,
+                    repair=False,
+                    lock=False,
+                )
+                if user is not None
+                else None
+            )
+            if user is None or context is None:
+                await message.answer("⚠️ هنوز ملت فعالی نداری. /start بزن.")
                 return
-            nation = await session.get(Nation, user.home_nation_id)
+            nation = context[0]
             trade_count = int(
                 await session.scalar(
                     select(func.count(Transaction.id)).where(
@@ -1357,7 +1379,17 @@ async def first_trade_tutorial(call: CallbackQuery, state: FSMContext) -> None:
     async with async_session() as session:
         async with session.begin():
             user = await get_user(session, call.from_user.id)
-            nation = await session.get(Nation, user.home_nation_id) if user and user.home_nation_id else None
+            context = (
+                await get_user_active_nation_context(
+                    session,
+                    call.from_user.id,
+                    repair=False,
+                    lock=False,
+                )
+                if user is not None
+                else None
+            )
+            nation = context[0] if context is not None else None
     if not user or not nation:
         await call.answer("⚠️ اطلاعات معامله پیدا نشد.", show_alert=True)
         return
@@ -1384,14 +1416,20 @@ async def confirm_first_trade(call: CallbackQuery, state: FSMContext) -> None:
                     ).with_for_update()
                 )
             ).scalar_one_or_none()
-            if not user or not user.home_nation_id:
-                await call.answer("⚠️ حساب پیدا نشد. /start بزن.", show_alert=True)
+            context = await get_user_active_nation_context(
+                session,
+                call.from_user.id,
+                repair=False,
+                lock=True,
+            )
+            if not user or context is None:
+                await call.answer("⚠️ عضویت ملت فعال نیست. /start بزن.", show_alert=True)
                 return
-            nation = await session.get(Nation, user.home_nation_id, with_for_update=True)
+            nation = context[0]
             holding = await session.scalar(
                 select(CurrencyHolding).where(
                     CurrencyHolding.user_id == user.user_id,
-                    CurrencyHolding.nation_id == user.home_nation_id,
+                    CurrencyHolding.nation_id == nation.nation_id,
                 ).with_for_update()
             )
             if not nation or not holding:
@@ -1420,6 +1458,15 @@ async def confirm_first_trade(call: CallbackQuery, state: FSMContext) -> None:
                 nation_id=nation.nation_id,
                 activity_type="trade",
             ))
+            record_economic_event(
+                session,
+                nation_id=nation.nation_id,
+                event_type="TRADE_SELL",
+                actor_id=user.user_id,
+                amount_xr=receive_omx,
+                amount_local=Decimal("50"),
+                metadata={"source": "first_trade"},
+            )
             await sync_user_balance(session, user.user_id)
 
     text = (
@@ -1451,7 +1498,17 @@ async def skip_first_trade(call: CallbackQuery, state: FSMContext) -> None:
     async with async_session() as session:
         async with session.begin():
             user = await get_user(session, call.from_user.id)
-            nation = await session.get(Nation, user.home_nation_id) if user and user.home_nation_id else None
+            context = (
+                await get_user_active_nation_context(
+                    session,
+                    call.from_user.id,
+                    repair=False,
+                    lock=False,
+                )
+                if user is not None
+                else None
+            )
+            nation = context[0] if context is not None else None
     currency_code = nation.currency_code if nation else "ارز"
     balance = fmt_amount(nation and (await _get_holding_amount(call.from_user.id, nation.nation_id)) or Decimal("500")) if nation else "500"
     text = f"{html.escape(call.from_user.first_name or 'معامله‌گر')}، فعلاً از معامله رد شدی.\n\n💰 موجودی: {balance} <code>{html.escape(currency_code)}</code>\n\nهر وقت آماده شدی، از بازار شروع کن."

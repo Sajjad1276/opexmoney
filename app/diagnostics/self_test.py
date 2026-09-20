@@ -119,6 +119,33 @@ async def run_startup_smoke_test(
         ok = False
 
     try:
+        async with async_session() as session:
+            orphan_human = await session.scalar(
+                text(
+                    "SELECT COUNT(*) FROM nations "
+                    "WHERE is_active = TRUE AND is_ai = FALSE AND group_id IS NULL"
+                )
+            )
+            invalid_ai_group = await session.scalar(
+                text(
+                    "SELECT COUNT(*) FROM nations "
+                    "WHERE is_active = TRUE AND is_ai = TRUE AND group_id IS NOT NULL"
+                )
+            )
+        if orphan_human or invalid_ai_group:
+            logger.error(
+                "SELFTEST|FAIL|nation-backing|orphan_human=%s|ai_with_group=%s",
+                orphan_human,
+                invalid_ai_group,
+            )
+            ok = False
+        else:
+            logger.info("SELFTEST|PASS|nation-backing|human=telegram|ai=virtual")
+    except Exception:
+        logger.exception("SELFTEST|FAIL|nation-backing")
+        ok = False
+
+    try:
         phase2_tables = ("proposals", "votes", "rule_overrides", "governance_ledger",
                          "player_temporal_profiles", "behavior_snapshots")
         nation_tables = (
@@ -127,6 +154,7 @@ async def run_startup_smoke_test(
             "nation_join_requests",
             "nation_wars",
             "nation_telegram_members",
+            "nation_economic_events",
         )
         missing_phase2 = [x for x in phase2_tables if not await _table_exists(x)]
         missing_nation = [x for x in nation_tables if not await _table_exists(x)]
@@ -229,7 +257,8 @@ async def run_startup_smoke_test(
 
     missing_metadata = {
         "proposals", "votes", "rule_overrides", "governance_ledger",
-        "player_temporal_profiles", "behavior_snapshots"
+        "player_temporal_profiles", "behavior_snapshots",
+        "nation_telegram_members", "nation_economic_events",
     }.difference(Base.metadata.tables)
     if missing_metadata:
         logger.error("SELFTEST|FAIL|metadata|missing=%s", ",".join(sorted(missing_metadata))); ok = False

@@ -31,6 +31,7 @@ from app.services.governance_service import (
     revoke_override,
 )
 from app.services.rules.registry import RULE_REGISTRY, get_rule, parse_rule_input
+from app.services.nation_service import get_user_active_nation_context
 from app.services.rules.resolver import resolve
 from app.states.governance import GovernanceStates
 from app.utils.formatting import to_fa
@@ -174,13 +175,24 @@ async def governance_select_rule(call: CallbackQuery, state: FSMContext):
     async with async_session() as session:
         async with session.begin():
             user = await session.get(User, call.from_user.id)
-            if user is None or not await is_proposer_eligible(session, user.user_id):
+            context = (
+                await get_user_active_nation_context(
+                    session,
+                    call.from_user.id,
+                    repair=False,
+                    lock=False,
+                )
+                if user is not None
+                else None
+            )
+            if user is None or context is None or not await is_proposer_eligible(session, user.user_id):
                 await call.answer("⚠️ شرایط ثبت طرح رو نداری.", show_alert=True)
                 return
+            active_nation, _role, _source = context
             current = await resolve(
                 session,
                 key,
-                nation_id=user.home_nation_id,
+                nation_id=active_nation.nation_id,
                 player_id=user.user_id,
             )
 
@@ -226,16 +238,27 @@ async def governance_receive_value(message: Message, state: FSMContext):
     async with async_session() as session:
         async with session.begin():
             user = await session.get(User, message.from_user.id)
-            if user is None or not await is_proposer_eligible(session, user.user_id):
+            context = (
+                await get_user_active_nation_context(
+                    session,
+                    message.from_user.id,
+                    repair=False,
+                    lock=False,
+                )
+                if user is not None
+                else None
+            )
+            if user is None or context is None or not await is_proposer_eligible(session, user.user_id):
                 await state.clear()
                 await message.answer("⚠️ دیگه شرایط ثبت این طرح رو نداری.")
                 return
 
-            target_id = user.home_nation_id if rule.target_scope == "nation" else None
+            active_nation, _role, _source = context
+            target_id = active_nation.nation_id if rule.target_scope == "nation" else None
             current = await resolve(
                 session,
                 key,
-                nation_id=user.home_nation_id,
+                nation_id=active_nation.nation_id,
                 player_id=user.user_id,
             )
 

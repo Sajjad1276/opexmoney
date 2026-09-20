@@ -24,6 +24,7 @@ REVISION_CHAIN = [
     "0015_nation_founding_drafts",
     "0016_ai_world",
     "0017_telegram_membership",
+    "0018_economic_events",
 ]
 
 BASE_TABLES = {
@@ -242,6 +243,9 @@ async def detect_revision(conn: asyncpg.Connection) -> str | None:
 
     if await table_exists(conn, "nation_telegram_members"):
         highest = "0017_telegram_membership"
+
+    if await table_exists(conn, "nation_economic_events"):
+        highest = "0018_economic_events"
 
     return highest
 
