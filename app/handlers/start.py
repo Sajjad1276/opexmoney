@@ -43,7 +43,15 @@ from app.services.user_service import get_registration_status, get_user, is_full
 from app.states.founder import FounderStates
 from app.states.onboarding import OnboardingStates
 from config import settings
-from app.utils.formatting import fmt_amount, fmt_pct, fmt_rate, get_rate_change, get_rate_emoji, to_fa
+from app.utils.formatting import (
+    fmt_amount,
+    fmt_pct,
+    fmt_rate,
+    get_rate_change,
+    get_rate_emoji,
+    imperial_datetime,
+    to_fa,
+)
 from app.utils.ui import close_inline_panel, remember_inline_panel, send_submenu_panel
 
 router = Router(name="start")
@@ -283,9 +291,20 @@ async def show_dashboard(
             logger.debug("Could not delete previous inline panel", exc_info=True)
 
     # Reply keyboards are attached to outgoing messages. Deleting an inline
-    # panel does not restore the main keyboard, so explicitly re-publish it
-    # without adding visible dashboard text.
-    await message.answer("\u2060", reply_markup=main_menu_keyboard())
+    # panel does not restore the main keyboard, so re-publish it together with
+    # the compact main-menu landing message.
+    imperial_date, imperial_time = imperial_datetime()
+    text = (
+        "⛃ <b>بازگشت به منوی OPEXMONEY</b>\n\n"
+        "🎯 <b>تصمیم بگیر، معامله کن، رشد کن!</b>\n"
+        f"📅 تاریخ شاهنشاهی: {imperial_date}\n"
+        f"🕐 ساعت شاهنشاهی: {imperial_time}"
+    )
+    await message.answer(
+        rtl_html(text),
+        reply_markup=main_menu_keyboard(),
+        parse_mode=ParseMode.HTML,
+    )
 
 
 async def continue_registration(
