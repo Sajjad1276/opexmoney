@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - rebuild/phase-2-membership-engine
+  pull_request:
+    branches:
+      - main
 
 jobs:
   compile:
