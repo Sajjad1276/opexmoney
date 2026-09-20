@@ -898,6 +898,71 @@ async def _generate_personalized_welcome(
         )
 
 
+@router.callback_query(
+    F.data == "use_suggested_name",
+    StateFilter(OnboardingStates.ONBOARDING_NAME),
+)
+async def use_suggested_name(call: CallbackQuery, state: FSMContext) -> None:
+    data = await state.get_data()
+    name = (data.get("suggested_username") or "").strip()
+    if not name or not is_valid_trader_name(name) or is_blocked_trader_name(name):
+        await call.answer("⚠️ این نام قابل استفاده نیست.", show_alert=True)
+        return
+
+    async with async_session() as session:
+        async with session.begin():
+            if await username_exists(session, name):
+                await call.answer("⚠️ این نام قبلاً گرفته شده.", show_alert=True)
+                return
+
+    await state.update_data(username=name, onboarding_started_at=time.time())
+    await call.answer("✅ نام انتخاب شد")
+    if call.message:
+        await _render_nation_page(call.message, state, page=0, edit=True)
+
+
+@router.callback_query(
+    F.data == "choose_custom_name",
+    StateFilter(OnboardingStates.ONBOARDING_NAME),
+)
+async def choose_custom_name(call: CallbackQuery, state: FSMContext) -> None:
+    await call.answer()
+    if call.message:
+        await call.message.edit_text(
+            rtl_html(
+                "👤 <b>نام معامله‌گرت رو بنویس</b>\n\n"
+                "۳ تا ۲۰ کاراکتر. فارسی، انگلیسی، عدد و خط تیره."
+            ),
+            reply_markup=cancel_keyboard(),
+            parse_mode="HTML",
+        )
+
+
+@router.message(F.text == "☰ بیشتر")
+async def open_more_menu(message: Message) -> None:
+    await message.answer(
+        rtl_html("☰ <b>بخش‌های بیشتر</b>\n\nقابلیت‌های مدیریتی و جزئی‌تر اینجا قرار دارن."),
+        reply_markup=more_menu_keyboard(),
+        parse_mode="HTML",
+    )
+
+
+@router.callback_query(F.data == "missions_open")
+async def open_missions_from_more(call: CallbackQuery) -> None:
+    await call.answer()
+    if call.message:
+        from app.handlers.missions import show_missions
+        await show_missions(call.message)
+
+
+@router.callback_query(F.data == "treasury_open")
+async def open_treasury_from_more(call: CallbackQuery, state: FSMContext) -> None:
+    await call.answer()
+    if call.message:
+        from app.handlers.treasury import open_treasury_from_main_menu
+        await open_treasury_from_main_menu(call.message, state)
+
+
 @router.message(OnboardingStates.ONBOARDING_NAME, F.text)
 async def onboarding_name(message: Message, state: FSMContext) -> None:
     if not await _state_is_alive(state, OnboardingStates.ONBOARDING_NAME):
@@ -1269,24 +1334,26 @@ async def confirm_first_trade(call: CallbackQuery, state: FSMContext) -> None:
             await sync_user_balance(session, user.user_id)
 
     text = (
-        "✅ <b>معامله انجام شد.</b>\n<blockquote>⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀</blockquote>\n"
-        f"📤 فروختی:   <s>50 {html.escape(nation.currency_code)}</s>\n"
-        f"📥 دریافتی:  <b>{fmt_amount(receive_omx)} دلار</b>\n\n"
+        "✅ <b>اولین معامله انجام شد!</b>\n"
         "<blockquote>⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀</blockquote>\n"
-        f"💰 موجودی:\n<code>{html.escape(nation.currency_code)}</code>: <b>{fmt_amount(holding.amount)}</b>\n"
-        f"<code>دلار</code>: <b>{fmt_amount(user.xr_balance)}</b>\n\n"
-        "<blockquote>⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀</blockquote>\n✨ <b>«اولین قدم در بازارهای OPEX» باز شد.</b>\n"
-        "<blockquote>⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀</blockquote>"
+        f"📤 فروختی: <s>۵۰ {html.escape(nation.currency_code)}</s>\n"
+        f"📥 دریافتی: <b>{fmt_amount(receive_omx)} دلار</b>\n\n"
+        f"💰 حالا داری: <b>{fmt_amount(holding.amount)} {html.escape(nation.currency_code)}</b> + <b>{fmt_amount(user.xr_balance)} دلار</b>\n\n"
+        "🎯 <b>قدم بعدی:</b>\n"
+        "یک ارز دیگه از بازار بخر و ببین با تغییر نرخ، دارایی‌ات چطور بالا و پایین می‌شه."
     )
     await state.clear()
-    await _safe_edit_text(call, text)
-    await call.answer()
-    if call.message:
-        await call.message.answer(
-            "🌐 <b>منوی اصلی آماده‌ست.</b>",
-            reply_markup=main_menu_keyboard(),
-            parse_mode="HTML",
-        )
+    await _safe_edit_text(
+        call,
+        text,
+        InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text="💹 رفتن به بازار", callback_data="market_main", style=ButtonStyle.SUCCESS)],
+                [InlineKeyboardButton(text="🏠 دیدن داشبورد", callback_data="back_to_dashboard")],
+            ]
+        ),
+    )
+    await call.answer("✅ اولین بردت ثبت شد")
 
 
 @router.callback_query(F.data == "skip_first_trade")
