@@ -283,7 +283,7 @@ async def get_nation_log(
         elif row.action_type == "POLICY_CHANGED":
             detail = str(meta.get("change", ""))
         elif row.action_type in {"TREASURY_DEPOSIT", "TREASURY_WITHDRAW"}:
-            detail = f"{meta.get('amount', '?')} ΩXR"
+            detail = f"{meta.get('amount', '?')} دلار"
 
         actor_part = f" · {actor}" if actor and actor != "سیستم" else ""
         detail_part = f" · {html.escape(detail)}" if detail else ""
@@ -404,7 +404,7 @@ async def _panel_text(
         f"🛡 وزیر: <b>{ministers}/3</b>\n"
         f"💼 تاجر: <b>{traders}/10</b>\n"
         f"👤 شهروند: <b>{citizens}</b>\n"
-        f"💰 خزانه: <b>{_fmt_amount(nation.treasury)}</b> ΩXR\n"
+        f"💰 خزانه: <b>{_fmt_amount(nation.treasury)}</b> دلار\n"
         f"🧭 سیاست ورود: <b>{html.escape(JOIN_POLICIES.get(nation.join_policy, nation.join_policy))}</b>\n"
         f"🎭 شخصیت: <b>{html.escape(PERSONALITIES.get(nation.personality, nation.personality))}</b>"
     )
