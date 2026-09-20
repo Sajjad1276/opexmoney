@@ -178,6 +178,17 @@ async def run_membership_reconciliation(bot: Bot) -> None:
         logger.exception("Nation membership reconciliation failed")
 
 
+async def run_founder_draft_expiration() -> None:
+    try:
+        async with async_session() as session:
+            async with session.begin():
+                from app.services.founder_service import expire_founder_drafts
+                expired = await expire_founder_drafts(session)
+        logger.info("Founder draft expiration completed | expired=%s", expired)
+    except Exception:
+        logger.exception("Founder draft expiration failed")
+
+
 async def run_rank_job() -> None:
     try:
         async with async_session() as session:
@@ -278,6 +289,14 @@ def build_scheduler(bot: Bot) -> AsyncIOScheduler:
         CronTrigger(minute="*/15"),
         args=[bot],
         id="nation_membership_reconciliation_15m",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+    scheduler.add_job(
+        run_founder_draft_expiration,
+        CronTrigger(minute="*/15"),
+        id="founder_draft_expiration_15m",
         replace_existing=True,
         max_instances=1,
         coalesce=True,
