@@ -19,6 +19,7 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
     text,
+    CheckConstraint,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -42,6 +43,10 @@ class Nation(Base):
             "group_id",
             unique=True,
             postgresql_where=text("is_active = TRUE"),
+        ),
+        CheckConstraint(
+            "(is_ai = TRUE AND group_id IS NULL) OR (is_ai = FALSE AND group_id IS NOT NULL)",
+            name="ck_nations_ai_group_boundary",
         ),
     )
     nation_id: Mapped[int] = mapped_column(Integer, primary_key=True)
