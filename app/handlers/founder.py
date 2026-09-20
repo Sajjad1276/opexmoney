@@ -24,6 +24,7 @@ from app.keyboards.inline import (
     founder_currency_confirm_keyboard,
     founder_flag_selection_keyboard,
     founder_name_step_keyboard,
+    nation_founder_announcement_keyboard,
     founder_review_keyboard,
 )
 from app.services.founder_service import (
@@ -38,7 +39,7 @@ from app.services.founder_service import (
     set_flag,
     set_nation_name,
 )
-from app.services.user_service import get_user
+from app.services.user_service import get_user, username_exists
 from app.states.founder import FounderStates
 from app.states.onboarding import OnboardingStates
 from app.utils.name_filter import is_blocked_trader_name, is_valid_trader_name
@@ -459,7 +460,7 @@ async def founder_no_group(call: CallbackQuery) -> None:
                 InlineKeyboardButton(
                     text="🔄 گروه ساختم، ادامه بده",
                     callback_data="founder_has_group",
-                    style="success",
+                    style=ButtonStyle.SUCCESS,
                 ),
                 InlineKeyboardButton(
                     text="💹 فعلاً Player میشم",
@@ -516,9 +517,12 @@ async def founder_start_player(call: CallbackQuery, state: FSMContext) -> None:
         # Reuse the canonical player onboarding path.
         await start_game_button(call.message, state)
     elif call.message:
-        await call.message.edit_text(
-            "✅ حالت Player فعال شد. برای ورود به بازی، منوی اصلی رو باز کن.",
-            reply_markup=None,
+        await show_dashboard(
+            call.message,
+            user,
+            replace_inline=True,
+            bot=call.bot,
+            display_user=call.from_user,
         )
     await call.answer()
 
@@ -674,17 +678,20 @@ async def group_founder_start(
         chat_id=message.from_user.id,
         user_id=message.from_user.id,
     )
-    await private_state.set_state(FounderStates.SET_NATION_NAME)
+    bound.nation_name = bound.group_title or "گروه"
+    bound.status = "NAMING"
+    await private_state.set_state(FounderStates.SET_CURRENCY_CODE)
     await private_state.update_data(founder_group_id=bound.group_id)
+
+    try:
+        member_count = await bot.get_chat_member_count(bound.group_id)
+    except Exception:
+        member_count = 0
 
     try:
         await bot.send_message(
             message.from_user.id,
-            (
-                "✅ <b>گروه پایتخت متصل شد.</b>\n"
-                f"📍 پایتخت: <b>{html.escape(bound.group_title or 'گروه')}</b>\n\n"
-                "حالا اسم ملت رو بفرست."
-            ),
+            _group_identified_text(bound, member_count),
             reply_markup=founder_cancel_keyboard(),
             parse_mode="HTML",
         )
@@ -772,7 +779,8 @@ async def check_founder_group(
                     await session.flush()
                     conflict_message = "⚠️ این گروه قبلاً پایتخت یک ملت شده."
                 else:
-                    draft.status = "GROUP_READY"
+                    draft.nation_name = draft.group_title or "گروه"
+                    draft.status = "NAMING"
                     draft.expires_at = datetime.utcnow() + timedelta(minutes=30)
                     await session.flush()
 
@@ -780,9 +788,6 @@ async def check_founder_group(
         await call.answer(conflict_message, show_alert=True)
         return
 
-    # The Telegram group title is the canonical nation name for this flow.
-    draft.nation_name = draft.group_title or "گروه"
-    draft.status = "NAMING"
     await state.set_state(FounderStates.SET_CURRENCY_CODE)
     await state.update_data(founder_group_id=group_id)
     await call.answer("✅ گروه شناسایی شد.")
@@ -846,6 +851,16 @@ async def receive_founder_username(
     async with async_session() as session:
         async with session.begin():
             user = await session.get(User, message.from_user.id, with_for_update=True)
+            if await username_exists(session, value) and (
+                user is None or user.username != value
+            ):
+                await message.answer(
+                    "🔴 <b>این نام قبلاً ثبت شده.</b>\n\nیک نام دیگر برای معامله‌گرت انتخاب کن.",
+                    reply_markup=founder_cancel_keyboard(),
+                    parse_mode="HTML",
+                )
+                return
+
             if user is None:
                 user = User(
                     user_id=message.from_user.id,
@@ -1177,7 +1192,7 @@ async def confirm_founder(
                 f"۳. به ملت «{html.escape(nation.name)}» بپیوند\n"
                 "۴. معامله کن و ارزش ارزت رو بالا ببر!"
             ),
-            reply_markup=__import__("app.keyboards.inline", fromlist=["nation_founder_announcement_keyboard"]).nation_founder_announcement_keyboard(
+            reply_markup=nation_founder_announcement_keyboard(
                 me.username or "",
                 nation.nation_id,
             ),
@@ -1210,6 +1225,14 @@ async def confirm_founder(
                 bot=bot,
                 display_user=call.from_user,
             )
+
+
+@founder_router.callback_query(
+    F.data == "founder_announce",
+    StateFilter(None),
+)
+async def founder_announce_ack(call: CallbackQuery) -> None:
+    await call.answer("📢 اطلاع‌رسانی ملت در گروه انجام شده.", show_alert=True)
 
 
 @founder_router.callback_query(
