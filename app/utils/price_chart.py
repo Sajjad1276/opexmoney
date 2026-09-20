@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import math
+import os
 import threading
 from datetime import datetime
 from io import BytesIO
@@ -33,6 +34,10 @@ _WINDOW_LABELS = {
 
 
 def _find_persian_font() -> str | None:
+    configured_path = os.getenv("OPEX_CHART_FONT_PATH", "").strip()
+    if configured_path and os.path.isfile(configured_path):
+        return configured_path
+
     candidates = (
         "Vazirmatn",
         "Vazir",
