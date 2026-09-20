@@ -68,3 +68,31 @@ async def hide_reply_keyboard(
             pass
     except Exception:
         pass
+
+
+async def send_submenu_panel(
+    message: Message,
+    text: str,
+    *,
+    reply_markup=None,
+    parse_mode: str | None = None,
+) -> Message:
+    """Send a submenu while removing the Reply Keyboard on the same message."""
+    panel = await message.answer(
+        text,
+        reply_markup=ReplyKeyboardRemove(),
+        parse_mode=parse_mode,
+    )
+    if reply_markup is not None:
+        try:
+            await panel.edit_text(
+                text,
+                reply_markup=reply_markup,
+                parse_mode=parse_mode,
+            )
+        except Exception:
+            try:
+                await panel.edit_reply_markup(reply_markup=reply_markup)
+            except Exception:
+                raise
+    return panel
