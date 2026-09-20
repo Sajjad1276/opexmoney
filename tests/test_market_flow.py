@@ -33,6 +33,11 @@ TEST_GROUP_HOME = -100930001
 TEST_GROUP_TARGET = -100930002
 
 
+class FakeBot:
+    async def delete_message(self, *, chat_id: int, message_id: int):
+        return None
+
+
 class FakeMessage:
     def __init__(self, user_id: int, text: str | None = None):
         self.from_user = SimpleNamespace(
@@ -43,6 +48,7 @@ class FakeMessage:
         self.text = text
         self.message_id = 100
         self.chat = SimpleNamespace(id=user_id)
+        self.bot = FakeBot()
         self.edits: list[str] = []
         self.answers: list[str] = []
 
