@@ -30,7 +30,8 @@ async def cleanup():
             nation_ids = (
                 await session.execute(
                     select(Nation.nation_id).where(
-                        Nation.group_id.in_([HUMAN_GROUP_ID, None])
+                        (Nation.group_id == HUMAN_GROUP_ID)
+                        | Nation.is_ai.is_(True)
                     )
                 )
             ).scalars().all()
