@@ -482,6 +482,9 @@ async def start(message: Message, state: FSMContext) -> None:
 ملتت رو انتخاب می‌کنی، ارز می‌خری و می‌فروشی
 و تصمیم‌هات روی اقتصاد زنده بازی اثر می‌ذاره.
 
+🎯 <b>هدف ساده‌ست:</b> با تصمیم‌های بهتر، ارزش دارایی‌هات رو بیشتر کن؛
+بعد رتبه‌ات رو بالا ببر و وقتی آماده شدی، وارد بازی ملت‌سازی شو.
+
 <b>شروع بازی فقط ۳ قدمه:</b>
 ۱) هویتت رو بساز
 ۲) ۵۰۰ واحد سرمایه بگیر
@@ -1434,7 +1437,7 @@ async def confirm_first_trade(call: CallbackQuery, state: FSMContext) -> None:
             ]
         ),
     )
-    await call.answer("✅ اولین بردت ثبت شد")
+    await call.answer("✅ اولین معامله‌ات ثبت شد")
 
 
 @router.callback_query(F.data == "skip_first_trade")
