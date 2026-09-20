@@ -123,6 +123,10 @@ async def _build_photo(chart_data: dict) -> BufferedInputFile:
     )
 
 
+async def build_chart_photo(chart_data: dict) -> BufferedInputFile:
+    return await _build_photo(chart_data)
+
+
 async def _send_chart_message(
     callback: CallbackQuery,
     chart_data: dict,
