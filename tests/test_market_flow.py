@@ -10,6 +10,9 @@ from sqlalchemy import delete, select
 from app.database.models import (
     CurrencyHolding,
     Nation,
+    NationMember,
+    NationMemberRole,
+    NationTelegramMember,
     TradePreview,
     Transaction,
     User,
@@ -110,6 +113,14 @@ async def cleanup_market_health_rows():
                 delete(UserActivity).where(UserActivity.user_id == TEST_USER_ID)
             )
             await session.execute(
+                delete(NationTelegramMember).where(
+                    NationTelegramMember.telegram_user_id == TEST_USER_ID
+                )
+            )
+            await session.execute(
+                delete(NationMember).where(NationMember.user_id == TEST_USER_ID)
+            )
+            await session.execute(
                 delete(CurrencyHolding).where(CurrencyHolding.user_id == TEST_USER_ID)
             )
             await session.execute(
@@ -164,6 +175,23 @@ async def test_complete_buy_then_sell_button_journey():
             session.add_all([user, home, target])
             await session.flush()
             user.home_nation_id = home.nation_id
+            session.add(
+                NationMember(
+                    nation_id=home.nation_id,
+                    user_id=TEST_USER_ID,
+                    role=NationMemberRole.CITIZEN,
+                    is_active=True,
+                )
+            )
+            session.add(
+                NationTelegramMember(
+                    nation_id=home.nation_id,
+                    telegram_user_id=TEST_USER_ID,
+                    telegram_status="member",
+                    is_member=True,
+                    is_active=True,
+                )
+            )
             await ensure_temporal_profile(session, TEST_USER_ID)
 
     state = FakeState()
