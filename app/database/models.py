@@ -27,6 +27,11 @@ class Base(DeclarativeBase):
     pass
 
 
+class NationBackingType(StrEnum):
+    HUMAN = "human"
+    AI = "ai"
+
+
 class ActivityType(StrEnum):
     TRADE = "trade"
     LOGIN = "login"
@@ -66,6 +71,10 @@ class Nation(Base):
     invite_code: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
     treasury: Mapped[Decimal] = mapped_column(Numeric(20, 2), default=Decimal("0.00"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    @property
+    def backing_type(self) -> NationBackingType:
+        return NationBackingType.AI if self.is_ai else NationBackingType.HUMAN
 
 
 class BotGroup(Base):
