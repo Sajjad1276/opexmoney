@@ -192,6 +192,9 @@ async def _ensure_registered_user_projection(
     if user.home_nation_id is None:
         user.home_nation_id = nation.nation_id
 
+    if user.home_nation_id == nation.nation_id:
+        await sync_user_balance(session, user.user_id)
+
     return user, created
 
 
