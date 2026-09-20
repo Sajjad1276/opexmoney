@@ -293,35 +293,65 @@ async def sync_telegram_membership(
             member.is_active = False
 
         if user.home_nation_id == nation.nation_id:
-            fallback_nation_id = await session.scalar(
-                select(NationMember.nation_id)
-                .join(
-                    NationTelegramMember,
-                    (
-                        (NationTelegramMember.nation_id == NationMember.nation_id)
-                        & (
-                            NationTelegramMember.telegram_user_id
-                            == NationMember.user_id
-                        )
-                    ),
+            fallback_row = (
+                await session.execute(
+                    select(NationMember, Nation)
+                    .join(
+                        NationTelegramMember,
+                        (
+                            (NationTelegramMember.nation_id == NationMember.nation_id)
+                            & (
+                                NationTelegramMember.telegram_user_id
+                                == NationMember.user_id
+                            )
+                            & NationTelegramMember.is_active.is_(True)
+                        ),
+                    )
+                    .join(Nation, Nation.nation_id == NationMember.nation_id)
+                    .where(
+                        NationMember.user_id == telegram_user_id,
+                        NationMember.is_active.is_(True),
+                        Nation.is_active.is_(True),
+                        Nation.is_ai.is_(False),
+                    )
+                    .order_by(
+                        NationMember.joined_at.desc(),
+                        Nation.nation_id.asc(),
+                    )
+                    .limit(1)
                 )
-                .join(
-                    Nation,
-                    Nation.nation_id == NationMember.nation_id,
-                )
-                .where(
-                    NationMember.user_id == telegram_user_id,
-                    NationMember.is_active.is_(True),
-                    NationTelegramMember.is_active.is_(True),
-                    Nation.is_active.is_(True),
-                    Nation.is_ai.is_(False),
-                )
-                .order_by(NationMember.joined_at.desc(), NationMember.nation_id.asc())
-                .limit(1)
-            )
-            user.home_nation_id = fallback_nation_id
-            if fallback_nation_id is None:
+            ).first()
+
+            if fallback_row is None:
+                user.home_nation_id = None
                 user.role = "player"
+                user.balance = Decimal("0.00")
+            else:
+                fallback_member, fallback_nation = fallback_row
+                user.home_nation_id = fallback_nation.nation_id
+                fallback_holding = await session.scalar(
+                    select(CurrencyHolding)
+                    .where(
+                        CurrencyHolding.user_id == telegram_user_id,
+                        CurrencyHolding.nation_id == fallback_nation.nation_id,
+                    )
+                    .with_for_update()
+                    .limit(1)
+                )
+                fallback_role = fallback_member.role
+                if fallback_role == NationMemberRole.FOUNDER:
+                    user.role = "founder"
+                elif fallback_role == NationMemberRole.MINISTER:
+                    user.role = "minister"
+                elif fallback_role == NationMemberRole.TRADER:
+                    user.role = "trader"
+                else:
+                    user.role = "citizen"
+                user.balance = (
+                    fallback_holding.amount
+                    if fallback_holding is not None
+                    else Decimal("0.00")
+                )
 
     action_type: str | None = None
     if became_active:
