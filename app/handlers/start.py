@@ -1021,6 +1021,23 @@ async def confirm_nation(call: CallbackQuery, state: FSMContext, bot) -> None:
         await state.clear()
         return
 
+    async with async_session() as session:
+        async with session.begin():
+            user = await session.get(User, call.from_user.id, with_for_update=True)
+            if user is None:
+                user = User(
+                    user_id=call.from_user.id,
+                    username=username,
+                    home_nation_id=None,
+                    balance=Decimal("0"),
+                    xr_balance=Decimal("0"),
+                    role="player",
+                )
+                session.add(user)
+                await session.flush()
+            else:
+                user.username = username
+
     try:
         result_message, nation = await _join_user(
             bot=bot,
