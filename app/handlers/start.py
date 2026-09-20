@@ -281,7 +281,11 @@ async def show_dashboard(
             await message.delete()
         except Exception:
             logger.debug("Could not delete previous inline panel", exc_info=True)
-    return
+
+    # Reply keyboards are attached to outgoing messages. Deleting an inline
+    # panel does not restore the main keyboard, so explicitly re-publish it
+    # without adding visible dashboard text.
+    await message.answer("\u2060", reply_markup=main_menu_keyboard())
 
 
 async def continue_registration(
