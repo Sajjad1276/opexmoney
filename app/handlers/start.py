@@ -213,14 +213,14 @@ USERNAME_CAPTION = """💹 <b>اسم معامله‌گرت رو انتخاب ک�
 def nation_list_text(user, trader_name: str, nations: list[Nation]) -> str:
     lines = [
         f"✅ <b>«{html.escape(trader_name)}»</b> ثبت شد.",
-        "<blockquote>⁠</blockquote>",
+        "<blockquote>⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀</blockquote>",
         f"{user_mention(user)}، حالا باید به یه ملت بپیوندی.",
         "",
         "ارز اون ملت، پول اصلی حسابت میشه.",
         "هر معامله‌ات مستقیم روی نرخ اون ارز اثر میذاره.",
         "",
         "<b>🌍 ملت‌های فعال:</b>",
-        "<blockquote>⁠</blockquote>",
+        "<blockquote>⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀</blockquote>",
     ]
     for index, nation in enumerate(nations, start=1):
         change = get_rate_change(nation)
@@ -232,10 +232,10 @@ def nation_list_text(user, trader_name: str, nations: list[Nation]) -> str:
             ]
         )
         if index != len(nations):
-            lines.append("<blockquote>⁠</blockquote>")
+            lines.append("<blockquote>⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀</blockquote>")
     lines.extend(
         [
-            "<blockquote>⁠</blockquote>",
+            "<blockquote>⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀</blockquote>",
             "نرخ‌ها هر 15 دقیقه آپدیت میشن.",
         ]
     )
@@ -313,7 +313,7 @@ async def show_dashboard(
 
     text = """
 🌐 <b>OPEX MONEY</b>
-<blockquote>⁠</blockquote>
+<blockquote>⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀</blockquote>
 {0}
 
 {1}
@@ -324,7 +324,7 @@ async def show_dashboard(
 🏆 رتبه #{7} از {8}
 👥 {9} عضو
 ⏱ <i>{10} دقیقه پیش</i>
-<blockquote>⁠</blockquote>
+<blockquote>⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀</blockquote>
 """.format(
         user_mention(display_user or message.from_user),
         f"{html.escape(nation.flag_emoji or '🏴')} <b>{html.escape(nation.name)}</b>",
@@ -619,7 +619,7 @@ async def render_nation_profile(nation: Nation) -> str:
     خروجی HTML فرمت، راست‌چین:
 
     🏴 <b>نام ملت</b>
-    <blockquote>⁠</blockquote>
+    <blockquote>⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀</blockquote>
     💰 <b>واحد پول:</b> {symbol}
     📈 <b>نرخ ارز:</b> {rate} دلار  <u>(آپدیت 15 دقیقه پیش)</u>
     👥 <b>اعضا:</b> {member_count} نفر
@@ -682,7 +682,7 @@ async def render_nation_profile(nation: Nation) -> str:
 
     text = """
 {0}
-<blockquote>⁠</blockquote>
+<blockquote>⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀</blockquote>
 💰 <b>واحد پول:</b> {1}
 📈 <b>نرخ ارز:</b> {2} دلار  <u>(آپدیت {3} دقیقه پیش)</u>
 👥 <b>اعضا:</b> {4} نفر
@@ -1152,19 +1152,19 @@ async def confirm_nation(call: CallbackQuery, state: FSMContext, bot: Bot) -> No
 
     initial_omx = Decimal("500") * nation.exchange_rate
     text = f"""{html.escape(nation.flag_emoji or "🏴")} <b>{html.escape(nation.name)}</b>
-<blockquote>⁠</blockquote>
+<blockquote>⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀</blockquote>
 {user_mention(call.from_user)}، شهروند رسمی این ملت شدی.
 
 💰 موجودی اولیه:
 <b>500 <code>{html.escape(nation.currency_code)}</code> ≈ {fmt_amount(initial_omx)} دلار</b>
 
-<blockquote>⁠</blockquote>
+<blockquote>⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀</blockquote>
 {get_rate_emoji(get_rate_change(nation))} نرخ <code>{html.escape(nation.currency_code)}</code>: <b>{fmt_rate(nation.exchange_rate)} دلار</b>
 <i>{fmt_pct(get_rate_change(nation))} نسبت به دیروز</i>
 
 🏆 رتبه #{to_fa(rank)} از {to_fa(total_nations)}
 👥 {to_fa(nation.member_count)} عضو
-<blockquote>⁠</blockquote>
+<blockquote>⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀</blockquote>
 هر معامله‌ات روی نرخ <code>{html.escape(nation.currency_code)}</code> اثر میذاره."""
     await _safe_edit_text(call, text, first_trade_keyboard())
     await call.answer()
@@ -1184,7 +1184,7 @@ async def first_trade_tutorial(call: CallbackQuery, state: FSMContext) -> None:
         return
     receive_omx = Decimal("50") * nation.exchange_rate
     change = get_rate_change(nation)
-    text = ("⚡ <b>اولین معامله</b>\n<blockquote>⁠</blockquote>\n" f"📤 می‌فروشی:   <b>50 <code>{html.escape(nation.currency_code)}</code></b>\n" f"📥 دریافت می‌کنی: <b>{fmt_amount(receive_omx)} <code>دلار</code></b>\n\n<blockquote>⁠</blockquote>\n" f"💹 نرخ: <code>1 {html.escape(nation.currency_code)} = {fmt_rate(nation.exchange_rate)} دلار</code>\n" f"{get_rate_emoji(change)} تغییر 24h: <b>{fmt_pct(change)}</b>\n<blockquote>⁠</blockquote>")
+    text = ("⚡ <b>اولین معامله</b>\n<blockquote>⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀</blockquote>\n" f"📤 می‌فروشی:   <b>50 <code>{html.escape(nation.currency_code)}</code></b>\n" f"📥 دریافت می‌کنی: <b>{fmt_amount(receive_omx)} <code>دلار</code></b>\n\n<blockquote>⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀</blockquote>\n" f"💹 نرخ: <code>1 {html.escape(nation.currency_code)} = {fmt_rate(nation.exchange_rate)} دلار</code>\n" f"{get_rate_emoji(change)} تغییر 24h: <b>{fmt_pct(change)}</b>\n<blockquote>⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀</blockquote>")
     await _safe_edit_text(call, text, trade_confirmation_keyboard())
     await call.answer()
 
@@ -1244,14 +1244,14 @@ async def confirm_first_trade(call: CallbackQuery, state: FSMContext) -> None:
             await sync_user_balance(session, user.user_id)
 
     text = (
-        "✅ <b>معامله انجام شد.</b>\n<blockquote>⁠</blockquote>\n"
+        "✅ <b>معامله انجام شد.</b>\n<blockquote>⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀</blockquote>\n"
         f"📤 فروختی:   <s>50 {html.escape(nation.currency_code)}</s>\n"
         f"📥 دریافتی:  <b>{fmt_amount(receive_omx)} دلار</b>\n\n"
-        "<blockquote>⁠</blockquote>\n"
+        "<blockquote>⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀</blockquote>\n"
         f"💰 موجودی:\n<code>{html.escape(nation.currency_code)}</code>: <b>{fmt_amount(holding.amount)}</b>\n"
         f"<code>دلار</code>: <b>{fmt_amount(user.xr_balance)}</b>\n\n"
-        "<blockquote>⁠</blockquote>\n✨ <b>«اولین قدم در بازارهای OPEX» باز شد.</b>\n"
-        "<blockquote>⁠</blockquote>"
+        "<blockquote>⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀</blockquote>\n✨ <b>«اولین قدم در بازارهای OPEX» باز شد.</b>\n"
+        "<blockquote>⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀</blockquote>"
     )
     await state.clear()
     await _safe_edit_text(call, text)
