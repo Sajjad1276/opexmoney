@@ -485,8 +485,12 @@ async def founder_no_group(call: CallbackQuery) -> None:
 async def founder_has_group(call: CallbackQuery, state: FSMContext, bot: Bot) -> None:
     user = await _get_user_or_none(call.from_user.id)
     if user is not None and (user.username or "").strip():
-        async with async_session() as session:
-            draft = await get_or_create_draft(session, call.from_user.id)
+        try:
+            async with async_session() as session:
+                draft = await get_or_create_draft(session, call.from_user.id)
+        except ValueError as exc:
+            await call.answer(str(exc), show_alert=True)
+            return
         await state.set_state(FounderStates.WAITING_GROUP_ADMIN)
         await call.answer()
         if call.message:
@@ -875,8 +879,12 @@ async def receive_founder_username(
 
     await state.set_state(FounderStates.WAITING_GROUP_ADMIN)
     await state.update_data(founder_pending_group=None)
-    async with async_session() as session:
-        draft = await get_or_create_draft(session, message.from_user.id)
+    try:
+        async with async_session() as session:
+            draft = await get_or_create_draft(session, message.from_user.id)
+    except ValueError as exc:
+        await message.answer(str(exc), reply_markup=founder_cancel_keyboard(), parse_mode="HTML")
+        return
     await _show_group_step(message, state, bot, draft)
 
 
