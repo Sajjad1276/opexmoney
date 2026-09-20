@@ -21,6 +21,7 @@ from app.database.models import (
 )
 
 from app.services.nation_service import convert_holding_to_xr
+from app.services.user_service import sync_user_balance
 
 
 TELEGRAM_ACTIVE_STATUSES = frozenset({
@@ -192,6 +193,9 @@ async def _ensure_registered_user_projection(
     if user.home_nation_id is None:
         user.home_nation_id = nation.nation_id
 
+    if user.home_nation_id == nation.nation_id:
+        await sync_user_balance(session, user_id)
+
     return user, created
 
 
@@ -235,7 +239,7 @@ async def sync_telegram_membership(
         observed_at=observed_at,
     )
 
-    previous_active = bool(row.is_active)
+    previous_active = False if created else bool(row.is_active)
     active_now = telegram_status_is_active(telegram_status, is_member)
     previously_active = previous_active or (
         created and legacy_member is not None
