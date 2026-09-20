@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from aiogram import Bot
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message
+from aiogram.types import Message, ReplyKeyboardRemove
 
 
 PANEL_MESSAGE_ID = "inline_panel_message_id"
@@ -46,3 +46,25 @@ async def close_inline_panel(
             PANEL_CHAT_ID: None,
         }
     )
+
+
+async def hide_reply_keyboard(
+    bot: Bot,
+    chat_id: int,
+) -> None:
+    """Remove the persistent reply keyboard without leaving a visible message."""
+    try:
+        marker = await bot.send_message(
+            chat_id,
+            "\u2060",
+            reply_markup=ReplyKeyboardRemove(),
+        )
+        try:
+            await bot.delete_message(
+                chat_id=chat_id,
+                message_id=marker.message_id,
+            )
+        except Exception:
+            pass
+    except Exception:
+        pass
