@@ -146,6 +146,11 @@ def test_new_player_reply_keyboard_is_focused():
     assert texts == ["🎯 قدم بعدی", "💰 پول من", "🌍 ملت من"]
 
 
+def test_main_menu_return_button_is_explicit():
+    callbacks = _button_callback_values(market_keyboard())
+    assert "back_to_dashboard" in callbacks
+
+
 def test_first_trade_keyboard_starts_the_trade_directly():
     callbacks = _button_callback_values(first_trade_keyboard())
     assert callbacks == ["confirm_first_trade", "skip_first_trade"]
