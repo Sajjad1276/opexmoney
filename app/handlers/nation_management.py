@@ -35,7 +35,7 @@ from app.services.membership_service import (
     sync_telegram_membership,
     telegram_chat_member_state,
 )
-from app.services.nation_service import convert_holding_to_xr
+from app.services.nation_service import convert_holding_to_xr, is_user_active_in_nation
 from app.services.war_service import declare_war
 from app.services.user_service import sync_user_balance
 
@@ -165,6 +165,13 @@ async def _require_admin(
     nation_id: int,
     user_id: int,
 ) -> NationMember:
+    if not await is_user_active_in_nation(
+        session,
+        user_id,
+        nation_id,
+        lock=True,
+    ):
+        raise ValueError("⛔ برای مدیریت ملت باید عضو فعال همان گروه تلگرام باشی.")
     member = await _get_member(session, nation_id, user_id)
     if member is None or _role_enum(member.role) not in {
         NationMemberRole.FOUNDER,
@@ -179,6 +186,13 @@ async def _require_founder(
     nation_id: int,
     user_id: int,
 ) -> NationMember:
+    if not await is_user_active_in_nation(
+        session,
+        user_id,
+        nation_id,
+        lock=True,
+    ):
+        raise ValueError("برای مدیریت ملت باید عضو فعال گروه تلگرام باشی.")
     member = await _get_member(session, nation_id, user_id)
     if member is None or _role_enum(member.role) != NationMemberRole.FOUNDER:
         raise ValueError("👑 فقط بنیان‌گذار این عملیات را انجام می‌دهد.")
