@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy import and_, select
@@ -60,7 +60,7 @@ async def get_user_missions(
     session: AsyncSession,
     user_id: int,
 ) -> dict[str, list[MissionStatus]]:
-    now = datetime.utcnow()
+    now = datetime.now(UTC).replace(tzinfo=None)
     rows = (
         await session.execute(
             select(Mission, UserMissionProgress)
