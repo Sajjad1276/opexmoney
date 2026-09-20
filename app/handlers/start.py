@@ -140,13 +140,13 @@ def _nation_page_keyboard(
         rows.append(
             [
                 InlineKeyboardButton(
-                    text="{0} {1} | 💰 نرخ: {2} دلار | 👥 {3} نفر".format(
+                    text="{0} {1} · {2} · {3} نفر".format(
                         html.escape(nation.flag_emoji or "🏴"),
                         html.escape(nation.name),
-                        fmt_rate(nation.exchange_rate),
+                        html.escape(nation.currency_code),
                         to_fa(nation.member_count),
                     ),
-                    callback_data="select_nation:{0}".format(nation.nation_id),
+                    callback_data="confirm_nation:{0}".format(nation.nation_id),
                 )
             ]
         )
@@ -504,27 +504,41 @@ async def _begin_registration(
     await state.clear()
     await _start_timed_state(state, OnboardingStates.ONBOARDING_NAME)
 
-    text = """
-👤 <b>نام معامله‌گرت رو انتخاب کن</b>
+    suggested = (message.from_user.first_name or "").strip()[:20]
+    if not suggested or not is_valid_trader_name(suggested) or is_blocked_trader_name(suggested):
+        suggested = ""
 
-این نام به عنوان نام نمایشی تو در OPEX MONEY
-به بقیه بازیکن‌ها نمایش داده می‌شه.
+    if suggested:
+        await state.update_data(suggested_username=suggested)
+        text = (
+            "👤 <b>هویت معامله‌گرت</b>\n\n"
+            f"برای شروع، می‌تونیم از اسم «{html.escape(suggested)}» استفاده کنیم.\n"
+            "اسم بعداً از تنظیمات هم قابل تغییره.\n\n"
+            "یا خودت یک نام ۳ تا ۲۰ کاراکتری انتخاب کن."
+        )
+        markup = suggested_name_keyboard(suggested)
+    else:
+        text = """
+👤 <b>هویت معامله‌گرت رو بساز</b>
 
-3 تا 20 کاراکتر وارد کن.
-فقط حروف فارسی یا انگلیسی، عدد و خط تیره مجازه.
+یک نام ۳ تا ۲۰ کاراکتری انتخاب کن.
+این اسم روی تابلوی معاملات دیده می‌شه.
+
+فارسی، انگلیسی، عدد و خط تیره مجازه.
 """
+        markup = cancel_keyboard()
 
     if replace_inline:
         await message.edit_text(
             rtl_html(text),
-            reply_markup=cancel_keyboard(),
+            reply_markup=markup,
             parse_mode=ParseMode.HTML,
         )
         panel = message
     else:
         panel = await message.answer(
             rtl_html(text),
-            reply_markup=cancel_keyboard(),
+            reply_markup=markup,
             parse_mode=ParseMode.HTML,
         )
     await remember_inline_panel(state, panel)
@@ -754,17 +768,18 @@ async def _render_nation_page(
 
     if not nations:
         text = """
-🌍 <b>فعلاً ملت فعالی وجود نداره</b>
+🌍 <b>هنوز ملتی برای ورود وجود نداره</b>
 
-بعداً دوباره برگرد و یکی از ملت‌های فعال رو انتخاب کن.
+می‌تونی بعداً برگردی و یک ملت فعال انتخاب کنی.
 """
         keyboard = None
     else:
         text = """
-🌍 <b>ملت خودت رو انتخاب کن</b>
+🌍 <b>ملتت رو انتخاب کن</b>
 
-5 ملت در هر صفحه نمایش داده می‌شه.
-روی یک ملت بزن تا پروفایل کاملش رو ببینی.
+یک گزینه رو بزن و مستقیم وارد بازی شو.
+💰 سرمایه شروع: ۵۰۰ واحد از ارز همان ملت
+⚡ بعد از ورود، اولین معامله‌ات آماده‌ست.
 """
         keyboard = _nation_page_keyboard(nations, max(0, page), has_next)
 
@@ -1164,21 +1179,18 @@ async def confirm_nation(call: CallbackQuery, state: FSMContext, bot: Bot) -> No
         return
 
     initial_omx = Decimal("500") * nation.exchange_rate
-    text = f"""{html.escape(nation.flag_emoji or "🏴")} <b>{html.escape(nation.name)}</b>
+    text = f"""{html.escape(nation.flag_emoji or "🏴")} <b>به {html.escape(nation.name)} خوش اومدی</b>
 <blockquote>⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀</blockquote>
-{user_mention(call.from_user)}، شهروند رسمی این ملت شدی.
+{user_mention(call.from_user)}، تو الان شهروند این ملت هستی.
 
-💰 موجودی اولیه:
-<b>500 <code>{html.escape(nation.currency_code)}</code> ≈ {fmt_amount(initial_omx)} دلار</b>
+💰 سرمایه شروع: <b>۵۰۰ <code>{html.escape(nation.currency_code)}</code></b>
+💎 موجودی دلار: <b>۰</b>
+📈 نرخ فعلی: <b>۱ {html.escape(nation.currency_code)} = {fmt_rate(nation.exchange_rate)} دلار</b>
 
-<blockquote>⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀</blockquote>
-{get_rate_emoji(get_rate_change(nation))} نرخ <code>{html.escape(nation.currency_code)}</code>: <b>{fmt_rate(nation.exchange_rate)} دلار</b>
-<i>{fmt_pct(get_rate_change(nation))} نسبت به دیروز</i>
+🎯 <b>اولین حرکتت:</b>
+۵۰ واحد از ارزت رو بفروش و بازار OPEX رو با یک معامله واقعی تجربه کن.
 
-🏆 رتبه #{to_fa(rank)} از {to_fa(total_nations)}
-👥 {to_fa(nation.member_count)} عضو
-<blockquote>⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀</blockquote>
-هر معامله‌ات روی نرخ <code>{html.escape(nation.currency_code)}</code> اثر میذاره."""
+<i>بعد از این معامله، قدم بعدی رو خود بازی بهت نشون می‌ده.</i>"""
     await _safe_edit_text(call, text, first_trade_keyboard())
     await call.answer()
 
