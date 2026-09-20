@@ -1254,6 +1254,56 @@ async def kick_member(call: CallbackQuery, bot: Bot) -> None:
             )
             return
 
+        # Apply the local game-state transition only after Telegram confirms
+        # the kick. The Telegram chat_member event is also idempotent with this
+        # state and can refresh the projection later.
+        async with async_session() as session:
+            async with session.begin():
+                locked_nation = await session.get(
+                    Nation,
+                    nation_id,
+                    with_for_update=True,
+                )
+                locked_member = await session.scalar(
+                    select(NationMember)
+                    .where(
+                        NationMember.nation_id == nation_id,
+                        NationMember.user_id == user_id,
+                        NationMember.is_active.is_(True),
+                    )
+                    .with_for_update()
+                )
+                locked_target = await session.get(
+                    User,
+                    user_id,
+                    with_for_update=True,
+                )
+                if (
+                    locked_nation is not None
+                    and locked_member is not None
+                    and locked_target is not None
+                ):
+                    await convert_holding_to_xr(
+                        locked_target,
+                        locked_nation,
+                        session,
+                    )
+                    locked_member.is_active = False
+                    locked_target.home_nation_id = None
+                    locked_target.role = "player"
+                    locked_nation.member_count = max(
+                        0,
+                        int(locked_nation.member_count or 0) - 1,
+                    )
+                    await _append_log(
+                        session,
+                        nation_id=nation_id,
+                        actor_id=call.from_user.id,
+                        action_type="MEMBER_KICKED",
+                        target_id=user_id,
+                        metadata={"previous_role": target_role.value if target_role else "unknown"},
+                    )
+
         await call.answer("اخراج از گروه تلگرام انجام شد.")
         if target is not None:
             try:
