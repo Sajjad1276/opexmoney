@@ -304,12 +304,23 @@ async def switch_chart_window(callback: CallbackQuery) -> None:
 
 async def back_to_market(callback: CallbackQuery) -> None:
     try:
-        if callback.message is not None:
-            await callback.message.delete()
+        if callback.message is None:
+            await callback.answer("⚠️ پیام نمودار پیدا نشد.", show_alert=True)
+            return
+
+        # The chart is a photo message, so it cannot be converted back into
+        # the text-based market panel with edit_text. Re-render the market
+        # from the same chat after removing the chart.
+        chart_message = callback.message
+        await chart_message.delete()
+
+        from app.handlers.market import render_market
+
+        await render_market(chart_message)
         await callback.answer()
     except Exception:
         logger.exception(
-            "Failed to delete chart message for user %s",
+            "Failed to return to market for user %s",
             callback.from_user.id,
         )
         await callback.answer(
