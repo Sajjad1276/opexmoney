@@ -179,12 +179,13 @@ async def count_active_alerts(
     session: AsyncSession,
     user_id: int,
 ) -> int:
+    from sqlalchemy import func
+
     value = await session.scalar(
-        select(PriceAlert.id)
+        select(func.count(PriceAlert.id))
         .where(
             PriceAlert.user_id == user_id,
             PriceAlert.triggered.is_(False),
         )
-        .limit(1)
     )
-    return 1 if value is not None else 0
+    return int(value or 0)
