@@ -467,6 +467,59 @@ class NationLog(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
+class NationEconomicEvent(Base):
+    __tablename__ = "nation_economic_events"
+    __table_args__ = (
+        Index(
+            "ix_nation_economic_events_nation_created",
+            "nation_id",
+            "created_at",
+        ),
+        Index(
+            "ix_nation_economic_events_nation_type_created",
+            "nation_id",
+            "event_type",
+            "created_at",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    nation_id: Mapped[int] = mapped_column(
+        ForeignKey("nations.nation_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    event_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    actor_id: Mapped[int | None] = mapped_column(
+        BigInteger,
+        ForeignKey("users.user_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    target_nation_id: Mapped[int | None] = mapped_column(
+        ForeignKey("nations.nation_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    amount_xr: Mapped[Decimal] = mapped_column(
+        Numeric(20, 6),
+        nullable=False,
+        default=Decimal("0"),
+    )
+    amount_local: Mapped[Decimal] = mapped_column(
+        Numeric(20, 6),
+        nullable=False,
+        default=Decimal("0"),
+    )
+    event_metadata: Mapped[dict | None] = mapped_column(
+        "metadata",
+        postgresql.JSONB,
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
 class NationJoinRequest(Base):
     __tablename__ = "nation_join_requests"
     __table_args__ = (
