@@ -11,7 +11,7 @@ from app.utils.name_filter import is_blocked_trader_name
 
 
 _NATION_NAME_RE = re.compile(r"^[A-Za-z]+(?: [A-Za-z]+)*$")
-_CURRENCY_CODE_RE = re.compile(r"^[A-Z]{3}$")
+_CURRENCY_CODE_RE = re.compile(r"^[A-Z]{3,4}$")
 _RESERVED_CURRENCY_CODES = {"XMR", "XRP", "XLM", "OMX", "XOM", "OXR"}
 _RESERVED_NATION_NAMES = {
     "ADMIN",
@@ -39,7 +39,7 @@ def validate_nation_name(value: str) -> tuple[bool, str]:
 async def validate_currency_code(value: str, session: AsyncSession) -> tuple[bool, str]:
     value = value.strip().upper()
     if not _CURRENCY_CODE_RE.fullmatch(value):
-        return False, "⚠️ کد ارز باید دقیقاً ۳ حرف لاتین بزرگ باشه."
+        return False, "🔴 کد باید ۳ تا ۴ حرف لاتین بزرگ باشه.\nمثال: AZD یا GOLD"
     if value in _RESERVED_CURRENCY_CODES:
         return False, "⚠️ این کد رزرو سیستمه. یه کد دیگه انتخاب کن."
     existing = await session.execute(
