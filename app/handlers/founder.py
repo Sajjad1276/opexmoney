@@ -131,7 +131,9 @@ async def _edit_panel(
     text: str,
     reply_markup,
 ) -> None:
-    await FounderPanel(state, call.bot).edit(call, text, reply_markup)
+    if call.message is None:
+        return
+    await FounderPanel(state, call.message.bot).edit(call, text, reply_markup)
 
 
 async def _set_state_for_draft(state: FSMContext, status: str) -> None:
@@ -542,6 +544,8 @@ async def check_founder_group(
         await call.answer(error, show_alert=True)
         return
 
+    conflict_message = None
+
     async with async_session() as session:
         async with session.begin():
             draft = await get_active_draft(
@@ -550,40 +554,31 @@ async def check_founder_group(
                 lock=True,
             )
             if draft is None:
-                await call.answer(
-                    "⚠️ فرآیند تأسیس منقضی شده. دوباره شروع کن.",
-                    show_alert=True,
+                conflict_message = "⚠️ فرآیند تأسیس منقضی شده. دوباره شروع کن."
+            elif draft.group_id != group_id:
+                conflict_message = "⚠️ گروه این فرآیند تغییر کرده. دوباره از لینک تأسیس استفاده کن."
+            else:
+                existing_nation = await session.scalar(
+                    select(Nation)
+                    .where(
+                        Nation.group_id == group_id,
+                        Nation.is_active.is_(True),
+                    )
+                    .with_for_update()
+                    .limit(1)
                 )
-                return
+                if existing_nation is not None:
+                    draft.status = "CANCELLED"
+                    await session.flush()
+                    conflict_message = "⚠️ این گروه قبلاً پایتخت یک ملت شده."
+                else:
+                    draft.status = "GROUP_READY"
+                    draft.expires_at = datetime.utcnow() + timedelta(minutes=30)
+                    await session.flush()
 
-            if draft.group_id != group_id:
-                await call.answer(
-                    "⚠️ گروه این فرآیند تغییر کرده. دوباره از لینک تأسیس استفاده کن.",
-                    show_alert=True,
-                )
-                return
-
-            existing_nation = await session.scalar(
-                select(Nation)
-                .where(
-                    Nation.group_id == group_id,
-                    Nation.is_active.is_(True),
-                )
-                .with_for_update()
-                .limit(1)
-            )
-            if existing_nation is not None:
-                draft.status = "CANCELLED"
-                await session.flush()
-                await call.answer(
-                    "⚠️ این گروه قبلاً پایتخت یک ملت شده.",
-                    show_alert=True,
-                )
-                return
-
-            draft.status = "GROUP_READY"
-            draft.expires_at = datetime.utcnow() + timedelta(minutes=30)
-            await session.flush()
+    if conflict_message is not None:
+        await call.answer(conflict_message, show_alert=True)
+        return
 
     await state.set_state(FounderStates.SET_NATION_NAME)
     await state.update_data(founder_group_id=group_id)
