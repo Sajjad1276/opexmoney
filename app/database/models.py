@@ -462,6 +462,7 @@ class EconomyEventOutbox(Base):
     payload_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     available_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    claimed_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
