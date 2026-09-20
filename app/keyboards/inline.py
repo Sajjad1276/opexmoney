@@ -286,6 +286,26 @@ def founder_flag_selection_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
+def founder_currency_confirm_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="✅ تأیید — ملت رو ثبت کن",
+                    callback_data="confirm_found",
+                    style=ButtonStyle.SUCCESS,
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="✏️ تغییر کد",
+                    callback_data="founder_recode",
+                )
+            ],
+        ]
+    )
+
+
 def founder_review_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
