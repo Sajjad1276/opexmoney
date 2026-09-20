@@ -23,6 +23,7 @@ from app.database.models import (
     Vote,
 )
 from app.services.economy_metrics import get_player_net_worth, get_player_net_worths
+from app.services.economic_event_service import record_economic_event
 from app.services.nation_service import get_user_active_nation_context
 from app.services.rules.registry import clamp_rule_value, get_rule
 from app.services.rules.resolver import invalidate_rule_cache
@@ -322,6 +323,19 @@ async def _activate_proposal(
     proposal.status = "active"
     await session.flush()
     invalidate_rule_cache(proposal.rule_key)
+
+    if proposal.target_scope == "nation" and proposal.target_id is not None:
+        record_economic_event(
+            session,
+            nation_id=proposal.target_id,
+            event_type="GOVERNANCE_RULE_ACTIVATED",
+            actor_id=proposal.proposer_player_id,
+            metadata={
+                "proposal_id": proposal.id,
+                "rule_key": proposal.rule_key,
+                "value": str(proposal.proposed_value),
+            },
+        )
 
     session.add(
         GovernanceLedger(
