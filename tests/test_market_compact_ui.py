@@ -36,3 +36,14 @@ def test_market_keyboard_keeps_trade_actions():
     assert "market_sell" in callbacks
     assert "market_history" in callbacks
     assert "market_refresh" in callbacks
+
+
+def test_legacy_market_keyboard_wrapper_is_also_compact():
+    from app.handlers.market import market_keyboard_for_nation
+
+    callbacks = _callbacks(market_keyboard_for_nation(123))
+    assert "market_chart_select" in callbacks
+    assert not any(
+        callback.startswith("market_chart:")
+        for callback in callbacks
+    )
