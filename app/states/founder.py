@@ -3,6 +3,7 @@ from aiogram.fsm.state import State, StatesGroup
 
 class FounderStates(StatesGroup):
     WAITING_GROUP_ADMIN = State()
+    SET_USERNAME_FOUNDER = State()
     SET_NATION_NAME = State()
     SET_CURRENCY_CODE = State()
     SELECT_FLAG = State()
