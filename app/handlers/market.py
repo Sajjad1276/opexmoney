@@ -73,18 +73,8 @@ router = Router(name="market")
 logger = logging.getLogger(__name__)
 
 def market_keyboard_for_nation(nation_id: int) -> InlineKeyboardMarkup:
-    keyboard = market_keyboard()
-    rows = [list(row) for row in keyboard.inline_keyboard]
-    rows.insert(
-        1,
-        [
-            InlineKeyboardButton(
-                text="📈 نمودار",
-                callback_data=f"market_chart:{nation_id}",
-            )
-        ],
-    )
-    return InlineKeyboardMarkup(inline_keyboard=rows)
+    """Backward-compatible wrapper using the compact market layout."""
+    return market_keyboard()
 
 async def safe_edit(call, text, markup=None):
     try:
