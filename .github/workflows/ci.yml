@@ -36,7 +36,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: pip install -r requirements-dev.txt
 
       - name: Compile Python sources
         run: python -m compileall -q .
@@ -50,10 +50,11 @@ jobs:
           alembic upgrade head
 
       - name: Health contract - route callback coverage
+        id: flow_health
         run: pytest -q tests/test_flow_health.py::test_global_flow_contract_has_no_orphaned_controls
 
       - name: Diagnose flow health failure
-        if: ${{ failure() }}
+        if: ${{ steps.flow_health.outcome == 'failure' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -125,10 +126,11 @@ jobs:
         run: pytest -q tests/test_identity_sequences.py
 
       - name: Onboarding journey
+        id: onboarding_journey
         run: pytest -q tests/test_onboarding_flow.py
 
       - name: Diagnose onboarding failure
-        if: ${{ failure() }}
+        if: ${{ steps.onboarding_journey.outcome == 'failure' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -195,3 +197,51 @@ jobs:
 
       - name: Full test suite
         run: pytest -q
+
+      - name: Close resolved CI diagnostic issues
+        if: ${{ success() }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import urllib.parse
+          import urllib.request
+
+          repository = "Sajjad1276/opexmoney"
+          query = urllib.parse.quote(
+              f"repo:{repository} is:issue is:open in:title \"OPEX CI\""
+          )
+          headers = {
+              "Authorization": f"Bearer {os.environ['GITHUB_TOKEN']}",
+              "Accept": "application/vnd.github+json",
+              "X-GitHub-Api-Version": "2022-11-28",
+              "Content-Type": "application/json",
+          }
+
+          with urllib.request.urlopen(
+              urllib.request.Request(
+                  f"https://api.github.com/search/issues?q={query}&per_page=100",
+                  headers=headers,
+                  method="GET",
+              ),
+              timeout=15,
+          ) as response:
+              issues = json.loads(response.read().decode("utf-8")).get("items", [])
+
+          for issue in issues:
+              number = issue["number"]
+              payload = json.dumps(
+                  {"state": "closed", "state_reason": "completed"}
+              ).encode("utf-8")
+              request = urllib.request.Request(
+                  f"https://api.github.com/repos/{repository}/issues/{number}",
+                  data=payload,
+                  headers=headers,
+                  method="PATCH",
+              )
+              with urllib.request.urlopen(request, timeout=15) as response:
+                  response.read()
+              print(f"Closed CI diagnostic issue #{number}: {issue['title']}")
+          PY
