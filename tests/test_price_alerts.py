@@ -13,6 +13,7 @@ from app.services.alert_service import (
     check_price_alerts,
     create_price_alert,
     delete_price_alert,
+    count_active_alerts,
 )
 
 
@@ -81,6 +82,7 @@ async def test_price_alert_triggers_and_can_be_deleted():
                 direction="above",
             )
             assert alert.triggered is False
+            assert await count_active_alerts(session, TEST_USER_ID) == 1
 
     bot = FakeBot()
     async with async_session() as session:
