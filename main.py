@@ -54,7 +54,9 @@ from app.services.economic_engine import (
 )
 from app.services.governance_service import governance_cycle
 from app.services.war_service import resolve_expired_wars
+from app.services.ai_world import ensure_ai_world, run_ai_world_cycle
 from app.schedulers.alert_checker import register_price_alert_job
+from app.schedulers.ai_world import register_ai_world_job
 from config import settings
 
 logging.basicConfig(
@@ -116,6 +118,33 @@ async def configure_bot_menu(bot: Bot) -> None:
     await bot.set_chat_menu_button(
         menu_button=MenuButtonCommands(),
     )
+
+
+async def ensure_ai_population() -> None:
+    try:
+        async with async_session() as session:
+            async with session.begin():
+                result = await ensure_ai_world(session)
+        logger.info(
+            "AI world ready | nations=%s users=%s holdings=%s memberships=%s",
+            result["nations"],
+            result["users"],
+            result["holdings"],
+            result["memberships"],
+        )
+    except Exception:
+        logger.exception("AI world seeding failed")
+        raise
+
+
+async def run_ai_warmup() -> None:
+    try:
+        async with async_session() as session:
+            async with session.begin():
+                acted = await run_ai_world_cycle(session, warmup=True)
+        logger.info("AI world warmup completed | acted=%s", acted)
+    except Exception:
+        logger.exception("AI world warmup failed")
 
 
 async def run_rate_job() -> None:
@@ -294,6 +323,7 @@ def build_scheduler(bot: Bot) -> AsyncIOScheduler:
 async def main() -> None:
     # Intentional: Railway currently has no pre-deploy hook configured, so migrations stay here until one is properly configured.
     await ensure_database_schema()
+    await ensure_ai_population()
     bot = Bot(
         token=settings.bot_token,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
@@ -356,6 +386,8 @@ async def main() -> None:
 
     scheduler = build_scheduler(bot)
     register_price_alert_job(scheduler, bot)
+    register_ai_world_job(scheduler)
+    await run_ai_warmup()
     smoke_ok = await run_startup_smoke_test(dp, scheduler)
     if not smoke_ok:
         logger.error(

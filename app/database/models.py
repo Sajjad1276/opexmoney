@@ -7,6 +7,7 @@ from enum import StrEnum
 from sqlalchemy.dialects import postgresql
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     DateTime,
     Enum as SAEnum,
     ForeignKey,
@@ -61,6 +62,7 @@ class Nation(Base):
     is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
     join_policy: Mapped[str] = mapped_column(String(20), default="OPEN", nullable=False)
     personality: Mapped[str] = mapped_column(String(20), default="neutral", nullable=False)
+    is_ai: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     invite_code: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
     treasury: Mapped[Decimal] = mapped_column(Numeric(20, 2), default=Decimal("0.00"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
@@ -150,6 +152,8 @@ class User(Base):
     balance: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("500.00"), nullable=False)
     xr_balance: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0.00"), nullable=False)
     role: Mapped[str] = mapped_column(String(20), default="player", nullable=False)
+    is_ai: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    ai_strategy: Mapped[str] = mapped_column(String(20), default="balanced", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
