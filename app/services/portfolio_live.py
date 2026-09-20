@@ -13,7 +13,6 @@ from sqlalchemy import select
 from app.database.models import User
 from app.database.session import async_session
 from app.services.portfolio_service import get_portfolio_data
-from app.handlers.portfolio import build_portfolio_text, portfolio_keyboard
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +54,8 @@ async def update_open_portfolios(bot: Bot) -> None:
         return
 
     async def update_one(panel: PortfolioPanel) -> None:
+        from app.handlers.portfolio import build_portfolio_text, portfolio_keyboard
+
         try:
             async with async_session() as session:
                 async with session.begin():
