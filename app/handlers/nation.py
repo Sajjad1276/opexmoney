@@ -31,7 +31,7 @@ async def open_nations(message: Message) -> None:
                     session,
                     message.from_user.id,
                     repair=True,
-                    lock=True,
+                lock=True,
                 )
                 if registered
                 else None
