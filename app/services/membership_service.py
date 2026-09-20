@@ -21,6 +21,7 @@ from app.database.models import (
 )
 
 from app.services.nation_service import convert_holding_to_xr
+from app.services.user_service import sync_user_balance
 
 
 TELEGRAM_ACTIVE_STATUSES = frozenset({
@@ -191,6 +192,9 @@ async def _ensure_registered_user_projection(
 
     if user.home_nation_id is None:
         user.home_nation_id = nation.nation_id
+
+    if user.home_nation_id == nation.nation_id:
+        await sync_user_balance(session, user_id)
 
     return user, created
 
