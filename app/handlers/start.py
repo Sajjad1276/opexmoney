@@ -469,8 +469,6 @@ async def _begin_registration(
     *,
     replace_inline: bool = False,
 ) -> None:
-    if not replace_inline:
-
     async with async_session() as session:
         async with session.begin():
             registered = await is_fully_registered(session, message.from_user.id)
