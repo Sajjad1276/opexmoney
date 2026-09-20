@@ -199,7 +199,7 @@ class PromptEngine:
 ━━━ اطلاعات کاربر ━━━
 نام: {_esc(ctx.get("name") or user.get("name"))}
 نقش: {_esc(ctx.get("role") or user.get("role"), "بازیکن")}
-موجودی ΩXR: {_number(ctx.get("xr_balance") or user.get("xr_balance"))}
+موجودی دلار: {_number(ctx.get("xr_balance") or user.get("xr_balance"))}
 روزهای فعال: {_number(ctx.get("active_days"), "۰")}
 """.strip()
 
@@ -211,7 +211,7 @@ class PromptEngine:
 ━━━ اطلاعات ملت ━━━
 نام ملت: {_esc(ctx.get("nation_name") or nation.get("name"))}
 واحد ارز: {_esc(ctx.get("currency_symbol") or ctx.get("currency") or nation.get("currency"))}
-نرخ فعلی ملت: {_number(ctx.get("nation_rate") or ctx.get("exchange_rate") or nation.get("exchange_rate"))} ΩXR
+نرخ فعلی ملت: {_number(ctx.get("nation_rate") or ctx.get("exchange_rate") or nation.get("exchange_rate"))} دلار
 رتبه ملت: #{_number(ctx.get("nation_rank") or ctx.get("rank") or nation.get("rank"))}
 تعداد اعضا: {_number(ctx.get("nation_members") or ctx.get("members") or nation.get("members"))}
 وضعیت اقتصادی ملت: {_esc(ctx.get("economic_status"), "نامشخص")}
@@ -284,7 +284,7 @@ class PromptEngine:
 ━━━ معامله ━━━
 نوع معامله: {_esc(ctx.get("trade_type"))}
 حجم معامله: {_number(ctx.get("trade_amount"))}
-هزینه ΩXR: {_number(ctx.get("trade_spend_xr"))}
+هزینه دلار: {_number(ctx.get("trade_spend_xr"))}
 نرخ معامله: {_number(ctx.get("trade_rate"))}
 کارمزد: {_number(ctx.get("trade_fee_xr"))}
 تغییر نرخ پس از معامله: {_esc(ctx.get("rate_impact"), "نامشخص")}
@@ -308,7 +308,7 @@ class PromptEngine:
 ━━━ جنگ اقتصادی ━━━
 ملت رقیب: {_esc(ctx.get("opponent_name") or opponent.get("name"))}
 رتبه رقیب: #{_number(ctx.get("opponent_rank") or opponent.get("rank"))}
-نرخ ارز رقیب: {_number(ctx.get("opponent_rate") or opponent.get("rate"))} ΩXR
+نرخ ارز رقیب: {_number(ctx.get("opponent_rate") or opponent.get("rate"))} دلار
 دلیل ثبت‌شده برای جنگ: {_esc(ctx.get("reason"))}
 تاریخ شروع: {_esc(ctx.get("declared_at"))}
 
