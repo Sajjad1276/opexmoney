@@ -158,7 +158,7 @@ def build_lesson_msg(lesson) -> str:
         lesson.content_fa,
         "━━━━━━━━━━━━━━━━━━",
         f"⭐ جایزه: +{to_fa(lesson.xp_reward)} XP "
-        f"💰 +{to_fa(fmt_amount(lesson.xr_reward))} ΩXR",
+        f"💰 +{to_fa(fmt_amount(lesson.xr_reward))} دلار",
     ]
     return "\n".join(f"{RLM}{line}" for line in lines)
 
@@ -712,7 +712,7 @@ async def finish_quiz(
         ]
         if result["xr_gained"] > 0:
             lines.append(
-                f"{RLM}💰 +{to_fa(fmt_amount(result['xr_gained']))} ΩXR"
+                f"{RLM}💰 +{to_fa(fmt_amount(result['xr_gained']))} دلار"
             )
         if result["level_up"]:
             lines.append(
