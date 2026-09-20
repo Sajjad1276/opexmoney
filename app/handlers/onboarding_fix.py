@@ -15,6 +15,7 @@ from app.database.models import Nation, User
 from app.database.session import async_session
 from app.handlers.start import _safe_edit_caption, _safe_edit_text, start as restart_flow, user_mention
 from app.keyboards.inline import cancel_keyboard, nation_selection_keyboard
+from app.services.membership_service import sync_registered_user_memberships
 from app.services.temporal_service import ensure_temporal_profile
 from app.services.user_service import get_user, is_fully_registered, username_exists
 from app.states.onboarding import OnboardingStates
@@ -213,6 +214,32 @@ async def accept_valid_name(message: Message, state: FSMContext) -> None:
         NAME_ACCEPTED_TEXT.format(username=html.escape(username)),
         parse_mode="HTML",
     )
+
+    async with async_session() as session:
+        async with session.begin():
+            synced_nations = await sync_registered_user_memberships(
+                session,
+                message.from_user.id,
+            )
+
+    if synced_nations:
+        async with async_session() as session:
+            async with session.begin():
+                registered_user = await get_user(
+                    session,
+                    message.from_user.id,
+                )
+        await state.clear()
+        if registered_user is not None:
+            await message.answer(
+                rtl_text(
+                    "عضویت تلگرامی‌ات شناسایی شد و ملت‌های مرتبط با حسابت همگام شدند."
+                ),
+                parse_mode="HTML",
+            )
+            from app.handlers.start import show_dashboard
+            await show_dashboard(message, registered_user)
+            return
 
     async with async_session() as session:
         await show_nation_selection(message, session, state)
