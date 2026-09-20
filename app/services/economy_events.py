@@ -69,6 +69,7 @@ async def claim_events(
                 .where(
                     EconomyEventOutbox.published_at.is_(None),
                     EconomyEventOutbox.available_at <= now,
+                    (EconomyEventOutbox.claimed_until.is_(None) | (EconomyEventOutbox.claimed_until <= now)),
                 )
                 .order_by(EconomyEventOutbox.id.asc())
                 .limit(max(1, min(int(limit), 500)))
@@ -78,8 +79,10 @@ async def claim_events(
     )
 
     events: list[EconomyEvent] = []
+    lease_until = now + timedelta(minutes=5)
     for row in rows:
         row.attempts = int(row.attempts or 0) + 1
+        row.claimed_until = lease_until
         events.append(
             EconomyEvent(
                 id=row.id,
@@ -100,6 +103,7 @@ async def mark_published(session: AsyncSession, event_id: int) -> None:
     if row is None:
         return
     row.published_at = datetime.utcnow()
+    row.claimed_until = None
     row.last_error = None
     await session.flush()
 
@@ -115,6 +119,7 @@ async def mark_failed(
     if row is None:
         return
     row.last_error = error[:4000]
+    row.claimed_until = None
     row.available_at = datetime.utcnow() + timedelta(seconds=max(1, retry_after_seconds))
     await session.flush()
 
