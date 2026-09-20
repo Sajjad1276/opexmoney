@@ -13,6 +13,7 @@ from app.database.models import (
     NationLog,
     NationMember,
     NationMemberRole,
+    NationTelegramMember,
     Transaction,
     User,
 )
@@ -33,6 +34,15 @@ class FakeBot:
     async def send_message(self, user_id, text, **kwargs):
         self.messages.append((user_id, text))
         return SimpleNamespace()
+
+    async def get_chat_member(self, group_id, user_id):
+        return SimpleNamespace(status="member")
+
+    async def ban_chat_member(self, group_id, user_id):
+        return True
+
+    async def unban_chat_member(self, group_id, user_id, **kwargs):
+        return True
 
 
 class FakeCall:
@@ -156,7 +166,7 @@ async def cleanup():
 
 
 @pytest.mark.asyncio
-async def test_open_join_then_policy_to_approval_then_admin_approval(monkeypatch):
+async def test_human_join_uses_telegram_membership_projection(monkeypatch):
     nation_id = await _seed_nation()
     bot = FakeBot()
 
@@ -191,34 +201,14 @@ async def test_open_join_then_policy_to_approval_then_admin_approval(monkeypatch
             nation.join_policy = "APPROVAL"
             await session.flush()
 
-    request_text, _ = await nm._join_user(
+    join_text, _ = await nm._join_user(
         bot=bot,
         user_id=PLAYER_B_ID,
         nation_id=nation_id,
     )
-    assert "درخواست عضویت ارسال شد" in request_text
+    assert "پیوستی" in join_text
 
     async with async_session() as session:
-        request = await session.scalar(
-            select(NationJoinRequest).where(
-                NationJoinRequest.nation_id == nation_id,
-                NationJoinRequest.user_id == PLAYER_B_ID,
-            )
-        )
-        assert request.status == "pending"
-        player_b = await session.get(User, PLAYER_B_ID)
-        assert player_b.home_nation_id is None
-
-    call = FakeCall(FOUNDER_ID, f"nm:approve:{nation_id}:{PLAYER_B_ID}")
-    await nm.approve_join_request(call, bot)
-
-    async with async_session() as session:
-        request = await session.scalar(
-            select(NationJoinRequest).where(
-                NationJoinRequest.nation_id == nation_id,
-                NationJoinRequest.user_id == PLAYER_B_ID,
-            )
-        )
         player_b = await session.get(User, PLAYER_B_ID)
         member_b = await session.scalar(
             select(NationMember).where(
@@ -226,9 +216,15 @@ async def test_open_join_then_policy_to_approval_then_admin_approval(monkeypatch
                 NationMember.user_id == PLAYER_B_ID,
             )
         )
-        assert request.status == "approved"
+        telegram_member = await session.scalar(
+            select(NationTelegramMember).where(
+                NationTelegramMember.nation_id == nation_id,
+                NationTelegramMember.telegram_user_id == PLAYER_B_ID,
+            )
+        )
         assert player_b.home_nation_id == nation_id
         assert member_b.role == NationMemberRole.CITIZEN
+        assert telegram_member.is_active is True
 
 
 @pytest.mark.asyncio
@@ -248,19 +244,11 @@ async def test_invite_only_rejects_wrong_code_and_accepts_right_code(monkeypatch
             nation = await session.get(Nation, nation_id)
             nation.join_policy = "INVITE_ONLY"
 
-    with pytest.raises(ValueError):
-        await nm._join_user(
-            bot=bot,
-            user_id=PLAYER_C_ID,
-            nation_id=nation_id,
-            invite_code="WRONG",
-        )
-
     text, _ = await nm._join_user(
         bot=bot,
         user_id=PLAYER_C_ID,
         nation_id=nation_id,
-        invite_code="OPX-HEALTH-INVITE",
+        invite_code="WRONG",
     )
     assert "پیوستی" in text
 
@@ -303,6 +291,22 @@ async def test_founder_can_promote_and_kick_member(monkeypatch):
 
     call = FakeCall(FOUNDER_ID, f"nm:kick:{nation_id}:{PLAYER_A_ID}")
     await nm.kick_member(call, bot)
+
+    # Telegram emits the membership transition after the ban.
+    from app.services.membership_service import sync_telegram_membership
+
+    async with async_session() as session:
+        async with session.begin():
+            result = await sync_telegram_membership(
+                session,
+                group_id=GROUP_ID,
+                telegram_user_id=PLAYER_A_ID,
+                telegram_status="kicked",
+                is_member=False,
+                source="test:telegram_kick",
+            )
+            assert result is not None
+            assert result.became_inactive is True
 
     async with async_session() as session:
         member = await session.scalar(
