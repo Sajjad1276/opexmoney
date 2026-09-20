@@ -29,12 +29,17 @@ from app.keyboards.inline import (
     buy_amount_keyboard,
     market_buy_keyboard,
     market_keyboard,
+    listed_currencies_keyboard,
     sell_amount_keyboard,
     sell_currency_keyboard,
     trade_preview_keyboard,
 )
 from app.services.economic_engine import get_active_members
-from app.services.market_service import get_user_sell_holdings
+from app.services.market_service import (
+    LISTED_CURRENCIES_PAGE_SIZE,
+    get_listed_currencies_page,
+    get_user_sell_holdings,
+)
 from app.services.alert_service import (
     create_price_alert,
     delete_price_alert,
@@ -311,6 +316,90 @@ async def market_refresh(call: CallbackQuery):
     except Exception:
         logger.exception("Market refresh failed for user=%s", call.from_user.id)
         await call.answer("⚠️ بازار موقتاً در دسترس نیست.", show_alert=True)
+
+
+async def render_listed_currencies(call: CallbackQuery, page: int = 0) -> None:
+    async with async_session() as session:
+        async with session.begin():
+            listed = await get_listed_currencies_page(session, page)
+
+    if listed.total_count == 0:
+        text = (
+            "📋 <b>ارزهای لیست شده</b>\n\n"
+            "فعلاً هیچ ارز فعالی برای نمایش وجود ندارد."
+        )
+    else:
+        start_index = listed.page * LISTED_CURRENCIES_PAGE_SIZE + 1
+        lines = [
+            "📋 <b>ارزهای لیست شده</b>",
+            "",
+            f"تعداد کل: <b>{to_fa(listed.total_count)}</b> ارز",
+            "مرتب‌سازی: <b>کمترین قیمت فعلی → بیشترین قیمت فعلی</b>",
+            "",
+            "برای استفاده در بخش‌های دیگر، روی خود کد ارز بزن تا راحت کپی شود.",
+            "",
+        ]
+        lines.extend(
+            f"{to_fa(index)}. <code>{html.escape(currency_code)}</code>"
+            for index, currency_code in enumerate(
+                listed.currency_codes,
+                start=start_index,
+            )
+        )
+        text = "\n".join(lines)
+
+    await safe_edit(
+        call,
+        text,
+        listed_currencies_keyboard(listed.page, listed.total_pages),
+    )
+
+
+@router.callback_query(F.data == "market_listed_currencies")
+async def market_listed_currencies_callback(
+    call: CallbackQuery,
+    state: FSMContext,
+):
+    await state.clear()
+    try:
+        await render_listed_currencies(call, 0)
+        await call.answer()
+    except Exception:
+        logger.exception(
+            "Could not render listed currencies user=%s",
+            call.from_user.id,
+        )
+        await call.answer(
+            "⚠️ فهرست ارزها موقتاً در دسترس نیست.",
+            show_alert=True,
+        )
+
+
+@router.callback_query(F.data.startswith("market_listed:"))
+async def market_listed_currencies_page_callback(
+    call: CallbackQuery,
+    state: FSMContext,
+):
+    try:
+        page = int((call.data or "").rsplit(":", 1)[1])
+    except (ValueError, IndexError):
+        await call.answer("⚠️ صفحه نامعتبر است.", show_alert=True)
+        return
+
+    await state.clear()
+    try:
+        await render_listed_currencies(call, page)
+        await call.answer()
+    except Exception:
+        logger.exception(
+            "Could not render listed currencies page=%s user=%s",
+            page,
+            call.from_user.id,
+        )
+        await call.answer(
+            "⚠️ فهرست ارزها موقتاً در دسترس نیست.",
+            show_alert=True,
+        )
 
 
 def _currency_selector_prompt(action: str) -> str:
