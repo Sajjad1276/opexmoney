@@ -179,16 +179,22 @@ async def test_telegram_membership_is_authoritative_and_home_wallet_survives_sec
             assert user.home_nation_id == nation_a_id
             assert user.balance == Decimal("777")
 
-            active_projection_count = int(
-                await session.scalar(
-                    select(NationTelegramMember.id).where(
-                        NationTelegramMember.telegram_user_id == USER_ID,
-                        NationTelegramMember.is_active.is_(True),
-                    )
+            nation_b_member = await session.scalar(
+                select(NationMember).where(
+                    NationMember.nation_id == nation_b_id,
+                    NationMember.user_id == USER_ID,
+                    NationMember.is_active.is_(True),
                 )
-                is not None
             )
-            assert active_projection_count == 1 or active_projection_count == 0
+            nation_b_projection = await session.scalar(
+                select(NationTelegramMember).where(
+                    NationTelegramMember.nation_id == nation_b_id,
+                    NationTelegramMember.telegram_user_id == USER_ID,
+                    NationTelegramMember.is_active.is_(True),
+                )
+            )
+            assert nation_b_member is not None
+            assert nation_b_projection is not None
 
 
 @pytest.mark.asyncio
