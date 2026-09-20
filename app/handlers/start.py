@@ -403,9 +403,7 @@ async def start(message: Message, state: FSMContext) -> None:
     if preferred_nation_id is not None:
         await state.update_data(preferred_nation_id=preferred_nation_id)
 
-    now = datetime.now()
-    date_text = to_fa(now.strftime("%Y/%m/%d"))
-    time_text = to_fa(now.strftime("%H:%M"))
+    imperial_date, imperial_time = imperial_datetime()
 
     text = f"""🌐 <b>به OPEX MONEY خوش اومدی</b>
 
@@ -413,8 +411,8 @@ async def start(message: Message, state: FSMContext) -> None:
 
 🎯 <b>تصمیم بگیر، معامله کن، رشد کن.</b>
 
-📅 {date_text}
-🕐 {time_text}"""
+📅 {imperial_date}
+🕐 {imperial_time}"""
 
     # /start is a clean entry point for every player.
     # Detailed balances and assets remain inside their dedicated sections.
