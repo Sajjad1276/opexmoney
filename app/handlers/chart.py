@@ -65,7 +65,7 @@ def build_chart_caption(data: dict) -> str:
     if not data["enough_data"]:
         return (
             f"📈 <b>نمودار {currency_code}</b>\n"
-            "━━━━━━━━━━━━━━━━━━\n"
+            "<blockquote>⁠</blockquote>\n"
             "⚠️ داده کافی برای نمودار وجود نداره.\n"
             "حداقل ۳ رکورد تاریخچه نرخ لازمه."
         )
