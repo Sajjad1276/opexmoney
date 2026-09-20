@@ -30,4 +30,4 @@ def test_nation_selection_keyboard_uses_persisted_flag():
     button = keyboard.inline_keyboard[0][0]
 
     assert button.text.startswith("🇯🇵 Sakura")
-    assert button.callback_data == "join_nation:42"
+    assert button.callback_data == "confirm_nation:42"
