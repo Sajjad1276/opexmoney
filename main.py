@@ -6,7 +6,12 @@ import sys
 from pathlib import Path
 
 from aiogram import Bot, Dispatcher
-from aiogram.types import Message
+from aiogram.types import (
+    BotCommand,
+    BotCommandScopeAllPrivateChats,
+    MenuButtonCommands,
+    Message,
+)
 from aiogram.types.error_event import ErrorEvent
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
@@ -92,6 +97,25 @@ def build_storage():
         return RedisStorage.from_url(settings.redis_url)
     logger.warning("REDIS_URL is not configured; using in-memory FSM storage")
     return MemoryStorage()
+
+
+def build_bot_commands() -> list[BotCommand]:
+    return [
+        BotCommand(
+            command="start",
+            description="بازگشت به منوی اصلی",
+        )
+    ]
+
+
+async def configure_bot_menu(bot: Bot) -> None:
+    await bot.set_my_commands(
+        build_bot_commands(),
+        scope=BotCommandScopeAllPrivateChats(),
+    )
+    await bot.set_chat_menu_button(
+        menu_button=MenuButtonCommands(),
+    )
 
 
 async def run_rate_job() -> None:
@@ -274,6 +298,7 @@ async def main() -> None:
         token=settings.bot_token,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
+    await configure_bot_menu(bot)
     dp = Dispatcher(storage=build_storage())
     ranking_redis = Redis.from_url(settings.redis_url, decode_responses=True) if settings.redis_url else None
     dp["redis"] = ranking_redis
