@@ -184,7 +184,8 @@ async def bind_group(
         draft.group_title = group_title
         draft.group_username = group_username
         draft.group_type = group_type
-        draft.status = "GROUP_READY"
+        draft.nation_name = group_title
+        draft.status = "NAMING"
         draft.expires_at = _utcnow() + DRAFT_TTL
 
         bot_group = await session.get(BotGroup, group_id, with_for_update=True)
