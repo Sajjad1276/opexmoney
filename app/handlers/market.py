@@ -50,6 +50,7 @@ from app.services.market_intelligence import (
 )
 from app.services.mission_service import increment_mission
 from app.services.nation_service import get_user_active_nation_context
+from app.services.economic_event_service import record_economic_event
 from app.services.user_service import sync_user_balance
 from app.services.rules.resolver import resolve
 from app.services.temporal_service import get_peak_multiplier
@@ -900,6 +901,15 @@ async def confirm_buy(call, state=None):
                     rate=nation.exchange_rate,
                 )
             )
+            record_economic_event(
+                session,
+                nation_id=nation_id,
+                event_type="TRADE_BUY",
+                actor_id=user.user_id,
+                amount_xr=spend,
+                amount_local=calc["receive"],
+                metadata={"fee_xr": str(calc["fee"]), "rate": str(nation.exchange_rate)},
+            )
             session.add(
                 UserActivity(
                     user_id=user.user_id,
@@ -1313,6 +1323,15 @@ async def confirm_sell(call, state=None):
                     fee_xr=calc["fee"],
                     rate=nation.exchange_rate,
                 )
+            )
+            record_economic_event(
+                session,
+                nation_id=nation_id,
+                event_type="TRADE_SELL",
+                actor_id=user.user_id,
+                amount_xr=calc["receive"],
+                amount_local=amount,
+                metadata={"fee_xr": str(calc["fee"]), "rate": str(nation.exchange_rate)},
             )
             session.add(
                 UserActivity(
