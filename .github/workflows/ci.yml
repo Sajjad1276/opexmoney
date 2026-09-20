@@ -231,6 +231,9 @@ jobs:
               issues = json.loads(response.read().decode("utf-8")).get("items", [])
 
           for issue in issues:
+              if issue.get("user", {}).get("login") != "github-actions[bot]":
+                  continue
+
               number = issue["number"]
               payload = json.dumps(
                   {"state": "closed", "state_reason": "completed"}
