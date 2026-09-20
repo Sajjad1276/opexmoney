@@ -31,7 +31,7 @@ async def _repair_membership(
     nation: Nation,
     *,
     role: NationMemberRole,
-) -> str:
+) -> str | None:
     if not nation.is_ai:
         telegram_membership = await session.scalar(
             select(NationTelegramMember)
@@ -43,9 +43,7 @@ async def _repair_membership(
             .limit(1)
         )
         if telegram_membership is None:
-            raise ValueError(
-                "Human nation membership cannot be repaired without Telegram membership."
-            )
+            return None
 
     member = await session.scalar(
         select(NationMember)
@@ -139,7 +137,8 @@ async def get_user_active_nation_context(
                     home_nation,
                     role=NationMemberRole.FOUNDER,
                 )
-                return home_nation, role, "repaired_founder"
+                if role is not None:
+                    return home_nation, role, "repaired_founder"
 
             holding = await session.scalar(
                 maybe_lock(
@@ -158,7 +157,8 @@ async def get_user_active_nation_context(
                     home_nation,
                     role=NationMemberRole.CITIZEN,
                 )
-                return home_nation, role, "repaired_holding"
+                if role is not None:
+                    return home_nation, role, "repaired_holding"
 
     membership_stmt = (
         select(NationMember, Nation)
@@ -201,7 +201,8 @@ async def get_user_active_nation_context(
                 founder_nation,
                 role=NationMemberRole.FOUNDER,
             )
-            return founder_nation, role, "founder_fallback_repaired"
+            if role is not None:
+                return founder_nation, role, "founder_fallback_repaired"
         return (
             founder_nation,
             NationMemberRole.FOUNDER.value,
@@ -227,7 +228,8 @@ async def get_user_active_nation_context(
                 nation,
                 role=NationMemberRole.CITIZEN,
             )
-            return nation, role, "holding_fallback_repaired"
+            if role is not None:
+                return nation, role, "holding_fallback_repaired"
         return (
             nation,
             NationMemberRole.CITIZEN.value,
