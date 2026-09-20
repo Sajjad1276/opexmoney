@@ -31,12 +31,14 @@ from app.services.founder_service import (
     get_draft_by_token,
     get_or_create_draft,
     reset_group,
+    set_currency_code,
     set_flag,
     set_nation_name,
 )
 from app.services.user_service import get_user
 from app.states.founder import FounderStates
 from app.states.onboarding import OnboardingStates
+from app.utils.name_filter import is_blocked_trader_name, is_valid_trader_name
 from app.utils.validators import validate_nation_name
 
 logger = logging.getLogger(__name__)
@@ -155,6 +157,74 @@ def _group_link(bot_username: str, token: str) -> str:
         f"https://t.me/{bot_username}"
         f"?startgroup=founder_{token}"
         f"&admin={_ADMIN_LINK_RIGHTS}"
+    )
+
+
+def _founder_intro_text(user_mention: str) -> str:
+    return (
+        f"{user_mention}، داری تاریخ میسازی.\n"
+        "\n"
+        "هر ملت یه گروه تلگرامیه.\n"
+        "هر گروه یه اقتصاد مستقل داره.\n"
+        "اعضای گروهت شهروندان ملتت میشن.\n\n"
+        "<blockquote>⁠</blockquote>\n"
+        "<b>قبل از شروع بدون:</b>\n\n"
+        "👑 تو به عنوان بنیان‌گذار ثبت میشی\n"
+        "💰 موجودی اولیه: <b>۱,۰۰۰ واحد</b> ارز ملت\n"
+        "🎖 نشان «بنیان‌گذار» برای همیشه روی پروفایلت\n"
+        "📊 کنترل کامل تنظیمات اقتصادی ملت\n\n"
+        "<blockquote>⁠</blockquote>\n"
+        "<i>گروه تلگرامی داری؟</i>"
+    )
+
+
+def _no_group_text(user_mention: str) -> str:
+    return (
+        f"{user_mention}، دو راه داری:\n\n"
+        "<blockquote>⁠</blockquote>\n"
+        "<b>راه اول — همین الان گروه بساز:</b>\n"
+        "تلگرام رو باز کن، یه گروه جدید بساز،\n"
+        "بعد برگرد اینجا.\n\n"
+        "<b>راه دوم — فعلاً به عنوان Player شروع کن:</b>\n"
+        "بعداً که گروه ساختی میتونی از تنظیمات\n"
+        "ملت بسازی."
+    )
+
+
+def _username_step_text(user_mention: str) -> str:
+    return (
+        f"{user_mention}، اول یه اسم معامله‌گر\n"
+        "شخصی برای خودت انتخاب کن.\n\n"
+        "این اسم جداست از اسم ملتت.\n\n"
+        "<b>اسم معامله‌گرت رو بنویس:</b>\n"
+        "<i>بین ۳ تا ۲۰ کاراکتر، بدون فاصله و @</i>"
+    )
+
+
+def _currency_step_text(draft) -> str:
+    return (
+        "💰 <b>کد ارز ملت</b>\n"
+        "<blockquote>⁠</blockquote>\n"
+        f"📍 گروه: <b>{html.escape(draft.group_title or 'گروه')}</b>\n\n"
+        "یه کد کوتاه ۳ تا ۴ حرفی انگلیسی انتخاب کن.\n"
+        "<i>مثال: AZD — IRN — PRS — GLX — VLT — GOLD</i>\n\n"
+        "⚠️ بعد از ثبت قابل تغییر نیست."
+    )
+
+
+def _f5_text(draft, founder_mention: str) -> str:
+    return (
+        "💰 <b>تأیید کد ارز</b>\n"
+        "<blockquote>⁠</blockquote>\n"
+        f"{founder_mention}:\n\n"
+        f"کد انتخابی: <code>{html.escape(draft.currency_code or '---')}</code>\n"
+        f"ملت: <b>{html.escape(draft.group_title or '---')}</b>\n\n"
+        "<blockquote>⁠</blockquote>\n"
+        "<b>بعد از تأیید:</b>\n"
+        f"- ارز <code>{html.escape(draft.currency_code or '---')}</code> در بازارهای OPEX ثبت میشه\n"
+        "- نرخ اولیه: <b>۱.۰۰۰۰ دلار</b>\n"
+        f"- موجودی اولیه تو: <b>۱,۰۰۰ {html.escape(draft.currency_code or '---')}</b>\n\n"
+        "⚠️ بعد از تأیید کد قابل تغییر نیست."
     )
 
 
@@ -317,7 +387,7 @@ async def _show_review_step(
 
 
 @founder_router.callback_query(
-    F.data == "found_nation",
+    F.data.in_({"start_founder", "found_nation"}),
     StateFilter(None, OnboardingStates.SELECT_NATION),
 )
 async def start_founder(
@@ -325,52 +395,114 @@ async def start_founder(
     state: FSMContext,
     bot: Bot,
 ) -> None:
-    user = await _get_user_or_none(call.from_user.id)
-    if user is None or not (user.username or "").strip():
-        await call.answer("⚠️ اول باید وارد بازی بشی.", show_alert=True)
-        return
-
-    try:
-        async with async_session() as session:
-            draft = await get_or_create_draft(session, call.from_user.id)
-    except ValueError as exc:
-        await call.answer(str(exc), show_alert=True)
-        return
-
     await state.clear()
-    try:
-        await _set_state_for_draft(state, draft.status)
-    except ValueError:
-        await call.answer(
-            "⚠️ وضعیت تأسیس قابل ادامه نیست. دوباره از «تأسیس ملت» شروع کن.",
-            show_alert=True,
-        )
-        return
     await call.answer()
-
     if call.message is None:
         return
 
-    if draft.status == "WAITING_GROUP":
-        await _show_group_step(call.message, state, bot, draft, edit_call=call)
-        return
-
-    if draft.status in {"GROUP_READY", "NAMING"}:
-        await _show_name_step(call.message, state, draft, edit_call=call)
-        return
-
-    if draft.status == "FLAG":
-        await _show_flag_step(call.message, state, draft, edit_call=call)
-        return
-
-    if draft.status == "REVIEW":
-        await _show_review_step(call.message, state, draft, edit_call=call)
-        return
-
-    await call.answer(
-        "⚠️ وضعیت تأسیس قابل ادامه نیست. دوباره شروع کن.",
-        show_alert=True,
+    mention = f'<a href="tg://user?id={call.from_user.id}">{html.escape(call.from_user.first_name or "بنیان‌گذار")}</a>'
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="✅ بله، گروه دارم",
+                    callback_data="founder_has_group",
+                    style="success",
+                ),
+                InlineKeyboardButton(
+                    text="❌ گروه ندارم",
+                    callback_data="founder_no_group",
+                    style="danger",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text="↩️ بازگشت",
+                    callback_data="back_to_dashboard",
+                )
+            ],
+        ]
     )
+    await call.message.edit_text(
+        "🏛 <b>ساخت ملت جدید</b>\n"
+        "<blockquote>⁠</blockquote>\n"
+        + _founder_intro_text(mention),
+        reply_markup=keyboard,
+        parse_mode="HTML",
+    )
+
+
+@founder_router.callback_query(F.data == "founder_no_group", StateFilter(None))
+async def founder_no_group(call: CallbackQuery) -> None:
+    mention = f'<a href="tg://user?id={call.from_user.id}">{html.escape(call.from_user.first_name or "بنیان‌گذار")}</a>'
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="🔄 گروه ساختم، ادامه بده",
+                    callback_data="founder_has_group",
+                    style="success",
+                ),
+                InlineKeyboardButton(
+                    text="💹 فعلاً Player میشم",
+                    callback_data="start_player",
+                    style="primary",
+                ),
+            ]
+        ],
+    )
+    if call.message:
+        await call.message.edit_text(
+            "💡 <b>بدون گروه هم میشه شروع کرد!</b>\n"
+            "<blockquote>⁠</blockquote>\n"
+            + _no_group_text(mention),
+            reply_markup=keyboard,
+            parse_mode="HTML",
+        )
+    await call.answer()
+
+
+@founder_router.callback_query(F.data == "founder_has_group", StateFilter(None))
+async def founder_has_group(call: CallbackQuery, state: FSMContext, bot: Bot) -> None:
+    user = await _get_user_or_none(call.from_user.id)
+    if user is not None and (user.username or "").strip():
+        async with async_session() as session:
+            draft = await get_or_create_draft(session, call.from_user.id)
+        await state.set_state(FounderStates.WAITING_GROUP_ADMIN)
+        await call.answer()
+        if call.message:
+            await _show_group_step(call.message, state, bot, draft, edit_call=call)
+        return
+
+    await state.set_state(FounderStates.SET_USERNAME_FOUNDER)
+    await state.update_data(founder_pending_group=True)
+    if call.message:
+        await call.message.edit_text(
+            "👑 <b>ثبت‌نام بنیان‌گذار</b>\n"
+            "<blockquote>⁠</blockquote>\n"
+            + _username_step_text(
+                f'<a href="tg://user?id={call.from_user.id}">{html.escape(call.from_user.first_name or "بنیان‌گذار")}</a>'
+            ),
+            reply_markup=founder_cancel_keyboard(),
+            parse_mode="HTML",
+        )
+    await call.answer()
+
+
+@founder_router.callback_query(F.data == "start_player", StateFilter(None))
+async def founder_start_player(call: CallbackQuery, state: FSMContext) -> None:
+    await state.clear()
+    user = await _get_user_or_none(call.from_user.id)
+    if user is None:
+        from app.handlers.start import start_game_button
+        # Reuse the canonical player onboarding path.
+        await start_game_button(call.message, state)
+    elif call.message:
+        await call.message.edit_text(
+            "✅ حالت Player فعال شد. برای ورود به بازی، منوی اصلی رو باز کن.",
+            reply_markup=None,
+        )
+    await call.answer()
 
 
 @founder_router.my_chat_member()
