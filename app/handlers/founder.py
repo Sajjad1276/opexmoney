@@ -30,7 +30,6 @@ from app.services.founder_service import (
     get_active_draft,
     get_draft_by_token,
     get_or_create_draft,
-    refresh_currency_code,
     reset_group,
     set_flag,
     set_nation_name,
@@ -381,58 +380,27 @@ async def founder_group_status_changed(
                     NationFoundingDraft.status == "WAITING_GROUP",
                 )
                 .order_by(NationFoundingDraft.id.desc())
-                .with_for_update()
                 .limit(1)
             )
 
     if draft is None:
         return
 
-    ok, _ = await _verify_group(
-        bot,
-        group_id=event.chat.id,
-        founder_user_id=actor.id,
-    )
-    if not ok:
-        return
-
-    try:
-        async with async_session() as session:
-            bound = await bind_group(
-                session,
-                founder_user_id=actor.id,
-                token=draft.launch_token,
-                group_id=event.chat.id,
-                group_title=event.chat.title or "گروه بدون نام",
-                group_username=getattr(event.chat, "username", None),
-                group_type=event.chat.type,
-            )
-    except ValueError as exc:
-        logger.info("Founder group binding rejected: %s", exc)
-        return
-
-    private_state = dispatcher.fsm.get_context(
-        bot=bot,
-        chat_id=actor.id,
-        user_id=actor.id,
-    )
-    await private_state.set_state(FounderStates.SET_NATION_NAME)
-    await private_state.update_data(founder_panel_message_id=None)
-
+    # Do not bind the group from this event. The exact random startgroup token
+    # is the only authoritative group-binding event.
     try:
         await bot.send_message(
             actor.id,
             (
-                "✅ <b>گروه پایتخت متصل شد.</b>\n"
-                f"📍 پایتخت: <b>{html.escape(bound.group_title or 'گروه')}</b>\n\n"
-                "حالا اسم ملت رو بفرست."
+                "✅ ربات ادمین شد.
+"
+                "برای اتصال همین گروه به فرآیند تأسیس، از لینک «➕ افزودن ربات به گروه» "
+                "در پنل تأسیس دوباره استفاده کن."
             ),
-            reply_markup=founder_cancel_keyboard(),
-            parse_mode="HTML",
         )
     except Exception:
         logger.debug(
-            "Could not notify founder after group promotion",
+            "Could not notify founder after bot promotion",
             exc_info=True,
         )
 
@@ -615,7 +583,12 @@ async def check_founder_group(
 
 
 @founder_router.message(
-    FounderStates.SET_NATION_NAME,
+    StateFilter(
+        FounderStates.WAITING_GROUP_ADMIN,
+        FounderStates.SET_NATION_NAME,
+        FounderStates.SELECT_FLAG,
+        FounderStates.CONFIRM,
+    ),
     CommandStart(),
 )
 async def founder_start_command(
