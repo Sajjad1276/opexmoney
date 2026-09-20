@@ -189,6 +189,20 @@ async def _edit_chart_message(
     )
 
 
+async def show_chart_for_nation(
+    callback: CallbackQuery,
+    nation_id: int,
+    window: str = "24h",
+) -> None:
+    """Render a chart for a resolved nation without exposing nation IDs in UI."""
+    async with async_session() as session:
+        async with session.begin():
+            chart_data = await get_chart_data(session, nation_id, window)
+            chart_data["window"] = window
+
+    await _send_chart_message(callback, chart_data, nation_id, window)
+
+
 async def show_chart(callback: CallbackQuery) -> None:
     try:
         parts = (callback.data or "").split(":")
