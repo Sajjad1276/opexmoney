@@ -23,6 +23,7 @@ from app.services.mission_service import (
     get_user_missions,
 )
 from app.utils.formatting import fmt_amount, progress_bar, to_fa
+from app.utils.ui import send_submenu_panel
 
 router = Router(name="missions")
 logger = logging.getLogger(__name__)
@@ -173,7 +174,8 @@ async def show_missions(message: Message) -> None:
         await message.answer(MISSIONS_ERROR, parse_mode=ParseMode.HTML)
         return
 
-    await message.answer(
+    await send_submenu_panel(
+        message,
         text,
         reply_markup=markup,
         parse_mode=ParseMode.HTML,
