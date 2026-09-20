@@ -555,6 +555,9 @@ async def founder_group_status_changed(
     if draft.group_id not in (None, event.chat.id):
         return
 
+    if draft.group_id == event.chat.id and draft.status == "NAMING":
+        return
+
     if new_status not in {"administrator", "creator"}:
         if draft.group_id in (None, event.chat.id):
             try:
@@ -612,6 +615,7 @@ async def founder_group_status_changed(
     )
     await private_state.set_state(FounderStates.SET_CURRENCY_CODE)
     await private_state.update_data(founder_group_id=event.chat.id)
+    await FounderPanel(private_state, bot).delete(actor.id)
 
     try:
         await bot.send_message(
@@ -647,6 +651,9 @@ async def group_founder_start(
             draft = await get_draft_by_token(session, token)
 
     if draft is None:
+        return
+
+    if draft.group_id == message.chat.id and draft.status == "NAMING":
         return
 
     if draft.founder_user_id != message.from_user.id:
