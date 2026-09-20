@@ -1197,7 +1197,7 @@ async def confirm_founder(
                 "از این لحظه این گروه یه ملت مستقل در بازارهای جهانی OPEX است.\n\n"
                 f"💰 واحد پول: <code>{html.escape(nation.currency_code)}</code>\n"
                 "📈 نرخ امروز: <b>۱.۰۰۰۰ دلار</b>\n"
-                f"👑 بنیان‌گذار: <a href="tg://user?id={call.from_user.id}">{html.escape(call.from_user.first_name or 'بنیان‌گذار')}</a>\n\n"
+                f"👑 بنیان‌گذار: <a href='tg://user?id={call.from_user.id}'>{html.escape(call.from_user.first_name or 'بنیان‌گذار')}</a>\n"
                 "<blockquote>⁠</blockquote>\n"
                 "<b>چطور بازی کنم؟</b>\n"
                 "۱. روی دکمه زیر بزن\n"
