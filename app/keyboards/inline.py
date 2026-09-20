@@ -72,7 +72,7 @@ def more_menu_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="📜 قوانین", callback_data="governance_main"),
             InlineKeyboardButton(text="⚙️ تنظیمات", callback_data="settings:back"),
         ],
-        [InlineKeyboardButton(text="↩️ بازگشت", callback_data="back_to_dashboard")],
+        [InlineKeyboardButton(text="🏠 منوی اصلی", callback_data="back_to_dashboard")],
     ])
 
 
@@ -91,7 +91,7 @@ def market_keyboard() -> InlineKeyboardMarkup:
         ],
         [InlineKeyboardButton(text="📜 تاریخچه", callback_data="market_history")],
         [InlineKeyboardButton(text="🔄 بروزرسانی", callback_data="market_refresh")],
-        [InlineKeyboardButton(text="↩️ بازگشت", callback_data="back_to_dashboard")],
+        [InlineKeyboardButton(text="🏠 منوی اصلی", callback_data="back_to_dashboard")],
     ])
 
 
@@ -143,7 +143,7 @@ def nation_panel_keyboard(
         )
 
     buttons.append(
-        [InlineKeyboardButton(text="↩️ بازگشت", callback_data="back_to_dashboard")]
+        [InlineKeyboardButton(text="🏠 منوی اصلی", callback_data="back_to_dashboard")]
     )
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
@@ -373,7 +373,7 @@ def governance_main_keyboard(is_founder: bool = False) -> InlineKeyboardMarkup:
     ]
     if is_founder:
         rows.append([InlineKeyboardButton(text="👑 لغو فوری قانون", callback_data="gov_revoke_list", style=ButtonStyle.DANGER)])
-    rows.append([InlineKeyboardButton(text="↩️ بازگشت", callback_data="back_to_dashboard")])
+    rows.append([InlineKeyboardButton(text="🏠 منوی اصلی", callback_data="back_to_dashboard")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
