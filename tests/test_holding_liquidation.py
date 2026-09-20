@@ -29,6 +29,12 @@ class FakeBot:
     async def send_message(self, *args, **kwargs):
         return SimpleNamespace()
 
+    async def ban_chat_member(self, *args, **kwargs):
+        return True
+
+    async def unban_chat_member(self, *args, **kwargs):
+        return True
+
 
 class FakeCall:
     def __init__(self, user_id: int, data: str):
