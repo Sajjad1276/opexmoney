@@ -16,6 +16,7 @@ from aiogram.types import (
 from app.database.session import async_session
 from app.services.portfolio_service import get_portfolio_data
 from app.utils.formatting import fmt_amount, to_fa
+from app.utils.ui import send_submenu_panel
 
 router = Router(name="portfolio")
 logger = logging.getLogger(__name__)
@@ -121,7 +122,8 @@ async def show_portfolio(message: Message) -> None:
         )
         return
 
-    await message.answer(
+    await send_submenu_panel(
+        message,
         build_portfolio_text(data),
         reply_markup=portfolio_keyboard(),
         parse_mode=ParseMode.HTML,
