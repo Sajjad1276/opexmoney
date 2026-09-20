@@ -14,7 +14,7 @@ from aiogram.types import (
     InlineKeyboardMarkup,
     Message,
 )
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.database.models import (
     CurrencyHolding,
@@ -165,6 +165,36 @@ def _format_mover(code: str | None, pct: float) -> str:
     return f"{html.escape(code)} {arrow} {format_percent_value(pct)}"
 
 
+def beginner_market_text(user, overview: dict) -> str:
+    currencies = overview.get("currencies") or []
+    lines = [
+        "💹 <b>بازار OPEX</b>",
+        "<blockquote>⁠</blockquote>",
+        "اینجا با <b>دلار</b> ارز ملت‌ها رو می‌خری و می‌فروشی.",
+        "🧠 قانون ساده: وقتی قیمت یک ارز بالا بره، ارزش دارایی‌ات بیشتر می‌شه؛ اگر پایین بیاد، کمتر می‌شه.",
+        "",
+        f"💎 دلار تو: <b>{fmt_amount(user.xr_balance)}</b>",
+        "",
+        "📌 <b>برای شروع فقط این دو چیز رو ببین:</b>",
+        "قیمت فعلی و تغییر ۲۴ ساعت اخیر.",
+        "",
+    ]
+    for item in currencies[:6]:
+        nation = item["nation"]
+        price = fmt_rate(item["current_rate"])
+        change = float(item["change_24h"])
+        direction = _direction_emoji(change)
+        lines.append(
+            f"{direction} <b>{html.escape(nation.currency_code)}</b> · "
+            f"<b>{price} دلار</b> · {format_change_text(change, '24h')}"
+        )
+    lines.extend([
+        "",
+        "🎯 <b>حرکت پیشنهادی:</b> یک ارز رو انتخاب کن و خرید اولت رو امتحان کن.",
+    ])
+    return "\n".join(lines)
+
+
 def market_text(user, overview: dict, active: int) -> str:
     lines = [
         "💹 <b>بازار OPEX</b>",
@@ -239,15 +269,32 @@ async def render_market(message: Message, edit_call=None):
                 user.home_nation_id,
                 limit=20,
             )
+            trade_count = int(
+                await session.scalar(
+                    select(func.count(Transaction.id)).where(
+                        Transaction.user_id == user_id,
+                    )
+                ) or 0
+            )
             if not overview["currencies"]:
                 text = "⚠️ هنوز ارز فعالی برای نمایش بازار وجود ندارد."
                 nations_for_keyboard: list[Nation] = []
+                beginner_mode = False
             else:
                 nations_for_keyboard = [item["nation"] for item in overview["currencies"]]
                 active = await get_active_members(session, user.home_nation_id)
-                text = market_text(user, overview, active)
+                beginner_mode = trade_count < 2
+                text = (
+                    beginner_market_text(user, overview)
+                    if beginner_mode
+                    else market_text(user, overview, active)
+                )
 
-    markup = market_intelligence_keyboard(nations_for_keyboard)
+    markup = (
+        market_buy_keyboard(nations_for_keyboard[:6])
+        if beginner_mode
+        else market_intelligence_keyboard(nations_for_keyboard)
+    )
     if edit_call:
         await safe_edit(edit_call, text, markup)
     else:
