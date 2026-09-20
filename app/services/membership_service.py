@@ -150,6 +150,11 @@ async def _ensure_registered_user_projection(
         created = True
     else:
         member.is_active = True
+        role = (
+            member.role
+            if isinstance(member.role, NationMemberRole)
+            else NationMemberRole(str(member.role))
+        )
 
     holding = await session.scalar(
         select(CurrencyHolding)
@@ -207,6 +212,17 @@ async def sync_telegram_membership(
     if nation is None:
         return None
 
+    legacy_member = await session.scalar(
+        select(NationMember)
+        .where(
+            NationMember.nation_id == nation.nation_id,
+            NationMember.user_id == telegram_user_id,
+            NationMember.is_active.is_(True),
+        )
+        .with_for_update()
+        .limit(1)
+    )
+
     row, created = await _get_or_create_telegram_membership(
         session,
         nation_id=nation.nation_id,
@@ -218,14 +234,17 @@ async def sync_telegram_membership(
 
     previous_active = bool(row.is_active)
     active_now = telegram_status_is_active(telegram_status, is_member)
+    previously_active = previous_active or (
+        created and legacy_member is not None
+    )
 
     row.telegram_status = telegram_status
     row.is_member = is_member
     row.is_active = active_now
     row.last_seen_at = observed_at
 
-    became_active = active_now and not previous_active
-    became_inactive = previous_active and not active_now
+    became_active = active_now and not previously_active
+    became_inactive = not active_now and previously_active
 
     if active_now:
         if row.joined_at is None:
