@@ -407,7 +407,6 @@ async def _show_review_step(
 
 @founder_router.callback_query(
     F.data.in_({"start_founder", "found_nation"}),
-    StateFilter(None, OnboardingStates.SELECT_NATION),
 )
 async def start_founder(
     call: CallbackQuery,
