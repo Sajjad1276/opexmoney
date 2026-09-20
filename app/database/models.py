@@ -77,6 +77,70 @@ class BotGroup(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
 
+class NationFoundingDraft(Base):
+    __tablename__ = "nation_founding_drafts"
+    __table_args__ = (
+        UniqueConstraint("launch_token", name="uq_nation_founding_draft_token"),
+        Index(
+            "uq_nation_founding_draft_founder_active",
+            "founder_user_id",
+            unique=True,
+            postgresql_where=text(
+                "status IN ('WAITING_GROUP', 'GROUP_READY', 'NAMING', 'FLAG', 'REVIEW', 'FINALIZING')"
+            ),
+            sqlite_where=text(
+                "status IN ('WAITING_GROUP', 'GROUP_READY', 'NAMING', 'FLAG', 'REVIEW', 'FINALIZING')"
+            ),
+        ),
+        Index(
+            "uq_nation_founding_draft_group_active",
+            "group_id",
+            unique=True,
+            postgresql_where=text(
+                "group_id IS NOT NULL AND status IN ('WAITING_GROUP', 'GROUP_READY', 'NAMING', 'FLAG', 'REVIEW', 'FINALIZING')"
+            ),
+            sqlite_where=text(
+                "group_id IS NOT NULL AND status IN ('WAITING_GROUP', 'GROUP_READY', 'NAMING', 'FLAG', 'REVIEW', 'FINALIZING')"
+            ),
+        ),
+        Index(
+            "ix_nation_founding_drafts_expiry",
+            "status",
+            "expires_at",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    founder_user_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    launch_token: Mapped[str] = mapped_column(String(64), nullable=False)
+    group_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    group_title: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    group_username: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    group_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    nation_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    currency_code: Mapped[str | None] = mapped_column(String(4), nullable=True)
+    flag_emoji: Mapped[str] = mapped_column(String(10), default="🏴", nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(20),
+        default="WAITING_GROUP",
+        nullable=False,
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        server_default=func.now(),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+
 class User(Base):
     __tablename__ = "users"
     __table_args__ = (UniqueConstraint("username", name="uq_users_username"),)
