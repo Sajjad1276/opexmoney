@@ -37,8 +37,8 @@ EXPECTED_JOB_IDS = {
 }
 
 EXPECTED_ROUTER_NAMES = {
-    "onboarding_fix", "start", "market", "founder", "nation_management",
-    "nation", "governance", "sections",
+    "onboarding_fix", "start", "market", "membership", "founder",
+    "nation_management", "nation", "governance", "sections",
 }
 EXPECTED_AI_ROUTER_NAMES = {"ai"}
 
