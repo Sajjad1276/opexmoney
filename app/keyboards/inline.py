@@ -23,6 +23,11 @@ def trade_confirmation_keyboard() -> InlineKeyboardMarkup:
     ]])
 
 
+# Backward-compatible alias used by the flow-health test and older callers.
+def confirm_trade_keyboard() -> InlineKeyboardMarkup:
+    return trade_confirmation_keyboard()
+
+
 def welcome_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🎮 شروع بازی", callback_data="start_game", style=ButtonStyle.SUCCESS)],
