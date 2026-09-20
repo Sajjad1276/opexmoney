@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
+from math import ceil
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import CurrencyHolding, Nation
@@ -15,6 +16,54 @@ class MarketHolding:
     nation_name: str
     amount: Decimal
     is_active: bool
+
+
+LISTED_CURRENCIES_PAGE_SIZE = 100
+
+
+@dataclass(frozen=True)
+class ListedCurrencyPage:
+    currency_codes: tuple[str, ...]
+    page: int
+    total_pages: int
+    total_count: int
+
+
+async def get_listed_currencies_page(
+    session: AsyncSession,
+    page: int = 0,
+) -> ListedCurrencyPage:
+    """Return up to 100 active currency codes ordered by current price.
+
+    The lowest exchange rate is treated as the best acquisition price.
+    Nation ID provides a deterministic tie-breaker.
+    """
+    total_count = int(
+        await session.scalar(
+            select(func.count(Nation.nation_id)).where(Nation.is_active.is_(True))
+        )
+        or 0
+    )
+    total_pages = max(1, ceil(total_count / LISTED_CURRENCIES_PAGE_SIZE))
+    safe_page = max(0, min(int(page), total_pages - 1))
+    offset = safe_page * LISTED_CURRENCIES_PAGE_SIZE
+
+    rows = (
+        await session.execute(
+            select(Nation.currency_code)
+            .where(Nation.is_active.is_(True))
+            .order_by(Nation.exchange_rate.asc(), Nation.nation_id.asc())
+            .offset(offset)
+            .limit(LISTED_CURRENCIES_PAGE_SIZE)
+        )
+    ).scalars().all()
+
+    return ListedCurrencyPage(
+        currency_codes=tuple(rows),
+        page=safe_page,
+        total_pages=total_pages,
+        total_count=total_count,
+    )
 
 
 async def get_user_sell_holdings(
