@@ -3,7 +3,6 @@ from __future__ import annotations
 from decimal import Decimal
 
 import pytest
-import secrets
 from sqlalchemy import delete, select
 
 from app.database.models import (
@@ -59,6 +58,11 @@ async def cleanup():
                     delete(NationMember).where(
                         NationMember.nation_id.in_(nation_ids)
                     )
+                )
+                await session.execute(
+                    User.__table__.update()
+                    .where(User.user_id == USER_ID)
+                    .values(home_nation_id=None)
                 )
                 await session.execute(
                     delete(Nation).where(Nation.nation_id.in_(nation_ids))
