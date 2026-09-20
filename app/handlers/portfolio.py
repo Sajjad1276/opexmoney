@@ -98,7 +98,7 @@ def build_portfolio_text(data: dict) -> str:
                 f"💰 <b>ارزش کل: <code>{_format_amount(data['total_xr'])}</code> "
                 "دلار</b>"
             ),
-            f"📅 {data['today_jalali']}",
+            f"📅 {data['today_imperial']}",
         ]
     )
 
