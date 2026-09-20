@@ -11,9 +11,18 @@ def cancel_keyboard() -> InlineKeyboardMarkup:
 
 
 def first_trade_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="⚡ اولین معامله‌ام رو انجام بده", callback_data="first_trade_tutorial", style=ButtonStyle.SUCCESS),
-    ]])
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(
+                text="⚡ انجام اولین معامله",
+                callback_data="confirm_first_trade",
+                style=ButtonStyle.SUCCESS,
+            )
+        ],
+        [
+            InlineKeyboardButton(text="⏭ فعلاً نه", callback_data="skip_first_trade"),
+        ],
+    ])
 
 
 def trade_confirmation_keyboard() -> InlineKeyboardMarkup:
@@ -272,8 +281,8 @@ def confirm_found_nation_keyboard() -> InlineKeyboardMarkup:
 def nation_selection_keyboard(nations) -> InlineKeyboardMarkup:
     rows = [
         [InlineKeyboardButton(
-            text=f"{getattr(nation, 'flag_emoji', None) or '🏴'} {nation.name} ({nation.currency_code}) · {nation.member_count} نفر",
-            callback_data=f"join_nation:{nation.nation_id}",
+            text=f"{getattr(nation, 'flag_emoji', None) or '🏴'} {nation.name} · {nation.currency_code} · {nation.member_count} نفر",
+            callback_data=f"confirm_nation:{nation.nation_id}",
             )]
         for nation in nations
     ]
