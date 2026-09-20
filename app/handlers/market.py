@@ -170,7 +170,7 @@ def market_text(user, overview: dict, active: int) -> str:
     lines = [
         "💹 <b>بازار OPEX</b>",
         "━━━━━━━━━━━━━━━━━━━━━━━━",
-        f"💰 ΩXR: <b>{fmt_amount(user.xr_balance)}</b> · "
+        f"💰 دلار: <b>{fmt_amount(user.xr_balance)}</b> · "
         f"{html.escape(user.home_nation_id and overview['currencies'][0]['nation'].currency_code or '—')}",
         "",
         "━━━━━━━━━━━━━━━",
@@ -530,14 +530,14 @@ async def market_buy(call: CallbackQuery, state: FSMContext):
         text = (
             "📈 <b>خرید ارز</b>\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            f"💰 ΩXR موجود: <b>{fmt_amount(user.xr_balance)}</b>\n\n"
+            f"💰 دلار موجود: <b>{fmt_amount(user.xr_balance)}</b>\n\n"
             "<b>کدوم ارز می‌خوای بخری؟</b>"
         )
         for nation in nations:
             text += (
                 f"\n🏛 <code>{html.escape(nation.currency_code)}</code> · "
                 f"{html.escape(nation.name)} · "
-                f"<b>{fmt_rate(nation.exchange_rate)} ΩXR</b>"
+                f"<b>{fmt_rate(nation.exchange_rate)} دلار</b>"
             )
 
     await state.clear()
@@ -566,7 +566,7 @@ async def make_buy_preview(
 
     if spend < 10:
         await message.answer(
-            "🔴 حداقل مقدار خرید 10 ΩXR است.",
+            "🔴 حداقل مقدار خرید 10 دلار است.",
             parse_mode="HTML",
         )
         return
@@ -588,8 +588,8 @@ async def make_buy_preview(
             if spend > user.xr_balance:
                 await message.answer(
                     f"🔴 موجودی کافی نیست.\n"
-                    f"موجودی: {fmt_amount(user.xr_balance)} ΩXR\n"
-                    f"مبلغ وارد شده: {fmt_amount(spend)} ΩXR\n\n"
+                    f"موجودی: {fmt_amount(user.xr_balance)} دلار\n"
+                    f"مبلغ وارد شده: {fmt_amount(spend)} دلار\n\n"
                     "مبلغ کمتری وارد کن.",
                     parse_mode="HTML",
                 )
@@ -633,18 +633,18 @@ async def make_buy_preview(
             text = (
                 "📈 <b>تأیید خرید</b>\n"
                 "━━━━━━━━━━━━━━━━━━━━\n"
-                f"📤 پرداخت:   <b>{fmt_amount(spend)} ΩXR</b>\n"
+                f"📤 پرداخت:   <b>{fmt_amount(spend)} دلار</b>\n"
                 f"📥 دریافت:   <b>{fmt_amount(calc['receive'])} "
                 f"{html.escape(nation.currency_code)}</b>\n\n"
                 "─────────────────\n"
                 f"💹 نرخ: <code>1 {html.escape(nation.currency_code)} = "
-                f"{fmt_rate(nation.exchange_rate)} ΩXR</code>\n"
-                f"📋 کارمزد: <b>{fmt_amount(calc['fee'])} ΩXR</b> "
+                f"{fmt_rate(nation.exchange_rate)} دلار</code>\n"
+                f"📋 کارمزد: <b>{fmt_amount(calc['fee'])} دلار</b> "
                 f"({_fmt_rule_percent(fee_rate)})\n"
                 f"{peak_signal}\n"
                 "─────────────────\n"
                 "<b>موجودی بعد از معامله:</b>\n"
-                f"ΩXR: <b>{fmt_amount(user.xr_balance - spend)}</b>\n"
+                f"دلار: <b>{fmt_amount(user.xr_balance - spend)}</b>\n"
                 f"{html.escape(nation.currency_code)}: "
                 f"<b>{fmt_amount(current + calc['receive'])}</b>\n"
                 "━━━━━━━━━━━━━━━━━━━━"
@@ -675,10 +675,10 @@ async def buy_currency(call, state):
             f"📈 <b>خرید <code>{html.escape(nation.currency_code)}</code></b>\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
             f"💹 نرخ: <code>1 {html.escape(nation.currency_code)} = "
-            f"{fmt_rate(nation.exchange_rate)} ΩXR</code>\n"
-            f"💰 موجودی: <b>{fmt_amount(user.xr_balance)} ΩXR</b>\n\n"
-            "<b>چقدر ΩXR خرج می‌کنی؟</b>\n"
-            "<i>حداقل 10 ΩXR</i>"
+            f"{fmt_rate(nation.exchange_rate)} دلار</code>\n"
+            f"💰 موجودی: <b>{fmt_amount(user.xr_balance)} دلار</b>\n\n"
+            "<b>چقدر دلار خرج می‌کنی؟</b>\n"
+            "<i>حداقل 10 دلار</i>"
         )
 
     await state.set_state(MarketStates.WAITING_BUY_AMOUNT)
@@ -833,13 +833,13 @@ async def confirm_buy(call, state=None):
             text = (
                 "✅ <b>خرید انجام شد.</b>\n"
                 "━━━━━━━━━━━━━━━━━━━━\n"
-                f"📤 پرداختی: <s>{fmt_amount(spend)} ΩXR</s>\n"
+                f"📤 پرداختی: <s>{fmt_amount(spend)} دلار</s>\n"
                 f"📥 دریافتی: <b>{fmt_amount(calc['receive'])} "
                 f"{html.escape(nation.currency_code)}</b>\n"
                 f"{peak_signal}\n"
                 "─────────────────\n"
                 "💰 موجودی:\n"
-                f"ΩXR: <b>{fmt_amount(user.xr_balance)}</b>\n"
+                f"دلار: <b>{fmt_amount(user.xr_balance)}</b>\n"
                 f"{html.escape(nation.currency_code)}: "
                 f"<b>{fmt_amount(holding.amount)}</b>"
             )
@@ -959,7 +959,7 @@ async def sell_currency(call, state):
         f"📉 <b>فروش <code>{html.escape(nation.currency_code)}</code></b>\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
         f"💹 نرخ: <code>1 {html.escape(nation.currency_code)} = "
-        f"{fmt_rate(nation.exchange_rate)} ΩXR</code>\n"
+        f"{fmt_rate(nation.exchange_rate)} دلار</code>\n"
         f"💰 موجودی: <b>{fmt_amount(holding.amount)} "
         f"{html.escape(nation.currency_code)}</b>\n\n"
         "<b>چقدر می‌فروشی؟</b>"
@@ -1056,16 +1056,16 @@ async def make_sell_preview(
                 "━━━━━━━━━━━━━━━━━━━━\n"
                 f"📤 فروش:     <b>{fmt_amount(amount)} "
                 f"{html.escape(nation.currency_code)}</b>\n"
-                f"📥 دریافت:   <b>{fmt_amount(calc['receive'])} ΩXR</b>\n\n"
+                f"📥 دریافت:   <b>{fmt_amount(calc['receive'])} دلار</b>\n\n"
                 "─────────────────\n"
                 f"💹 نرخ: <code>1 {html.escape(nation.currency_code)} = "
-                f"{fmt_rate(nation.exchange_rate)} ΩXR</code>\n"
-                f"📋 کارمزد: <b>{fmt_amount(calc['fee'])} ΩXR</b> "
+                f"{fmt_rate(nation.exchange_rate)} دلار</code>\n"
+                f"📋 کارمزد: <b>{fmt_amount(calc['fee'])} دلار</b> "
                 f"({_fmt_rule_percent(fee_rate)})\n"
                 f"{peak_signal}\n"
                 "─────────────────\n"
                 "<b>موجودی بعد از معامله:</b>\n"
-                f"ΩXR: <b>{fmt_amount(xr_after)}</b>\n"
+                f"دلار: <b>{fmt_amount(xr_after)}</b>\n"
                 f"{html.escape(nation.currency_code)}: "
                 f"<b>{fmt_amount(currency_after)}</b>\n"
                 "━━━━━━━━━━━━━━━━━━━━"
@@ -1245,11 +1245,11 @@ async def confirm_sell(call, state=None):
                 "━━━━━━━━━━━━━━━━━━━━\n"
                 f"📤 فروختی:  <b>{fmt_amount(amount)} "
                 f"{html.escape(nation.currency_code)}</b>\n"
-                f"📥 دریافتی: <b>{fmt_amount(calc['receive'])} ΩXR</b>\n"
+                f"📥 دریافتی: <b>{fmt_amount(calc['receive'])} دلار</b>\n"
                 f"{peak_signal}\n"
                 "─────────────────\n"
                 "💰 موجودی:\n"
-                f"ΩXR: <b>{fmt_amount(user.xr_balance)}</b>\n"
+                f"دلار: <b>{fmt_amount(user.xr_balance)}</b>\n"
                 f"{html.escape(nation.currency_code)}: "
                 f"<b>{fmt_amount(holding.amount)}</b>"
             )
@@ -1306,7 +1306,7 @@ async def market_history(call):
             f"{'📈' if transaction.transaction_type == 'buy' else '📉'} "
             f"<code>{html.escape(code)}</code> · "
             f"{fmt_amount(transaction.amount)} · "
-            f"{fmt_rate(transaction.rate)} ΩXR"
+            f"{fmt_rate(transaction.rate)} دلار"
         )
 
     await safe_edit(call, "\n".join(lines), market_markup)
