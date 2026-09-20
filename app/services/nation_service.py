@@ -232,6 +232,7 @@ async def get_user_active_nation(
         session,
         user_id,
         repair=repair_founder_membership,
+        lock=repair_founder_membership,
     )
     return context[0] if context is not None else None
 
