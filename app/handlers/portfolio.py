@@ -138,53 +138,6 @@ async def show_portfolio(message: Message) -> None:
     )
 
 
-@router.callback_query(F.data == "portfolio_refresh")
-async def refresh_portfolio(callback: CallbackQuery) -> None:
-    try:
-        async with async_session() as session:
-            async with session.begin():
-                data = await get_portfolio_data(session, callback.from_user.id)
-    except Exception:
-        logger.exception(
-            "Failed to refresh portfolio for user %s",
-            callback.from_user.id,
-        )
-        await callback.answer(PORTFOLIO_ERROR, show_alert=True)
-        return
-
-    new_text = build_portfolio_text(data)
-    if callback.message is None:
-        await callback.answer()
-        return
-
-    if callback.message.text == new_text:
-        await callback.answer("همین لحظه به‌روز است ✓")
-        return
-
-    try:
-        await callback.message.edit_text(
-            new_text,
-            reply_markup=portfolio_keyboard(data),
-            parse_mode=ParseMode.HTML,
-        )
-        await callback.answer()
-        register_portfolio_panel(
-            user_id=callback.from_user.id,
-            chat_id=callback.message.chat.id,
-            message_id=callback.message.message_id,
-        )
-    except TelegramBadRequest as exc:
-        if "not modified" in str(exc).lower():
-            await callback.answer("همین لحظه به‌روز است ✓")
-            return
-        logger.exception(
-            "Failed to edit portfolio message for user %s",
-            callback.from_user.id,
-        )
-        await callback.answer(PORTFOLIO_ERROR, show_alert=True)
-
-
-
 @router.callback_query(F.data.startswith("portfolio_info:"))
 async def portfolio_info_button(callback: CallbackQuery) -> None:
     """Information cards are intentionally non-navigational."""
