@@ -21,6 +21,7 @@ from app.database.models import (
 )
 
 from app.services.nation_service import convert_holding_to_xr
+from app.services.economic_event_service import record_economic_event
 
 
 TELEGRAM_ACTIVE_STATUSES = frozenset({
@@ -366,6 +367,17 @@ async def sync_telegram_membership(
         nation.member_count = max(0, int(nation.member_count or 0) - 1)
 
     if action_type is not None:
+        record_economic_event(
+            session,
+            nation_id=nation.nation_id,
+            event_type=action_type,
+            actor_id=telegram_user_id,
+            metadata={
+                "source": source,
+                "telegram_status": telegram_status,
+                "is_member": is_member,
+            },
+        )
         session.add(
             NationLog(
                 nation_id=nation.nation_id,
