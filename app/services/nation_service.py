@@ -18,6 +18,7 @@ from app.database.models import (
     NationLog,
     NationMember,
     NationMemberRole,
+    NationTelegramMember,
     Transaction,
     User,
     UserActivity,
@@ -30,7 +31,20 @@ async def _repair_membership(
     nation: Nation,
     *,
     role: NationMemberRole,
-) -> str:
+) -> str | None:
+    if not nation.is_ai:
+        telegram_membership = await session.scalar(
+            select(NationTelegramMember)
+            .where(
+                NationTelegramMember.nation_id == nation.nation_id,
+                NationTelegramMember.telegram_user_id == user.user_id,
+                NationTelegramMember.is_active.is_(True),
+            )
+            .limit(1)
+        )
+        if telegram_membership is None:
+            return None
+
     member = await session.scalar(
         select(NationMember)
         .where(
@@ -123,7 +137,8 @@ async def get_user_active_nation_context(
                     home_nation,
                     role=NationMemberRole.FOUNDER,
                 )
-                return home_nation, role, "repaired_founder"
+                if role is not None:
+                    return home_nation, role, "repaired_founder"
 
             holding = await session.scalar(
                 maybe_lock(
@@ -142,7 +157,8 @@ async def get_user_active_nation_context(
                     home_nation,
                     role=NationMemberRole.CITIZEN,
                 )
-                return home_nation, role, "repaired_holding"
+                if role is not None:
+                    return home_nation, role, "repaired_holding"
 
     membership_stmt = (
         select(NationMember, Nation)
@@ -185,7 +201,8 @@ async def get_user_active_nation_context(
                 founder_nation,
                 role=NationMemberRole.FOUNDER,
             )
-            return founder_nation, role, "founder_fallback_repaired"
+            if role is not None:
+                return founder_nation, role, "founder_fallback_repaired"
         return (
             founder_nation,
             NationMemberRole.FOUNDER.value,
@@ -211,7 +228,8 @@ async def get_user_active_nation_context(
                 nation,
                 role=NationMemberRole.CITIZEN,
             )
-            return nation, role, "holding_fallback_repaired"
+            if role is not None:
+                return nation, role, "holding_fallback_repaired"
         return (
             nation,
             NationMemberRole.CITIZEN.value,
@@ -446,6 +464,18 @@ async def create_nation(
                 user_id=founder_user_id,
                 role=NationMemberRole.FOUNDER,
                 is_active=True,
+            )
+        )
+        session.add(
+            NationTelegramMember(
+                nation_id=nation.nation_id,
+                telegram_user_id=founder_user_id,
+                telegram_status="administrator",
+                is_member=True,
+                is_active=True,
+                joined_at=datetime.utcnow(),
+                left_at=None,
+                last_seen_at=datetime.utcnow(),
             )
         )
         session.add(
