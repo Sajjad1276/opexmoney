@@ -64,7 +64,7 @@ async def open_nations(message: Message) -> None:
     )
 
 
-@nation_router.callback_query(F.data.regexp(r"^nation_stats_\d+$"))
+@nation_router.callback_query(F.data.startswith("nation_stats_"))
 async def nation_stats_callback(call: CallbackQuery) -> None:
     nation_id = int((call.data or "").rsplit("_", 1)[1])
     async with async_session() as session:
@@ -90,7 +90,7 @@ async def nation_stats_callback(call: CallbackQuery) -> None:
     await call.answer()
 
 
-@nation_router.callback_query(F.data.regexp(r"^nation_rate_\d+$"))
+@nation_router.callback_query(F.data.startswith("nation_rate_"))
 async def nation_rate_callback(call: CallbackQuery) -> None:
     nation_id = int((call.data or "").rsplit("_", 1)[1])
     async with async_session() as session:
