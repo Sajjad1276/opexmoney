@@ -1176,6 +1176,8 @@ async def kick_member(call: CallbackQuery, bot: Bot) -> None:
 
     nation: Nation | None = None
     target: User | None = None
+    target_role: NationMemberRole | None = None
+    human_nation = False
 
     async with async_session() as session:
         async with session.begin():
@@ -1191,39 +1193,93 @@ async def kick_member(call: CallbackQuery, bot: Bot) -> None:
                 .with_for_update()
             )
             target = await session.get(User, user_id, with_for_update=True)
+
             if nation is None or member is None or target is None:
                 raise ValueError("عضو پیدا نشد.")
 
             actor_role = _role_enum(actor.role)
             target_role = _role_enum(member.role)
             if target_role == NationMemberRole.FOUNDER:
-                raise ValueError("👑 بنیان‌گذار اخراج نمی‌شود.")
+                raise ValueError("بنیان‌گذار اخراج نمی‌شود.")
             if actor_role == NationMemberRole.MINISTER and target_role != NationMemberRole.CITIZEN:
-                raise ValueError("⛔ وزیر فقط می‌تواند شهروند اخراج کند.")
+                raise ValueError("وزیر فقط می‌تواند شهروند اخراج کند.")
 
-            # ECONOMIC RULE: holdings liquidate to XR on kick/dissolve wherever you touch this logic
-            await convert_holding_to_xr(target, nation, session)
-            member.is_active = False
-            # SYNC RULE: home_nation_id always mirrors active NationMember wherever you touch these fields
-            target.home_nation_id = None
-            target.role = "player"
-            nation.member_count = max(0, nation.member_count - 1)
+            human_nation = not nation.is_ai and nation.group_id is not None
 
-            await _append_log(
-                session,
-                nation_id=nation_id,
-                actor_id=call.from_user.id,
-                action_type="MEMBER_KICKED",
-                target_id=user_id,
-                metadata={"previous_role": target_role.value},
+            if not human_nation:
+                await convert_holding_to_xr(target, nation, session)
+                member.is_active = False
+                target.home_nation_id = None
+                target.role = "player"
+                nation.member_count = max(0, nation.member_count - 1)
+
+                await _append_log(
+                    session,
+                    nation_id=nation_id,
+                    actor_id=call.from_user.id,
+                    action_type="MEMBER_KICKED",
+                    target_id=user_id,
+                    metadata={"previous_role": target_role.value},
+                )
+
+    if human_nation and nation is not None and nation.group_id is not None:
+        try:
+            await bot.ban_chat_member(
+                nation.group_id,
+                user_id,
             )
+            try:
+                await bot.unban_chat_member(
+                    nation.group_id,
+                    user_id,
+                    only_if_banned=True,
+                )
+            except Exception:
+                logger.warning(
+                    "Telegram user remained banned after nation kick | nation=%s user=%s",
+                    nation_id,
+                    user_id,
+                    exc_info=True,
+                )
+        except Exception:
+            logger.exception(
+                "Telegram kick failed | nation=%s group=%s user=%s",
+                nation_id,
+                nation.group_id,
+                user_id,
+            )
+            await call.answer(
+                "اخراج در گروه تلگرام انجام نشد.",
+                show_alert=True,
+            )
+            return
 
-    await call.answer("⛔ عضو اخراج شد.")
+        await call.answer("اخراج از گروه تلگرام انجام شد.")
+        if target is not None:
+            try:
+                await bot.send_message(
+                    user_id,
+                    f"از ملت «{html.escape(nation.name)}» اخراج شدی.",
+                    parse_mode="HTML",
+                )
+            except Exception:
+                logger.exception("Could not notify kicked user")
+        await publish_nation_event_analysis(
+            bot,
+            nation_id=nation_id,
+            event_type="MEMBER_KICKED",
+            actor_id=call.from_user.id,
+            target_id=user_id,
+            context=f"عضو با نقش قبلی {target_role.value if target_role else 'unknown'} از گروه تلگرام حذف شد.",
+        )
+        return
+
+    await call.answer("عضو از ملت حذف شد.")
     if target is not None and nation is not None:
         try:
             await bot.send_message(
                 user_id,
-                f"⛔ از ملت «{html.escape(nation.name)}» اخراج شدی.",
+                f"از ملت «{html.escape(nation.name)}» اخراج شدی.",
                 parse_mode="HTML",
             )
         except Exception:
@@ -1234,7 +1290,7 @@ async def kick_member(call: CallbackQuery, bot: Bot) -> None:
             event_type="MEMBER_KICKED",
             actor_id=call.from_user.id,
             target_id=user_id,
-            context=f"عضو با نقش قبلی {target_role.value} اخراج شد.",
+            context=f"عضو با نقش قبلی {target_role.value if target_role else 'unknown'} اخراج شد.",
         )
 
 
@@ -1834,7 +1890,7 @@ async def approve_join_request(call: CallbackQuery, bot: Bot) -> None:
             user = await session.get(User, user_id, with_for_update=True)
 
             if nation is None or actor is None or request is None or user is None:
-                raise ValueError("⚠️ درخواست پیدا نشد.")
+                raise ValueError("درخواست پیدا نشد.")
 
             now = _now()
             if request.expires_at <= now:
@@ -1842,6 +1898,43 @@ async def approve_join_request(call: CallbackQuery, bot: Bot) -> None:
                 request.reviewed_by = call.from_user.id
                 request.reviewed_at = now
                 outcome = "expired"
+            elif not nation.is_ai and nation.group_id is not None:
+                try:
+                    telegram_member = await bot.get_chat_member(
+                        nation.group_id,
+                        user_id,
+                    )
+                except Exception:
+                    request.status = "rejected"
+                    request.reviewed_by = call.from_user.id
+                    request.reviewed_at = now
+                    outcome = "telegram_check_failed"
+                else:
+                    status, is_member, active = telegram_chat_member_state(
+                        telegram_member
+                    )
+                    if not active:
+                        request.status = "rejected"
+                        request.reviewed_by = call.from_user.id
+                        request.reviewed_at = now
+                        outcome = "not_in_telegram"
+                    else:
+                        result = await sync_telegram_membership(
+                            session,
+                            group_id=nation.group_id,
+                            telegram_user_id=user_id,
+                            telegram_status=status,
+                            is_member=is_member,
+                            observed_at=datetime.utcnow(),
+                            source="legacy_approval_confirmation",
+                        )
+                        if result is None or not result.active:
+                            raise ValueError("عضویت تلگرامی کاربر قابل تأیید نیست.")
+
+                        request.status = "approved"
+                        request.reviewed_by = call.from_user.id
+                        request.reviewed_at = now
+                        outcome = "approved"
             elif user.home_nation_id is not None:
                 request.status = "rejected"
                 request.reviewed_by = call.from_user.id
@@ -1877,7 +1970,6 @@ async def approve_join_request(call: CallbackQuery, bot: Bot) -> None:
                     )
                 )
                 await session.flush()
-                # SYNC RULE: home_nation_id always mirrors active NationMember wherever you touch these fields
                 user.home_nation_id = nation_id
                 await sync_user_balance(session, user_id)
                 await _append_log(
@@ -1895,32 +1987,39 @@ async def approve_join_request(call: CallbackQuery, bot: Bot) -> None:
                 outcome = "approved"
 
     if outcome == "expired":
-        await call.answer("⌛ مهلت درخواست تمام شده و درخواست منقضی شد.", show_alert=True)
+        await call.answer("مهلت درخواست تمام شده و درخواست منقضی شد.", show_alert=True)
         if user is not None:
             try:
                 await bot.send_message(
                     user.user_id,
-                    f"⌛ درخواست عضویتت در «{html.escape(nation.name if nation else 'این ملت')}» منقضی شد.",
+                    f"مهلت درخواست عضویتت در «{html.escape(nation.name if nation else 'این ملت')}» تمام شد.",
                     parse_mode="HTML",
                 )
             except Exception:
                 logger.exception("Could not notify expired approval request %s", user_id)
         return
 
+    if outcome in {"telegram_check_failed", "not_in_telegram"}:
+        await call.answer(
+            "این درخواست فقط بعد از تأیید عضویت واقعی در گروه قابل پذیرش است.",
+            show_alert=True,
+        )
+        return
+
     if outcome == "already_member":
-        await call.answer("⚠️ این کاربر قبلاً عضو یک ملت شده؛ درخواست رد شد.", show_alert=True)
+        await call.answer("این کاربر قبلاً عضو یک ملت شده؛ درخواست رد شد.", show_alert=True)
         return
 
     if outcome != "approved" or nation is None or user is None:
-        await call.answer("⚠️ درخواست دیگر قابل تأیید نیست.", show_alert=True)
+        await call.answer("درخواست دیگر قابل تأیید نیست.", show_alert=True)
         return
 
-    await call.answer("✅ درخواست تأیید شد.")
+    await call.answer("درخواست تأیید شد.")
     await _welcome_member(bot, nation=nation, user=user, actor_id=call.from_user.id)
     await _notify_founder(
         bot,
         nation,
-        f"✅ درخواست عضویت {_safe_name(user, user.user_id)} تأیید شد.",
+        f"درخواست عضویت {_safe_name(user, user.user_id)} تأیید شد.",
     )
     await publish_nation_event_analysis(
         bot,
@@ -1928,7 +2027,7 @@ async def approve_join_request(call: CallbackQuery, bot: Bot) -> None:
         event_type="MEMBER_JOIN",
         actor_id=call.from_user.id,
         target_id=user_id,
-        context="درخواست عضویت پس از بررسی مدیران تأیید شد.",
+        context="درخواست عضویت پس از تأیید وضعیت گروه Telegram پردازش شد.",
     )
 
 
