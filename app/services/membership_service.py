@@ -299,11 +299,16 @@ async def sync_telegram_membership(
                         )
                     ),
                 )
+                .join(
+                    Nation,
+                    Nation.nation_id == NationMember.nation_id,
+                )
                 .where(
                     NationMember.user_id == telegram_user_id,
                     NationMember.is_active.is_(True),
                     NationTelegramMember.is_active.is_(True),
-                    Nation.nation_id == NationMember.nation_id,
+                    Nation.is_active.is_(True),
+                    Nation.is_ai.is_(False),
                 )
                 .order_by(NationMember.joined_at.desc(), NationMember.nation_id.asc())
                 .limit(1)
@@ -345,7 +350,7 @@ async def sync_telegram_membership(
         telegram_user_id=telegram_user_id,
         active=active_now,
         changed=became_active or became_inactive,
-        became_active=became_active or (created and active_now),
+        became_active=became_active,
         became_inactive=became_inactive,
         action_type=action_type,
         user_registered=user_registered,
