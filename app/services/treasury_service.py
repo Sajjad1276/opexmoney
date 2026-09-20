@@ -73,11 +73,7 @@ async def get_treasury(
     session: AsyncSession,
     nation_id: int,
 ) -> dict | None:
-    treasury = await _ensure_treasury(session, nation_id)
-
-    if treasury is None:
-        return None
-
+    # Read paths must not create a treasury row.
     row = (
         await session.execute(
             select(
@@ -88,11 +84,15 @@ async def get_treasury(
                 NationTreasury.total_deposited,
                 NationTreasury.last_deposit_at,
             )
-            .join(
-                Nation,
-                Nation.nation_id == NationTreasury.nation_id,
+            .select_from(Nation)
+            .outerjoin(
+                NationTreasury,
+                NationTreasury.nation_id == Nation.nation_id,
             )
-            .where(NationTreasury.nation_id == nation_id)
+            .where(
+                Nation.nation_id == nation_id,
+                Nation.is_active.is_(True),
+            )
         )
     ).one_or_none()
 
@@ -102,9 +102,9 @@ async def get_treasury(
     return {
         "nation_name": str(row.name),
         "currency_code": str(row.currency_code),
-        "balance_xr": Decimal(str(row.balance_xr)),
-        "balance_local": Decimal(str(row.balance_local)),
-        "total_deposited": Decimal(str(row.total_deposited)),
+        "balance_xr": Decimal(str(row.balance_xr or Decimal("0"))),
+        "balance_local": Decimal(str(row.balance_local or Decimal("0"))),
+        "total_deposited": Decimal(str(row.total_deposited or Decimal("0"))),
         "last_deposit_at": row.last_deposit_at,
     }
 
