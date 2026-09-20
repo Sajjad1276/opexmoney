@@ -58,8 +58,8 @@ def build_portfolio_text(data: dict) -> str:
     lines = [
         f"📊 <b>پورتفولیو {html.escape(data['username'])}</b>",
         "━━━━━━━━━━━━━━━━━━",
-        "💎 <b>ΩXR (ذخیره جهانی)</b>",
-        f"   موجودی: <code>{_format_amount(data['xr_balance'])}</code> ΩXR",
+        "💎 <b>دلار (ذخیره جهانی)</b>",
+        f"   موجودی: <code>{_format_amount(data['xr_balance'])}</code> دلار",
         "",
     ]
 
@@ -79,7 +79,7 @@ def build_portfolio_text(data: dict) -> str:
                     ),
                     (
                         f"   ارزش: <code>{_format_amount(holding['value_in_xr'])}</code> "
-                        "ΩXR"
+                        "دلار"
                     ),
                     (
                         f"   {holding['rate_emoji']} "
@@ -96,7 +96,7 @@ def build_portfolio_text(data: dict) -> str:
             "━━━━━━━━━━━━━━━━━━",
             (
                 f"💰 <b>ارزش کل: <code>{_format_amount(data['total_xr'])}</code> "
-                "ΩXR</b>"
+                "دلار</b>"
             ),
             f"📅 {data['today_jalali']}",
         ]
