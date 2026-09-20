@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import Nation, NationMember, NationMemberRole, NationTreasury, TreasuryLog, User
-from app.services.nation_service import get_user_active_nation
+from app.services.nation_service import get_user_active_nation, is_user_active_in_nation
 from app.services.economic_event_service import record_economic_event
 from app.services.user_service import sync_user_balance
 
@@ -20,6 +20,12 @@ async def get_member_role(
     user_id: int,
     nation_id: int,
 ) -> str | None:
+    if not await is_user_active_in_nation(
+        session,
+        user_id,
+        nation_id,
+    ):
+        return None
     role = await session.scalar(
         select(NationMember.role)
         .where(
@@ -162,6 +168,14 @@ async def deposit_to_treasury(
     if user is None:
         return {"ok": False, "reason": "user_not_found"}
 
+    if not await is_user_active_in_nation(
+        session,
+        user_id,
+        nation_id,
+        lock=True,
+    ):
+        return {"ok": False, "reason": "membership_required"}
+
     if user.xr_balance < amount_xr:
         return {
             "ok": False,
@@ -228,6 +242,14 @@ async def withdraw_from_treasury(
     nation = await session.get(Nation, nation_id, with_for_update=True)
     if nation is None or not nation.is_active:
         return {"ok": False, "reason": "nation_not_found"}
+
+    if not await is_user_active_in_nation(
+        session,
+        actor_id,
+        nation_id,
+        lock=True,
+    ):
+        return {"ok": False, "reason": "membership_required"}
 
     member = await session.scalar(
         select(NationMember)
