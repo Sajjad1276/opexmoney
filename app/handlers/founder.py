@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import html
 import logging
 import re
@@ -20,6 +21,7 @@ from app.handlers.start import show_dashboard
 from app.keyboards.inline import (
     add_to_group_keyboard,
     founder_cancel_keyboard,
+    founder_currency_confirm_keyboard,
     founder_flag_selection_keyboard,
     founder_name_step_keyboard,
     founder_review_keyboard,
@@ -895,7 +897,7 @@ async def receive_currency_code(
             draft,
             f'<a href="tg://user?id={message.from_user.id}">{html.escape(message.from_user.first_name or "بنیان‌گذار")}</a>',
         ),
-        reply_markup=founder_review_keyboard(),
+        reply_markup=founder_currency_confirm_keyboard(),
         parse_mode="HTML",
     )
 
@@ -1053,6 +1055,36 @@ async def founder_edit_group(
 
 
 @founder_router.callback_query(
+    F.data == "founder_recode",
+    StateFilter(None),
+)
+async def founder_recode(
+    call: CallbackQuery,
+    state: FSMContext,
+) -> None:
+    async with async_session() as session:
+        async with session.begin():
+            draft = await get_active_draft(
+                session,
+                call.from_user.id,
+                lock=True,
+            )
+            if draft is None:
+                await call.answer("⚠️ اطلاعات تأسیس پیدا نشد.", show_alert=True)
+                return
+            draft.status = "NAMING"
+            draft.expires_at = datetime.utcnow() + timedelta(minutes=30)
+    await state.set_state(FounderStates.SET_CURRENCY_CODE)
+    await call.answer()
+    if call.message:
+        await call.message.edit_text(
+            _currency_step_text(draft),
+            reply_markup=founder_cancel_keyboard(),
+            parse_mode="HTML",
+        )
+
+
+@founder_router.callback_query(
     F.data == "confirm_found",
     StateFilter(None, FounderStates.CONFIRM),
 )
@@ -1086,6 +1118,89 @@ async def confirm_founder(
     await state.clear()
 
     if call.message is not None:
+        f6_text = (
+            f"👑 <b>ملت «{html.escape(nation.name)}» ساخته شد!</b>\n"
+            "<blockquote>⁠</blockquote>\n"
+            f"👤 بنیان‌گذار: <b>{html.escape(call.from_user.first_name or 'بنیان‌گذار')}</b>\n\n"
+            "<blockquote>⁠</blockquote>\n"
+            f"🏛 ملت: <b>{html.escape(nation.name)}</b>\n"
+            f"💰 ارز: <code>{html.escape(nation.currency_code)}</code>\n"
+            "📈 نرخ اولیه: <b>۱.۰۰۰۰ دلار</b>\n"
+            f"👑 بنیان‌گذار: <b>{html.escape(call.from_user.first_name or 'بنیان‌گذار')}</b>\n"
+            f"📅 تاریخ تأسیس: <b>{datetime.utcnow().strftime('%Y/%m/%d')}</b>\n\n"
+            "💰 <b>موجودی اولیه‌ات:</b>\n"
+            f"<b>۱,۰۰۰ <code>{html.escape(nation.currency_code)}</code></b>\n\n"
+            "🎖 نشان «بنیان‌گذار» به پروفایلت اضافه شد — برای همیشه."
+        )
+        await call.message.edit_text(
+            f6_text,
+            reply_markup=InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="📢 اطلاع‌رسانی به گروه",
+                            callback_data="founder_announce",
+                            style=ButtonStyle.PRIMARY,
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text="⚙️ تنظیمات ملت",
+                            callback_data=f"nm:panel:{nation.nation_id}",
+                        ),
+                        InlineKeyboardButton(
+                            text="⚡ شروع معامله",
+                            callback_data="market_main",
+                            style=ButtonStyle.SUCCESS,
+                        ),
+                    ],
+                ]
+            ),
+            parse_mode="HTML",
+        )
+
+    try:
+        me = await bot.get_me()
+        announcement = await bot.send_message(
+            group_id,
+            (
+                f"🏛 <b>ملت «{html.escape(nation.name)}» در OPEX ثبت شد!</b>\n"
+                "<blockquote>⁠</blockquote>\n"
+                "از این لحظه این گروه یه ملت مستقل در بازارهای جهانی OPEX است.\n\n"
+                f"💰 واحد پول: <code>{html.escape(nation.currency_code)}</code>\n"
+                "📈 نرخ امروز: <b>۱.۰۰۰۰ دلار</b>\n"
+                f"👑 بنیان‌گذار: <a href="tg://user?id={call.from_user.id}">{html.escape(call.from_user.first_name or 'بنیان‌گذار')}</a>\n\n"
+                "<blockquote>⁠</blockquote>\n"
+                "<b>چطور بازی کنم؟</b>\n"
+                "۱. روی دکمه زیر بزن\n"
+                "۲. ربات رو استارت بزن\n"
+                f"۳. به ملت «{html.escape(nation.name)}» بپیوند\n"
+                "۴. معامله کن و ارزش ارزت رو بالا ببر!"
+            ),
+            reply_markup=__import__("app.keyboards.inline", fromlist=["nation_founder_announcement_keyboard"]).nation_founder_announcement_keyboard(
+                me.username or "",
+                nation.nation_id,
+            ),
+            parse_mode="HTML",
+        )
+        try:
+            await bot.pin_chat_message(group_id, announcement.message_id, disable_notification=True)
+        except Exception:
+            logger.info(
+                "Could not pin nation founding announcement | nation=%s group=%s",
+                nation.nation_id,
+                group_id,
+            )
+    except (TelegramBadRequest, TelegramForbiddenError):
+        logger.warning(
+            "Could not announce nation %s in group %s",
+            nation.nation_id,
+            group_id,
+        )
+
+    await asyncio.sleep(1)
+
+    if call.message is not None:
         user = await _get_user_or_none(call.from_user.id)
         if user is not None:
             await show_dashboard(
@@ -1095,27 +1210,6 @@ async def confirm_founder(
                 bot=bot,
                 display_user=call.from_user,
             )
-
-    try:
-        nation_name = html.escape(nation.name)
-        flag = html.escape(nation.flag_emoji or DEFAULT_NATION_FLAG)
-        await bot.send_message(
-            group_id,
-            (
-                "🎉 <b>ملت جدید تأسیس شد!</b>\n"
-                f"{flag} <b>{nation_name}</b>\n"
-                f"💱 ارز رسمی: <b>{html.escape(nation.currency_code)}</b>\n"
-                f"👑 بنیان‌گذار: {html.escape(call.from_user.first_name or 'بنیان‌گذار')}\n"
-                "این گروه حالا پایتخت این ملت است."
-            ),
-            parse_mode="HTML",
-        )
-    except (TelegramBadRequest, TelegramForbiddenError):
-        logger.warning(
-            "Could not announce nation %s in group %s",
-            nation.nation_id,
-            group_id,
-        )
 
 
 @founder_router.callback_query(
