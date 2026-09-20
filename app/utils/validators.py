@@ -37,7 +37,7 @@ def validate_nation_name(value: str) -> tuple[bool, str]:
 
 
 async def validate_currency_code(value: str, session: AsyncSession) -> tuple[bool, str]:
-    value = value.strip().upper()
+    value = value.strip()
     if not _CURRENCY_CODE_RE.fullmatch(value):
         return False, "🔴 کد باید ۳ تا ۴ حرف لاتین بزرگ باشه.\nمثال: AZD یا GOLD"
     if value in _RESERVED_CURRENCY_CODES:
@@ -46,7 +46,7 @@ async def validate_currency_code(value: str, session: AsyncSession) -> tuple[boo
         select(Nation.nation_id).where(Nation.currency_code == value).limit(1)
     )
     if existing.scalar_one_or_none() is not None:
-        return False, "⚠️ این کد ارز قبلاً استفاده شده. یه کد دیگه انتخاب کن."
+        return False, f"🔴 «{value}» قبلاً ثبت شده.\nیه کد دیگه امتحان کن:"
     return True, ""
 
 
