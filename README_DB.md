@@ -65,7 +65,7 @@ User.telegram_id is an ORM synonym for users.user_id. The current schema already
 
 Nation and User use deleted_at for soft deletion. No real delete is required for normal lifecycle operations.
 
-All ORM timestamp columns use DateTime(timezone=True). All declared relationships use lazy=selectin.
+All timestamp columns are stored in PostgreSQL as timezone-aware UTC timestamps. The ORM UTCDateTime adapter also accepts legacy naive UTC datetime inputs and returns UTC-aware values that remain compatible with the current service layer. All declared relationships use lazy=selectin.
 
 ## Required indexes
 

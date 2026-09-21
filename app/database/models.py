@@ -24,12 +24,67 @@ from sqlalchemy import (
     func,
     text,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import ENUM as PGEnum, JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, synonym
+from sqlalchemy.types import TypeDecorator
 
 
 def utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
+
+class UTCComparableDateTime(datetime):
+    """UTC-aware datetime that safely compares with legacy naive UTC datetimes."""
+
+    @staticmethod
+    def _coerce(other: datetime | object) -> datetime | object:
+        if isinstance(other, datetime) and other.tzinfo is None:
+            return other.replace(tzinfo=timezone.utc)
+        return other
+
+    def __lt__(self, other):
+        return super().__lt__(self._coerce(other))
+
+    def __le__(self, other):
+        return super().__le__(self._coerce(other))
+
+    def __gt__(self, other):
+        return super().__gt__(self._coerce(other))
+
+    def __ge__(self, other):
+        return super().__ge__(self._coerce(other))
+
+    def __eq__(self, other):
+        try:
+            return super().__eq__(self._coerce(other))
+        except TypeError:
+            return False
+
+
+class UTCDateTime(TypeDecorator[datetime]):
+    """Store UTC as TIMESTAMP WITH TIME ZONE and normalize legacy UTC inputs."""
+
+    impl = DateTime
+    cache_ok = True
+    timezone = True
+
+    def load_dialect_impl(self, dialect):
+        return dialect.type_descriptor(DateTime(timezone=True))
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        if value.tzinfo is None or value.utcoffset() is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        return UTCComparableDateTime.fromtimestamp(
+            value.timestamp(),
+            tz=timezone.utc,
+        )
 
 
 def enum_type(enum_cls: type[StrEnum], name: str) -> SAEnum:
@@ -196,7 +251,7 @@ class Nation(Base):
     active_members_24h: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     nation_rank: Mapped[int | None] = mapped_column(Integer, nullable=True)
     last_rate_update: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
+        UTCDateTime(),
         nullable=True,
     )
     member_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -211,11 +266,11 @@ class Nation(Base):
         nullable=False,
     )
     deleted_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
+        UTCDateTime(),
         nullable=True,
     )
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
+        UTCDateTime(),
         default=utcnow,
         server_default=func.now(),
         nullable=False,
@@ -230,13 +285,13 @@ class BotGroup(Base):
     username: Mapped[str | None] = mapped_column(String(255), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
+        UTCDateTime(),
         default=utcnow,
         server_default=func.now(),
         nullable=False,
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
+        UTCDateTime(),
         default=utcnow,
         onupdate=utcnow,
         server_default=func.now(),
@@ -274,15 +329,15 @@ class NationTelegramMember(Base):
     is_member: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     joined_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
+        UTCDateTime(),
         nullable=True,
     )
     left_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
+        UTCDateTime(),
         nullable=True,
     )
     last_seen_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
+        UTCDateTime(),
         default=utcnow,
         server_default=func.now(),
         nullable=False,
@@ -335,12 +390,12 @@ class NationFoundingDraft(Base):
     currency_code: Mapped[str | None] = mapped_column(String(4), nullable=True)
     flag_emoji: Mapped[str] = mapped_column(String(10), default="🏴", nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="WAITING_GROUP", nullable=False)
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utcnow, server_default=func.now(), nullable=False
+        UTCDateTime(), default=utcnow, server_default=func.now(), nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utcnow, onupdate=utcnow, server_default=func.now(), nullable=False
+        UTCDateTime(), default=utcnow, onupdate=utcnow, server_default=func.now(), nullable=False
     )
 
     founder: Mapped["User"] = relationship(
@@ -381,10 +436,10 @@ class User(Base):
         nullable=False,
     )
     deleted_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
+        UTCDateTime(), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utcnow, server_default=func.now(), nullable=False
+        UTCDateTime(), default=utcnow, server_default=func.now(), nullable=False
     )
 
     home_nation: Mapped["Nation | None"] = relationship(
@@ -410,7 +465,7 @@ class CurrencyHolding(Base):
         Numeric(18, 4), default=Decimal("0"), nullable=False
     )
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utcnow, server_default=func.now(), nullable=False
+        UTCDateTime(), default=utcnow, server_default=func.now(), nullable=False
     )
 
     user: Mapped["User"] = relationship("User", lazy="selectin")
@@ -433,7 +488,7 @@ class Transaction(Base):
     fee_xr: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False)
     rate: Mapped[Decimal] = mapped_column(Numeric(10, 4), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utcnow, server_default=func.now(), nullable=False
+        UTCDateTime(), default=utcnow, server_default=func.now(), nullable=False
     )
 
     user: Mapped["User"] = relationship("User", lazy="selectin")
@@ -462,10 +517,10 @@ class PriceAlert(Base):
     is_triggered: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     triggered = synonym("is_triggered")
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utcnow, server_default=func.now(), nullable=False
+        UTCDateTime(), default=utcnow, server_default=func.now(), nullable=False
     )
     triggered_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
+        UTCDateTime(), nullable=True
     )
 
     user: Mapped["User"] = relationship("User", lazy="selectin")
@@ -482,10 +537,16 @@ class UserActivity(Base):
     user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.user_id"), nullable=False)
     nation_id: Mapped[int] = mapped_column(ForeignKey("nations.nation_id"), nullable=False)
     activity_type: Mapped[ActivityType] = mapped_column(
-        enum_type(ActivityType, "activity_type"), nullable=False
+        PGEnum(
+            ActivityType,
+            name="activity_type",
+            create_type=False,
+            values_callable=lambda values: [item.value for item in values],
+        ),
+        nullable=False,
     )
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utcnow, server_default=func.now(), nullable=False
+        UTCDateTime(), default=utcnow, server_default=func.now(), nullable=False
     )
 
     user: Mapped["User"] = relationship("User", lazy="selectin")
@@ -504,7 +565,7 @@ class NationMemberHistory(Base):
     )
     member_count: Mapped[int] = mapped_column(Integer, nullable=False)
     recorded_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utcnow, server_default=func.now(), nullable=False
+        UTCDateTime(), default=utcnow, server_default=func.now(), nullable=False
     )
 
     nation: Mapped["Nation"] = relationship("Nation", lazy="selectin")
@@ -524,7 +585,7 @@ class RateHistory(Base):
     volume: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False)
     active_members: Mapped[int] = mapped_column(Integer, nullable=False)
     calculated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utcnow, server_default=func.now(), nullable=False
+        UTCDateTime(), default=utcnow, server_default=func.now(), nullable=False
     )
 
     nation: Mapped["Nation"] = relationship("Nation", lazy="selectin")
@@ -548,7 +609,7 @@ class TradePreview(Base):
     spend: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False)
     preview_rate: Mapped[Decimal] = mapped_column(Numeric(10, 4), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utcnow, server_default=func.now(), nullable=False
+        UTCDateTime(), default=utcnow, server_default=func.now(), nullable=False
     )
 
     user: Mapped["User"] = relationship("User", lazy="selectin")
@@ -563,7 +624,7 @@ class NationRank(Base):
     )
     rank: Mapped[int] = mapped_column(Integer, nullable=False)
     calculated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utcnow, server_default=func.now(), nullable=False
+        UTCDateTime(), default=utcnow, server_default=func.now(), nullable=False
     )
 
     nation: Mapped["Nation"] = relationship("Nation", lazy="selectin")
@@ -578,7 +639,7 @@ class Proposal(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utcnow, server_default=func.now(), nullable=False
+        UTCDateTime(), default=utcnow, server_default=func.now(), nullable=False
     )
     proposer_player_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False
@@ -588,10 +649,10 @@ class Proposal(Base):
     target_scope: Mapped[str] = mapped_column(String(20), nullable=False)
     target_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="draft", nullable=False)
-    voting_opens_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    voting_closes_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    effective_from: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    effective_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    voting_opens_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    voting_closes_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    effective_from: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    effective_until: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
 
     proposer: Mapped["User"] = relationship(
         "User", foreign_keys=[proposer_player_id], lazy="selectin"
@@ -615,7 +676,7 @@ class Vote(Base):
     choice: Mapped[str] = mapped_column(String(10), nullable=False)
     weight: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utcnow, server_default=func.now(), nullable=False
+        UTCDateTime(), default=utcnow, server_default=func.now(), nullable=False
     )
 
     proposal: Mapped["Proposal"] = relationship("Proposal", lazy="selectin")
@@ -652,9 +713,9 @@ class RuleOverride(Base):
     source_proposal_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("proposals.id", ondelete="SET NULL"), nullable=True
     )
-    active_from: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    active_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    suspended_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    active_from: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    active_until: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    suspended_until: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     source_proposal: Mapped["Proposal | None"] = relationship("Proposal", lazy="selectin")
@@ -666,7 +727,7 @@ class GovernanceLedger(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utcnow, server_default=func.now(), nullable=False
+        UTCDateTime(), default=utcnow, server_default=func.now(), nullable=False
     )
     actor_player_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True
@@ -694,8 +755,8 @@ class PlayerTemporalProfile(Base):
     peak_multiplier: Mapped[Decimal] = mapped_column(
         Numeric(8, 4), default=Decimal("1.5"), nullable=False
     )
-    assigned_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    next_rotation_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    assigned_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    next_rotation_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
 
     player: Mapped["User"] = relationship("User", lazy="selectin")
 
@@ -705,7 +766,7 @@ class BehaviorSnapshot(Base):
     __table_args__ = (Index("ix_behavior_snapshots_at", "at"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
     active_players_count: Mapped[int] = mapped_column(Integer, nullable=False)
     buy_tx_count: Mapped[int] = mapped_column(Integer, nullable=False)
     sell_tx_count: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -746,10 +807,10 @@ class NationMembership(Base):
         default=NationMemberRole.CITIZEN,
     )
     joined_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utcnow, server_default=func.now(), nullable=False
+        UTCDateTime(), default=utcnow, server_default=func.now(), nullable=False
     )
     left_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
+        UTCDateTime(), nullable=True
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
@@ -780,7 +841,7 @@ class NationLog(Base):
     )
     event_metadata: Mapped[dict | None] = mapped_column("metadata", JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utcnow, server_default=func.now(), nullable=False
+        UTCDateTime(), default=utcnow, server_default=func.now(), nullable=False
     )
 
     nation: Mapped["Nation"] = relationship("Nation", lazy="selectin")
@@ -821,15 +882,15 @@ class NationJoinRequest(Base):
         nullable=False,
     )
     requested_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utcnow, server_default=func.now(), nullable=False
+        UTCDateTime(), default=utcnow, server_default=func.now(), nullable=False
     )
     resolved_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
+        UTCDateTime(), nullable=True
     )
     resolved_by: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True
     )
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
 
     created_at = synonym("requested_at")
     reviewed_at = synonym("resolved_at")
@@ -869,10 +930,10 @@ class NationInviteLink(Base):
     used_by: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True
     )
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
     is_used: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utcnow, server_default=func.now(), nullable=False
+        UTCDateTime(), default=utcnow, server_default=func.now(), nullable=False
     )
 
     nation: Mapped["Nation"] = relationship("Nation", lazy="selectin")
@@ -906,11 +967,11 @@ class NationWar(Base):
         nullable=False,
     )
     declared_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utcnow, server_default=func.now(), nullable=False
+        UTCDateTime(), default=utcnow, server_default=func.now(), nullable=False
     )
-    ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    ends_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
     ended_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
+        UTCDateTime(), nullable=True
     )
 
     nation: Mapped["Nation"] = relationship(
@@ -956,11 +1017,11 @@ class UserMissionProgress(Base):
     progress: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     completed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     completed_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
+        UTCDateTime(), nullable=True
     )
     claimed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     reset_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
+        UTCDateTime(), nullable=True
     )
 
     user: Mapped["User"] = relationship("User", lazy="selectin")
@@ -980,7 +1041,7 @@ class NationTreasury(Base):
         Numeric(18, 4), default=Decimal("0"), nullable=False
     )
     last_deposit_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
+        UTCDateTime(), nullable=True
     )
     total_deposited: Mapped[Decimal] = mapped_column(
         Numeric(18, 4), default=Decimal("0"), nullable=False
@@ -1003,7 +1064,7 @@ class TreasuryLog(Base):
     amount_xr: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False)
     note: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utcnow, server_default=func.now(), nullable=False
+        UTCDateTime(), default=utcnow, server_default=func.now(), nullable=False
     )
 
     nation: Mapped["Nation"] = relationship("Nation", lazy="selectin")
@@ -1050,7 +1111,7 @@ class UserLessonProgress(Base):
     status: Mapped[str] = mapped_column(String(10), default="locked", nullable=False)
     quiz_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
+        UTCDateTime(), nullable=True
     )
     ai_questions_count: Mapped[int] = mapped_column(
         Integer, default=0, nullable=False
@@ -1069,7 +1130,7 @@ class UserXP(Base):
     total_xp: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     level: Mapped[str] = mapped_column(String(10), default="beginner", nullable=False)
     last_updated: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utcnow, server_default=func.now(), nullable=False
+        UTCDateTime(), default=utcnow, server_default=func.now(), nullable=False
     )
 
     user: Mapped["User"] = relationship("User", lazy="selectin")
@@ -1116,7 +1177,7 @@ class CurrencyMarketState(Base):
         Numeric(18, 8), default=Decimal("1.00000000"), nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utcnow, onupdate=utcnow, server_default=func.now(), nullable=False
+        UTCDateTime(), default=utcnow, onupdate=utcnow, server_default=func.now(), nullable=False
     )
 
 
@@ -1133,7 +1194,7 @@ class PriceMovementReceipt(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     currency_code: Mapped[str] = mapped_column(String(4), nullable=False)
     timestamp: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utcnow, server_default=func.now(), nullable=False
+        UTCDateTime(), default=utcnow, server_default=func.now(), nullable=False
     )
     rate_before: Mapped[Decimal] = mapped_column(Numeric(18, 8), nullable=False)
     rate_after: Mapped[Decimal] = mapped_column(Numeric(18, 8), nullable=False)
@@ -1177,9 +1238,9 @@ class WorldEvent(Base):
     effect_magnitude: Mapped[float] = mapped_column(Float, nullable=False)
     duration_minutes: Mapped[int] = mapped_column(Integer, nullable=False)
     started_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utcnow, server_default=func.now(), nullable=False
+        UTCDateTime(), default=utcnow, server_default=func.now(), nullable=False
     )
-    ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    ends_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     source: Mapped[WorldEventSource] = mapped_column(
         enum_type(WorldEventSource, "world_event_source"), nullable=False
@@ -1239,10 +1300,10 @@ class DecisionSnapshot(Base):
     amount: Mapped[Decimal] = mapped_column(Numeric(18, 8), nullable=False)
     rate_at_decision: Mapped[Decimal] = mapped_column(Numeric(18, 8), nullable=False)
     decided_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utcnow, server_default=func.now(), nullable=False
+        UTCDateTime(), default=utcnow, server_default=func.now(), nullable=False
     )
     evaluated_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
+        UTCDateTime(), nullable=True
     )
     actual_outcome: Mapped[Decimal | None] = mapped_column(
         Numeric(18, 8), nullable=True
@@ -1300,10 +1361,10 @@ class UserPurchase(Base):
         String(80), ForeignKey("shop_items.item_key", ondelete="RESTRICT"), nullable=False
     )
     purchased_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utcnow, server_default=func.now(), nullable=False
+        UTCDateTime(), default=utcnow, server_default=func.now(), nullable=False
     )
     expires_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
+        UTCDateTime(), nullable=True
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     payment_method: Mapped[PaymentMethod] = mapped_column(
