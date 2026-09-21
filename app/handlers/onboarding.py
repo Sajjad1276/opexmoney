@@ -395,70 +395,35 @@ async def _begin_registration(
         OnboardingStates.ONBOARDING_NAME,
         OnboardingStates.SET_USERNAME_PLAYER,
         OnboardingStates.SELECT_NATION,
-        FounderStates.SET_USERNAME_FOUNDER,
-        FounderStates.WAITING_GROUP_ADMIN,
-        FounderStates.SET_NATION_NAME,
-        FounderStates.SET_CURRENCY_CODE,
-        FounderStates.SELECT_FLAG,
-        FounderStates.CONFIRM,
     ),
 )
 async def cancel_onboarding_panel(
     call: CallbackQuery,
     state: FSMContext,
 ) -> None:
-    current_state = await state.get_state()
-    founder_cancel = current_state in {
-        FounderStates.SET_USERNAME_FOUNDER.state,
-        FounderStates.WAITING_GROUP_ADMIN.state,
-        FounderStates.SET_NATION_NAME.state,
-        FounderStates.SET_CURRENCY_CODE.state,
-        FounderStates.SELECT_FLAG.state,
-        FounderStates.CONFIRM.state,
-    }
-
-    if founder_cancel:
-        async with async_session() as session:
-            try:
-                await cancel_draft(session, call.from_user.id)
-            except Exception:
-                logger.exception(
-                    "Could not cancel founding draft | founder=%s",
-                    call.from_user.id,
-                )
-        try:
-            if call.message is not None:
-                await call.message.delete()
-        except Exception:
-            logger.debug("Could not delete cancelled founder panel", exc_info=True)
-    else:
-        await close_inline_panel(state, call.bot)
-
+    await close_inline_panel(state, call.bot)
     await state.clear()
 
     async with async_session() as session:
-        async with session.begin():
-            user = await get_user(session, call.from_user.id) if await is_fully_registered(
-                session,
-                call.from_user.id,
-            ) else None
-
-    if user is not None and call.message is not None:
-        await show_dashboard(
-            call.message,
-            user,
-            replace_inline=False,
+        user = await get_user(session, call.from_user.id)
+        registered = user is not None and await is_fully_registered(
+            session,
+            call.from_user.id,
         )
+
+    if registered and user is not None and call.message is not None:
+        await show_dashboard(call.message, user, replace_inline=False)
     elif call.message is not None:
         await call.message.answer(
-            "👋 <b>شروع OPEX MONEY</b>\n\n"
-            "برای ورود به بازی، روی «شروع بازی» بزن.",
+            rtl_text(
+                "👋 <b>شروع OPEX MONEY</b>\n\n"
+                "برای ورود به بازی، روی «شروع بازی» بزن."
+            ),
             reply_markup=welcome_keyboard(),
             parse_mode=ParseMode.HTML,
         )
 
     await call.answer("❌ لغو شد.")
-
 
 
 @router.callback_query(
