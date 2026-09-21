@@ -263,6 +263,7 @@ def _direction_emoji(change: float) -> str:
 
 
 def _format_mover(code: str | None, pct: float) -> str:
+    from app.services.market_intelligence import format_percent_value
     if not code:
         return "—"
     arrow = "▲" if pct > 0 else "▼" if pct < 0 else "➡️"
