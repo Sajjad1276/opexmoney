@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OPEX MONEY Admin</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, system-ui, sans-serif; }
+    body { margin: 0; background: #0b1020; color: #eef2ff; }
+    main { max-width: 1100px; margin: 0 auto; padding: 32px 20px; }
+    h1 { margin: 0 0 8px; font-size: 28px; }
+    .muted { color: #9aa6bf; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-top: 24px; }
+    .card { background: #121a2b; border: 1px solid #23304a; border-radius: 14px; padding: 18px; }
+    .label { color: #9aa6bf; font-size: 13px; }
+    .value { font-size: 25px; font-weight: 700; margin-top: 8px; }
+    #status { margin-top: 18px; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>OPEX MONEY Admin</h1>
+  <div class="muted">Administrative API dashboard</div>
+  <div id="status" class="muted">Waiting for Telegram WebApp authentication.</div>
+  <section id="stats" class="grid"></section>
+</main>
+<script>
+(function () {
+  const tg = window.Telegram && window.Telegram.WebApp;
+  if (!tg || !tg.initData) {
+    document.getElementById("status").textContent =
+      "Open this page from the authorized Telegram Mini App.";
+    return;
+  }
+
+  tg.ready();
+
+  const headers = {"X-Telegram-Init-Data": tg.initData};
+
+  function card(label, value) {
+    const el = document.createElement("div");
+    el.className = "card";
+    el.innerHTML = '<div class="label"></div><div class="value"></div>';
+    el.querySelector(".label").textContent = label;
+    el.querySelector(".value").textContent = value;
+    return el;
+  }
+
+  fetch("/api/stats/overview", {headers})
+    .then(async (response) => {
+      if (!response.ok) throw new Error(await response.text());
+      return response.json();
+    })
+    .then((data) => {
+      document.getElementById("status").textContent = "Authenticated.";
+      const root = document.getElementById("stats");
+      const entries = [
+        ["Players", data.total_players],
+        ["Active 24h", data.active_players_24h],
+        ["Nations", data.total_nations],
+        ["Active wars", data.active_wars],
+        ["Transactions today", data.transactions_today],
+        ["Today volume", data.transaction_volume_today],
+        ["Market volume", data.total_market_volume],
+        ["Pending proposals", data.pending_proposals],
+        ["New players 7d", data.new_players_7d],
+        ["Gini", data.gini_coefficient],
+        ["Top 10 wealth share", data.top10_wealth_share]
+      ];
+      entries.forEach(([label, value]) => root.appendChild(card(label, value)));
+    })
+    .catch((error) => {
+      document.getElementById("status").textContent = "Request failed: " + error.message;
+    });
+})();
+</script>
+</body>
+</html>
