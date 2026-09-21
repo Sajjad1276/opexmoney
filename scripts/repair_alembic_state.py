@@ -93,6 +93,15 @@ async def all_tables_exist(conn: asyncpg.Connection, names: set[str]) -> bool:
     return True
 
 
+async def all_columns_exist(
+    conn: asyncpg.Connection, columns: set[tuple[str, str]]
+) -> bool:
+    for table_name, column_name in columns:
+        if not await column_exists(conn, table_name, column_name):
+            return False
+    return True
+
+
 async def index_exists(conn: asyncpg.Connection, index_name: str) -> bool:
     return bool(await conn.fetchval(
         "SELECT to_regclass($1) IS NOT NULL", f"public.{index_name}"
@@ -273,11 +282,7 @@ async def detect_revision(conn: asyncpg.Connection) -> str | None:
         ("price_alerts", "triggered_at"),
     }
     if await all_tables_exist(conn, foundation_v2_tables):
-        columns_ready = all(
-            await column_exists(conn, table_name, column_name)
-            for table_name, column_name in foundation_v2_columns
-        )
-        if columns_ready:
+        if await all_columns_exist(conn, foundation_v2_columns):
             highest = "0019_foundation_v2"
 
     return highest
