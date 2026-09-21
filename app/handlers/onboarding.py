@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import html
+import time
 from decimal import Decimal
 
-from aiogram import F, Router
+from aiogram import Bot, F, Router
+from aiogram.enums import ButtonStyle, ParseMode
 from aiogram.filters import CommandStart
 from aiogram.filters.state import StateFilter
 from aiogram.exceptions import TelegramBadRequest
@@ -11,14 +13,22 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import IntegrityError
 
-from app.database.models import User
+from app.database.models import CurrencyHolding, Nation, Transaction, User
 from app.database.session import async_session
-from app.utils.ui import safe_edit_caption as _safe_edit_caption, safe_edit_text as _safe_edit_text, user_mention
-from app.keyboards.inline import cancel_keyboard, nation_selection_keyboard
+from app.utils.ui import (
+    close_inline_panel,
+    remember_inline_panel,
+    safe_edit_caption as _safe_edit_caption,
+    safe_edit_text as _safe_edit_text,
+    user_mention,
+)
+from app.keyboards.inline import cancel_keyboard, nation_selection_keyboard, welcome_keyboard
 from app.services.membership_service import sync_registered_user_memberships
 from app.handlers.start import cmd_start as restart_flow
 from app.services.temporal_service import ensure_temporal_profile
+from app.services.nation_service import get_nation_rank
 from app.services.user_service import get_user, is_fully_registered, username_exists
 from app.states.onboarding import OnboardingStates
 from app.utils.formatting import fmt_pct, fmt_rate, get_rate_change, get_rate_emoji, to_fa, rtl_html
