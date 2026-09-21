@@ -38,7 +38,7 @@ EXPECTED_JOB_IDS = {
 }
 
 EXPECTED_ROUTER_NAMES = {
-    "onboarding_fix", "start", "market", "membership", "founder",
+    "onboarding", "start", "start_flow", "market", "membership", "founder",
     "nation_management", "nation", "governance", "sections", "support",
 }
 
