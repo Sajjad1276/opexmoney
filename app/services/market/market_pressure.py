@@ -99,14 +99,12 @@ async def record_trade_pressure(
         await redis.hincrby(key, "tx_count", 1)
         await redis.hset(key, "last_update", str(int(time.time())))
 
-        # Keep a fixed 15-minute bucket. Do not extend the window on every trade.
+        # Refresh the rolling 15-minute window after every successful trade.
         try:
-            ttl = await redis.ttl(key)
-            if ttl < 0:
-                await redis.expire(key, PRESSURE_TTL_SECONDS)
+            await redis.expire(key, PRESSURE_TTL_SECONDS)
         except Exception:
             logger.debug(
-                "Could not set pressure TTL for nation=%s",
+                "Could not refresh pressure TTL for nation=%s",
                 nation_id,
                 exc_info=True,
             )
@@ -364,6 +362,8 @@ async def build_price_receipt(
             Decimal("0.0001"),
             rounding=ROUND_HALF_UP,
         )
+        if impact == 0:
+            continue
         lines.append(
             ReceiptLine(
                 label=_label_for_factor(

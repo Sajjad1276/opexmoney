@@ -259,7 +259,8 @@ async def test_rate_engine_default_regression():
             )
             await session.flush()
 
-            assert nation.exchange_rate == Decimal("0.9800")
+            # The new factor model has no legacy -0.50 baseline.
+            assert nation.exchange_rate == Decimal("1.0000")
             assert nation.rate_prev == Decimal("1.0000")
 
 
