@@ -178,6 +178,7 @@ def _risk_title(label: str) -> str:
 
 
 def format_market_page(user, overview: dict, active: int, trade_count: int) -> str:
+    from app.services.market_intelligence import format_change_text, format_percent_value, format_volume
     currencies = overview.get("currencies") or []
     if not currencies:
         return "⚠️ هنوز ارز فعالی برای نمایش بازار وجود ندارد."
@@ -248,7 +249,8 @@ def format_market_page(user, overview: dict, active: int, trade_count: int) -> s
 def format_listed_currencies(page) -> str:
     if page.total_count == 0:
         return "📋 <b>ارزهای لیست شده</b>\n\nفعلاً هیچ ارز فعالی برای نمایش وجود ندارد."
-    start_index = page.page * 100 + 1
+    from app.services.market.market_service import LISTED_CURRENCIES_PAGE_SIZE
+    start_index = page.page * LISTED_CURRENCIES_PAGE_SIZE + 1
     lines = [
         "📋 <b>ارزهای لیست شده</b>",
         "",
