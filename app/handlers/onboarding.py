@@ -12,8 +12,9 @@ from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMar
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database.models import Nation, User
+from app.database.models import CurrencyHolding, Nation, User
 from app.database.session import async_session
+from app.handlers.start import cmd_start as restart_flow
 from app.handlers.dashboard import show_dashboard
 from app.utils.ui import safe_edit_caption as _safe_edit_caption, safe_edit_text as _safe_edit_text, user_mention
 
@@ -245,7 +246,7 @@ async def accept_valid_name(message: Message, state: FSMContext) -> None:
         )
 
     if registered_user is not None:
-        from app.handlers.start import show_dashboard
+        from app.handlers.dashboard import show_dashboard
         await show_dashboard(message, registered_user)
 
 
