@@ -358,7 +358,7 @@ async def finalize_draft(
         # one transaction. The DB unique constraint remains the final
         # concurrency guard against duplicate currency codes.
         async with session.begin_nested():
-            nation = await create_nation(
+            nation = await create_nation_core(
                 session=session,
                 founder_user_id=founder_user_id,
                 group_id=group_id,
@@ -415,6 +415,7 @@ from app.database.models import (
     NationLog,
     NationMember,
     NationMemberRole,
+    NationTelegramMember,
     Transaction,
     UserActivity,
     ActivityType,
