@@ -6,6 +6,7 @@ Revises: 0018_market_query_indexes
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 
 revision = "0019_foundation_v2"
@@ -21,6 +22,7 @@ def _alter_existing_timestamp_columns(timezone_enabled: bool) -> None:
 
     timestamp_columns = {
         "nations": ["last_rate_update", "created_at"],
+        "bot_groups": ["created_at", "updated_at"],
         "users": ["created_at"],
         "currency_holdings": ["created_at"],
         "transactions": ["created_at"],
@@ -37,7 +39,7 @@ def _alter_existing_timestamp_columns(timezone_enabled: bool) -> None:
         "behavior_snapshots": ["at"],
         "nation_members": ["joined_at"],
         "nation_logs": ["created_at"],
-        "nation_join_requests": ["expires_at"],
+        "nation_join_requests": ["created_at", "reviewed_at", "expires_at"],
         "nation_wars": ["declared_at", "ends_at", "ended_at"],
         "user_mission_progress": ["completed_at", "reset_at"],
         "nation_treasury": ["last_deposit_at"],
@@ -64,6 +66,15 @@ def _alter_existing_timestamp_columns(timezone_enabled: bool) -> None:
 
 def upgrade() -> None:
     _alter_existing_timestamp_columns(True)
+
+    op.create_foreign_key(
+        "fk_nations_founder_user_id",
+        "nations",
+        "users",
+        ["founder_user_id"],
+        ["user_id"],
+        ondelete="SET NULL",
+    )
 
     op.add_column(
         "nations",
@@ -120,11 +131,6 @@ def upgrade() -> None:
     op.add_column(
         "price_alerts",
         sa.Column("triggered_at", sa.DateTime(timezone=True), nullable=True),
-    )
-    op.create_check_constraint(
-        "ck_price_alert_direction",
-        "price_alerts",
-        "direction IN ('above', 'below')",
     )
     op.create_index(
         "ix_price_alerts_pending",
@@ -245,7 +251,7 @@ def upgrade() -> None:
         sa.Column("cause_primary", sa.String(length=100), nullable=False),
         sa.Column(
             "cause_breakdown",
-            sa.dialects.postgresql.JSONB(),
+            postgresql.JSONB(),
             nullable=False,
             server_default=sa.text("'{}'::jsonb"),
         ),
@@ -484,7 +490,6 @@ def downgrade() -> None:
     op.drop_index("ix_price_alerts_pending", table_name="price_alerts")
     op.drop_column("price_alerts", "triggered_at")
     op.alter_column("price_alerts", "is_triggered", new_column_name="triggered")
-    op.drop_constraint("ck_price_alert_direction", "price_alerts", type_="check")
     op.create_index(
         "ix_price_alerts_pending",
         "price_alerts",
@@ -515,5 +520,10 @@ def downgrade() -> None:
 
     op.drop_index("ix_nations_active_deleted", table_name="nations")
     op.drop_column("nations", "deleted_at")
+    op.drop_constraint(
+        "fk_nations_founder_user_id",
+        "nations",
+        type_="foreignkey",
+    )
 
     _alter_existing_timestamp_columns(False)
