@@ -17,7 +17,7 @@ from sqlalchemy import select
 
 from app.database.models import Nation, User
 from app.database.session import async_session
-from app.handlers.start import show_dashboard
+from app.handlers.dashboard import show_dashboard
 from app.keyboards.inline import (
     add_to_group_keyboard,
     founder_cancel_keyboard,
@@ -516,7 +516,7 @@ async def founder_start_player(call: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
     user = await _get_user_or_none(call.from_user.id)
     if user is None:
-        from app.handlers.start import start_game_button
+        from app.handlers.start_flow import start_game_button
         # Reuse the canonical player onboarding path.
         await start_game_button(call.message, state)
     elif call.message:
