@@ -10,6 +10,10 @@ _FA_DIGITS = str.maketrans("0123456789.-", "۰۱۲۳۴۵۶۷۸۹٫−")
 _FA_TO_LATIN = str.maketrans("۰۱۲۳۴۵۶۷۸۹٫٬−", "0123456789.,-")
 
 
+def rtl_html(text: str) -> str:
+    return "\u200f" + text
+
+
 def to_fa(number) -> str:
     """Return user-facing numbers using Latin/English digits."""
     return str(number)
