@@ -30,7 +30,17 @@ def _fallback(
                 "<b>باگ پیدا و اصلاح شد.</b>\n"
                 f"{html.escape(engineering.summary)}"
             )
-        if engineering.status in {"ci_failed", "blocked", "credentials_missing", "timeout"}:
+        if engineering.status in {
+            "ci_failed",
+            "blocked",
+            "credentials_missing",
+            "timeout",
+            "busy",
+            "no_patch",
+            "no_context",
+            "merge_failed",
+            "error",
+        }:
             return (
                 "<b>مشکل شناسایی شد، اما اصلاح نهایی اعمال نشد.</b>\n"
                 f"{html.escape(engineering.summary)}"
