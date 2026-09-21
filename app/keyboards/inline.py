@@ -62,27 +62,6 @@ def suggested_name_keyboard(name: str) -> InlineKeyboardMarkup:
     ])
 
 
-def more_menu_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text="⚡ مأموریت‌ها", callback_data="missions_open"),
-            InlineKeyboardButton(text="🏦 خزانه", callback_data="treasury_open"),
-        ],
-        [
-            InlineKeyboardButton(text="📜 قوانین", callback_data="governance_main"),
-            InlineKeyboardButton(text="⚙️ تنظیمات", callback_data="settings:back"),
-        ],
-        [
-            InlineKeyboardButton(
-                text="🛟 پشتیبانی هوشمند",
-                callback_data="support_open",
-                style=ButtonStyle.PRIMARY,
-            )
-        ],
-        [InlineKeyboardButton(text="🏠 منوی اصلی", callback_data="back_to_dashboard")],
-    ])
-
-
 def support_panel_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -95,9 +74,8 @@ def support_panel_keyboard() -> InlineKeyboardMarkup:
             ],
             [
                 InlineKeyboardButton(
-                    text="❌ بستن",
-                    callback_data="support_close",
-                    style=ButtonStyle.DANGER,
+                    text="↩️ بازگشت",
+                    callback_data="support_back",
                 )
             ],
         ]
@@ -253,10 +231,8 @@ def nation_panel_keyboard(
                     ),
                 ]
             )
-    else:
-        buttons.append(
-            [InlineKeyboardButton(text="📜 قانون اساسی", callback_data="governance_main")]
-        )
+    # Constitution and treasury are nation-scoped. Nationless players only
+    # see the general nation discovery/founding actions above.
 
     buttons.append(
         [InlineKeyboardButton(text="🏠 منوی اصلی", callback_data="back_to_dashboard")]
