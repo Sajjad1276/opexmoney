@@ -124,14 +124,38 @@ async def new_support_report(
     await callback.answer()
 
 
-@router.callback_query(F.data == "support_close")
-async def close_support(
+@router.callback_query(F.data == "support_back")
+async def support_back(
     callback: CallbackQuery,
     state: FSMContext,
 ) -> None:
     await close_inline_panel(state, callback.bot)
     await state.clear()
-    await callback.answer("بسته شد")
+    if callback.message is None:
+        await callback.answer()
+        return
+
+    async with async_session() as session:
+        async with session.begin():
+            user = await session.get(
+                __import__("app.database.models", fromlist=["User"]).User,
+                callback.from_user.id,
+            )
+
+    if user is None:
+        await callback.answer("⚠️ حساب پیدا نشد.", show_alert=True)
+        return
+
+    from app.handlers.start import show_dashboard
+
+    await show_dashboard(
+        callback.message,
+        user,
+        replace_inline=True,
+        bot=callback.bot,
+        display_user=callback.from_user,
+    )
+    await callback.answer()
 
 
 @router.message(SupportStates.WAITING_REPORT, F.text)
