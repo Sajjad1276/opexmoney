@@ -22,7 +22,7 @@ from sqlalchemy import select
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from ai import ai_router, companion
+from ai import companion
 from app.database.models import User
 from app.database.session import async_session, engine
 from app.diagnostics.flow_trace import FlowTraceMiddleware
@@ -413,7 +413,6 @@ async def main() -> None:
     dp.include_router(sections_router)
     dp.include_router(support_router)
     dp.include_router(academy_router)
-    dp.include_router(ai_router)
 
     ai_ok = await companion.health_check()
     if not ai_ok:
