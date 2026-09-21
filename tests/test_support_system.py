@@ -3,7 +3,10 @@ from __future__ import annotations
 import pytest
 
 from app.keyboards.inline import support_panel_keyboard, support_result_keyboard
-from app.services.support.code_repair import _policy_ok
+from app.services.support.code_repair import (
+    _policy_ok,
+    _resolve_local_imports,
+)
 from app.services.support.models import (
     RepairAction,
     RepairResult,
@@ -111,3 +114,24 @@ def test_repair_policy_has_no_economy_mutation_action() -> None:
         RepairAction.RESET_FSM,
         RepairAction.SYNC_HOME_NATION,
     }
+
+
+def test_local_import_context_follows_app_dependencies() -> None:
+    source = """
+from app.database.models import User
+from ..services.market import get_market
+from .helpers import normalize
+"""
+    known = {
+        "app/database/models.py",
+        "app/services/market.py",
+        "app/handlers/helpers.py",
+    }
+    resolved = _resolve_local_imports(
+        "app/handlers/nation.py",
+        source,
+        known,
+    )
+    assert "app/database/models.py" in resolved
+    assert "app/services/market.py" in resolved
+    assert "app/handlers/helpers.py" in resolved
