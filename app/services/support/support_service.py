@@ -7,7 +7,7 @@ from app.ai.support_agent import generate_support_reply
 from app.diagnostics.support_telemetry import get_recent_telemetry
 from app.services.support.code_repair import repair_code
 from app.services.support.diagnostic_service import diagnose_support_issue
-from app.services.support.models import EngineeringResult, RepairResult, SupportDiagnosis, SupportResult
+from app.services.support.models import EngineeringResult, SupportResult
 from app.services.support.repair_service import apply_safe_repair
 from app.states.support import SupportStates
 from config import settings
@@ -31,10 +31,10 @@ class SupportService:
         report: str,
     ) -> SupportResult:
         """
-        Fast diagnostic phase.
+        Run only the database-backed diagnostic and safe repair phase.
 
-        Database work ends before any GitHub/Gemini engineering operation starts.
-        This prevents a code-repair cycle from holding an open DB transaction.
+        The caller owns the transaction. No GitHub or long-running AI work is
+        started from this phase.
         """
         data = await state.get_data()
         previous_state = data.get("support_previous_state")
@@ -63,53 +63,18 @@ class SupportService:
         )
 
     @staticmethod
-    async def complete(
-        *,
-        report: str,
-        result: SupportResult,
-    ) -> SupportResult:
-        """
-        Engineering and response phase.
-
-        This phase runs after the DB transaction is committed. It can wait for
-        GitHub Actions without holding database connections or row locks.
-        """
-        engineering: EngineeringResult | None = None
-
-        if result.diagnosis.code_fix_required:
-            telemetry = await get_recent_telemetry(
-                int(result.diagnosis.evidence[-1].split(": ", 1)[-1])
-                if False
-                else 0
-            )
-            del telemetry
-
-        if result.diagnosis.code_fix_required:
-            # The user id is intentionally passed by the caller through report
-            # context only when a code repair is required. The actual telemetry
-            # lookup is repeated by SupportService.finalize with the concrete ID.
-            raise RuntimeError("complete() requires user_id for engineering repair")
-
-        response_text = await generate_support_reply(
-            report=report,
-            diagnosis=result.diagnosis,
-            repair=result.repair,
-            engineering=None,
-        )
-        return SupportResult(
-            response_text=response_text,
-            diagnosis=result.diagnosis,
-            repair=result.repair,
-            engineering=None,
-        )
-
-    @staticmethod
     async def finalize(
         *,
         user_id: int,
         report: str,
         result: SupportResult,
     ) -> SupportResult:
+        """
+        Run code engineering only after the DB transaction has committed.
+
+        This allows the agent to read source, create a branch, run CI, repair
+        CI failures, and merge without holding a DB connection or lock.
+        """
         engineering: EngineeringResult | None = None
 
         if result.diagnosis.code_fix_required:
