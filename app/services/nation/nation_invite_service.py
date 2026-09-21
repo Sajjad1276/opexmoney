@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import Nation, NationJoinRequest, NationMember, NationMemberRole
 from app.services.nation.membership_service import (
+
     MembershipResult,
     _join_nation_internal,
 )
@@ -17,7 +18,7 @@ from app.services.nation.membership_service import (
 
 INVITE_TTL_SECONDS = 86400
 _INVITE_KEY_PREFIX = "invite:"
-_BOT_USERNAME = "OpexMoney_bot"
+
 
 
 @dataclass(frozen=True)
@@ -69,7 +70,7 @@ async def create_invite_link(
     )
     return InviteLink(
         token=token,
-        url=f"https://t.me/{_BOT_USERNAME}?start=inv_{token}",
+        url=f"https://t.me/{settings.bot_username}?start=inv_{token}",
         expires_at=expires_at,
     )
 
