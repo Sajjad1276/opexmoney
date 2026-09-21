@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import CurrencyHolding, Nation, NationMember, User
+from app.services.nation_service import get_user_active_nation_context
 from app.diagnostics.support_telemetry import get_recent_telemetry
 from app.services.support.models import (
     RepairAction,
@@ -48,29 +49,49 @@ async def diagnose_support_issue(
     recent_errors = telemetry["errors"]
     latest_error = _error_text(recent_errors)
 
-    user = await session.get(User, user_id)
-    nation = (
-        await session.get(Nation, user.home_nation_id)
-        if user is not None and user.home_nation_id is not None
+    user = await session.get(User, user_id, with_for_update=True)
+    nation_context = (
+        await get_user_active_nation_context(
+            session,
+            user_id,
+            repair=True,
+            lock=True,
+        )
+        if user is not None
         else None
     )
+    nation = nation_context[0] if nation_context is not None else None
+    membership = None
+    if nation is not None:
+        membership = await session.scalar(
+            select(NationMember)
+            .where(
+                NationMember.user_id == user_id,
+                NationMember.nation_id == nation.nation_id,
+                NationMember.is_active.is_(True),
+            )
+            .limit(1)
+        )
+    elif user is not None:
+        membership = await session.scalar(
+            select(NationMember)
+            .where(
+                NationMember.user_id == user_id,
+                NationMember.is_active.is_(True),
+            )
+            .order_by(NationMember.joined_at.desc(), NationMember.id.asc())
+            .limit(1)
+        )
+
     holding = (
         await session.scalar(
             select(CurrencyHolding).where(
                 CurrencyHolding.user_id == user_id,
-                CurrencyHolding.nation_id == user.home_nation_id,
+                CurrencyHolding.nation_id == nation.nation_id,
             )
         )
-        if user is not None and user.home_nation_id is not None
+        if user is not None and nation is not None
         else None
-    )
-    membership = await session.scalar(
-        select(NationMember)
-        .where(
-            NationMember.user_id == user_id,
-            NationMember.is_active.is_(True),
-        )
-        .limit(1)
     )
 
     market_requested = _contains_any(
@@ -89,6 +110,12 @@ async def diagnose_support_issue(
     )
 
     home_nation_ok = user is not None and nation is not None and bool(nation.is_active)
+    membership_ok = membership is not None and bool(membership.is_active)
+    home_membership_sync = (
+        user is None
+        or membership is None
+        or user.home_nation_id == membership.nation_id
+    )
     checks = (
         SupportCheck(
             "user",
@@ -107,21 +134,15 @@ async def diagnose_support_issue(
         ),
         SupportCheck(
             "active_membership",
-            membership is not None,
-            "عضویت فعال وجود دارد." if membership is not None else "عضویت فعال پیدا نشد.",
+            membership_ok,
+            "عضویت فعال وجود دارد." if membership_ok else "عضویت فعال پیدا نشد.",
         ),
         SupportCheck(
             "home_membership_sync",
-            (
-                user is None
-                or membership is None
-                or user.home_nation_id == membership.nation_id
-            ),
+            home_membership_sync,
             (
                 "ملت اصلی حساب با عضویت فعال هماهنگ است."
-                if user is None
-                or membership is None
-                or user.home_nation_id == membership.nation_id
+                if home_membership_sync
                 else "ملت اصلی حساب با عضویت فعال ناهماهنگ است."
             ),
         ),
