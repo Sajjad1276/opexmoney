@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from types import SimpleNamespace
-
 import pytest
 
 from app.keyboards.inline import support_panel_keyboard, support_result_keyboard
@@ -22,6 +20,11 @@ class FakeState:
 
     async def get_data(self) -> dict:
         return dict(self.data)
+
+
+class FakeSession:
+    async def flush(self) -> None:
+        return None
 
 
 @pytest.mark.asyncio
@@ -65,10 +68,15 @@ async def test_support_service_keeps_repair_decision_deterministic(monkeypatch) 
     )
 
     result = await SupportService.analyze(
-        SimpleNamespace(),
+        FakeSession(),
         FakeState(),
         user_id=100,
         report="بازار باز نمی‌شود",
+    )
+    result = await SupportService.finalize(
+        user_id=100,
+        report="بازار باز نمی‌شود",
+        result=result,
     )
 
     assert result.diagnosis.category is SupportCategory.FSM
