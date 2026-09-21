@@ -44,7 +44,8 @@ from app.handlers.nation_management import (
     nation_management_router,
     send_weekly_nation_reports,
 )
-from app.handlers.onboarding_fix import router as onboarding_fix_router
+from app.handlers.onboarding import router as onboarding_router
+from app.handlers.start_flow import router as start_flow_router
 from app.handlers.sections import router as sections_router
 from app.handlers.start import router as start_router
 from app.handlers.support import router as support_router
@@ -396,8 +397,9 @@ async def main() -> None:
             logger.exception("Failed to send user-facing error message")
         return True
 
-    dp.include_router(onboarding_fix_router)
+    dp.include_router(onboarding_router)
     dp.include_router(start_router)
+    dp.include_router(start_flow_router)
     dp.include_router(market_router)
     dp.include_router(membership_router)
     dp.include_router(chart_router)
