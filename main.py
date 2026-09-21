@@ -398,6 +398,10 @@ async def main() -> None:
         return True
 
     dp.include_router(onboarding_router)
+    # Founder must precede the generic /start router so group deep-links
+    # (/start founder_<token>) reach the founder flow instead of being
+    # consumed as a normal start command.
+    dp.include_router(founder_router)
     dp.include_router(start_router)
     dp.include_router(start_flow_router)
     dp.include_router(market_router)
