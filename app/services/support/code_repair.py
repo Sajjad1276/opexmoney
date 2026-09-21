@@ -37,9 +37,11 @@ PROTECTED_FILES = {
 }
 ALLOWED_PREFIXES = ("app/", "ai/")
 
-MAX_FILES = 6
-MAX_SOURCE_CHARS = 14000
-MAX_TOTAL_SOURCE_CHARS = 48000
+MAX_FILES = 8
+MAX_CONTEXT_FILES = 28
+MAX_SOURCE_CHARS = 26000
+MAX_TOTAL_SOURCE_CHARS = 120000
+MAX_CODEBASE_MAP_CHARS = 24000
 MAX_CI_LOG_CHARS = 18000
 DEFAULT_REPAIR_ATTEMPTS = 3
 DEFAULT_CI_POLL_SECONDS = 8
@@ -218,7 +220,7 @@ def _relevant_paths(report: str, traceback: str, event: str) -> list[str]:
             _safe_path(clean)
         except ValueError:
             continue
-        if (ROOT / clean).exists() and clean not in found:
+        if clean not in found:
             found.append(clean)
 
     lower = blob.casefold()
@@ -282,23 +284,166 @@ async def _read_repo_file(path: str, ref: str) -> str | None:
     return base64.b64decode(encoded_content.encode("ascii")).decode("utf-8")
 
 
+async def _repository_python_paths(ref: str) -> list[str]:
+    ref_payload = await _api(
+        f"/repos/{_repo()}/git/ref/heads/{_encoded(ref)}"
+    )
+    commit_sha = str(ref_payload["object"]["sha"])
+    commit = await _api(f"/repos/{_repo()}/git/commits/{commit_sha}")
+    tree_sha = str(commit["tree"]["sha"])
+    tree = await _api(
+        f"/repos/{_repo()}/git/trees/{_encoded(tree_sha)}?recursive=1"
+    )
+    paths = [
+        str(item.get("path"))
+        for item in tree.get("tree", [])
+        if item.get("type") == "blob"
+        and str(item.get("path", "")).endswith(".py")
+        and str(item.get("path", "")).startswith(("app/", "ai/"))
+    ]
+    return sorted(paths)
+
+
+def _resolve_local_imports(path: str, content: str, known_paths: set[str]) -> list[str]:
+    try:
+        tree = ast.parse(content, filename=path)
+    except SyntaxError:
+        return []
+
+    module = path[:-3].replace("/", ".")
+    package = module.rsplit(".", 1)[0] if "." in module else ""
+    candidates: list[str] = []
+
+    def add(module_name: str) -> None:
+        if not module_name.startswith(("app.", "ai.")):
+            return
+        direct = module_name.replace(".", "/") + ".py"
+        init = module_name.replace(".", "/") + "/__init__.py"
+        for candidate in (direct, init):
+            if candidate in known_paths and candidate not in candidates:
+                candidates.append(candidate)
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                add(alias.name)
+        elif isinstance(node, ast.ImportFrom):
+            if node.level:
+                base_parts = package.split(".") if package else []
+                if node.level > len(base_parts) + 1:
+                    continue
+                parent = base_parts[: len(base_parts) - (node.level - 1)]
+                imported = ".".join((*parent, *(node.module.split(".") if node.module else ())))
+                if imported:
+                    add(imported)
+                    for alias in node.names:
+                        add(f"{imported}.{alias.name}")
+            elif node.module:
+                add(node.module)
+                for alias in node.names:
+                    add(f"{node.module}.{alias.name}")
+
+    return candidates
+
+
+async def _expand_code_context(
+    seed_paths: list[str],
+    ref: str,
+) -> tuple[list[str], str]:
+    known_paths = set(await _repository_python_paths(ref))
+    selected: list[str] = []
+
+    def add(path: str) -> None:
+        try:
+            clean = _safe_path(path)
+        except ValueError:
+            return
+        if clean in known_paths and clean not in selected:
+            selected.append(clean)
+
+    for path in seed_paths:
+        add(path)
+
+    frontier = list(selected)
+    for _ in range(2):
+        if len(selected) >= MAX_CONTEXT_FILES:
+            break
+
+        snapshot = await _source_snapshot(frontier, ref)
+        next_frontier: list[str] = []
+        for path, source in snapshot.items():
+            for dependency in _resolve_local_imports(path, source, known_paths):
+                before = len(selected)
+                add(dependency)
+                if len(selected) > before:
+                    next_frontier.append(dependency)
+                if len(selected) >= MAX_CONTEXT_FILES:
+                    break
+            if len(selected) >= MAX_CONTEXT_FILES:
+                break
+
+        frontier = next_frontier
+        if not frontier:
+            break
+
+    seed_lower = " ".join(seed_paths).casefold()
+    families = []
+    for family in ("market", "trade", "nation", "war", "treasury", "academy", "portfolio"):
+        if family in seed_lower:
+            families.append(family)
+
+    for path in known_paths:
+        folded = path.casefold()
+        if (
+            len(selected) < MAX_CONTEXT_FILES
+            and path not in selected
+            and any(f"/{family}" in folded or f"_{family}" in folded for family in families)
+        ):
+            add(path)
+
+    for preferred in (
+        "app/database/models.py",
+        "app/database/session.py",
+        "app/db/models.py",
+        "app/db/session.py",
+        "app/services/trade.py",
+        "app/services/market.py",
+        "app/services/nation.py",
+        "app/services/portfolio.py",
+        "app/keyboards/inline.py",
+    ):
+        if len(selected) >= MAX_CONTEXT_FILES:
+            break
+        add(preferred)
+
+    map_lines = "\n".join(known_paths)
+    return selected[:MAX_CONTEXT_FILES], map_lines[:MAX_CODEBASE_MAP_CHARS]
+
+
 async def _source_snapshot(paths: list[str], ref: str) -> dict[str, str]:
     source: dict[str, str] = {}
     total = 0
 
-    for path in paths:
-        content = await _read_repo_file(path, ref)
-        if content is None:
+    results = await asyncio.gather(
+        *(_read_repo_file(path, ref) for path in paths),
+        return_exceptions=True,
+    )
+    for path, result in zip(paths, results):
+        if isinstance(result, Exception) or result is None:
             continue
 
-        if len(content) > MAX_SOURCE_CHARS:
-            content = content[:MAX_SOURCE_CHARS] + "\n# [source truncated by support agent]"
+        file_content = str(result)
+        if len(file_content) > MAX_SOURCE_CHARS:
+            file_content = (
+                file_content[:MAX_SOURCE_CHARS]
+                + "\n# [source truncated by support agent]"
+            )
 
-        if total + len(content) > MAX_TOTAL_SOURCE_CHARS:
+        if total + len(file_content) > MAX_TOTAL_SOURCE_CHARS:
             break
 
-        source[path] = content
-        total += len(content)
+        source[path] = file_content
+        total += len(file_content)
 
     return source
 
@@ -309,6 +454,7 @@ async def _generate_patch(
     traceback: str,
     event: str,
     source: dict[str, str],
+    codebase_map: str,
     ci_failure: str,
     attempt: int,
 ) -> dict[str, Any]:
@@ -324,7 +470,10 @@ You are the autonomous bug-fixing engineer for OPEX MONEY.
 Fix only the reported software bug.
 
 Rules:
-- Read the supplied source before changing it.
+- You have read-only access to the broader OPEX MONEY codebase, not only the files named by the traceback.
+- Trace the reported failure through handlers, services, database models, keyboards, utilities, and local imports before deciding the root cause.
+- Use the codebase map to discover additional files you need to inspect.
+- Do not decide that a formatting-only change is a repair unless the failure is actually formatting-related.
 - Make the smallest correct change.
 - Do not add features.
 - Do not change game economy rules.
@@ -339,7 +488,10 @@ Rules:
 - This is repair attempt {attempt} of {DEFAULT_REPAIR_ATTEMPTS}.
 
 Return JSON only:
-{{"summary":"brief reason","files":[{{"path":"app/...py","content":"complete file content"}}]}}
+{{"summary":"root cause and why this patch fixes it","files":[{{"path":"app/...py","content":"complete file content"}}]}}
+
+CODEBASE MAP:
+{codebase_map}
 
 PLAYER REPORT:
 {report[: settings.support_max_report_chars]}
@@ -651,7 +803,8 @@ async def repair_code(
         branch = f"support/autofix-{uuid.uuid4().hex[:10]}"
         await _create_branch(branch, base_sha)
 
-        source = await _source_snapshot(paths, "main")
+        context_paths, codebase_map = await _expand_code_context(paths, "main")
+        source = await _source_snapshot(context_paths, "main")
         if not source:
             return EngineeringResult(
                 "no_context",
@@ -678,13 +831,15 @@ async def repair_code(
                 )
 
             current_ref = "main" if attempt == 1 else branch
-            source = await _source_snapshot(paths, current_ref)
+            context_paths, codebase_map = await _expand_code_context(paths, current_ref)
+            source = await _source_snapshot(context_paths, current_ref)
 
             payload = await _generate_patch(
                 report=report,
                 traceback=traceback,
                 event=event,
                 source=source,
+                codebase_map=codebase_map,
                 ci_failure=ci_failure,
                 attempt=attempt,
             )
