@@ -13,12 +13,12 @@ from app.database.models import (
     Nation,
     NationMember,
     NationMemberHistory,
-    NationTelegramMember,
     NationWar,
     RateHistory,
     User,
 )
 from app.services.market_intelligence import get_market_overview, get_risk_label
+from app.services.nation_service import get_user_active_nation_context
 from app.utils.formatting import fmt_amount, fmt_pct, fmt_rate, to_fa
 
 
@@ -45,69 +45,19 @@ async def _resolve_verified_nation(
     session: AsyncSession,
     user: User,
 ) -> Nation | None:
-    if user.is_ai and user.home_nation_id is not None:
-        return await session.scalar(
-            select(Nation).where(
-                Nation.nation_id == user.home_nation_id,
-                Nation.is_active.is_(True),
-            )
-        )
+    """Resolve the active nation from the canonical game membership invariant.
 
-    if user.home_nation_id is not None:
-        home = await session.scalar(
-            select(Nation)
-            .join(
-                NationMember,
-                and_(
-                    NationMember.nation_id == Nation.nation_id,
-                    NationMember.user_id == user.user_id,
-                    NationMember.is_active.is_(True),
-                ),
-            )
-            .join(
-                NationTelegramMember,
-                and_(
-                    NationTelegramMember.nation_id == Nation.nation_id,
-                    NationTelegramMember.telegram_user_id == user.user_id,
-                    NationTelegramMember.is_active.is_(True),
-                ),
-            )
-            .where(
-                Nation.nation_id == user.home_nation_id,
-                Nation.is_active.is_(True),
-                Nation.is_ai.is_(False),
-            )
-            .limit(1)
-        )
-        if home is not None:
-            return home
-
-    return await session.scalar(
-        select(Nation)
-        .join(
-            NationMember,
-            and_(
-                NationMember.nation_id == Nation.nation_id,
-                NationMember.user_id == user.user_id,
-                NationMember.is_active.is_(True),
-            ),
-        )
-        .join(
-            NationTelegramMember,
-            and_(
-                NationTelegramMember.nation_id == Nation.nation_id,
-                NationTelegramMember.telegram_user_id == user.user_id,
-                NationTelegramMember.is_active.is_(True),
-            ),
-        )
-        .where(
-            Nation.is_active.is_(True),
-            Nation.is_ai.is_(False),
-        )
-        .order_by(NationMember.joined_at.desc(), Nation.nation_id.asc())
-        .limit(1)
+    User.home_nation_id and an active NationMember are authoritative.
+    NationTelegramMember is only a Telegram-state projection and must not
+    block valid nation access when that projection is absent.
+    """
+    context = await get_user_active_nation_context(
+        session,
+        user.user_id,
+        repair=False,
+        lock=False,
     )
-
+    return context[0] if context is not None else None
 
 async def _national_rank(
     session: AsyncSession,
@@ -132,23 +82,8 @@ async def _national_rank(
         )
     )
 
-    if nation.is_ai:
-        stmt = stmt.where(
-            CurrencyHolding.user_id != user_id,
-        )
-    else:
-        stmt = stmt.join(
-            NationTelegramMember,
-            and_(
-                NationTelegramMember.nation_id == CurrencyHolding.nation_id,
-                NationTelegramMember.telegram_user_id == CurrencyHolding.user_id,
-                NationTelegramMember.is_active.is_(True),
-            ),
-        )
-
     higher = int(await session.scalar(stmt) or 0)
     return higher + 1
-
 
 async def _growth_status(session: AsyncSession, nation: Nation, now: datetime) -> str:
     if nation.is_ai:
