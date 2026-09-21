@@ -144,7 +144,7 @@ async def support_back(
         await callback.answer("⚠️ حساب پیدا نشد.", show_alert=True)
         return
 
-    from app.handlers.start import show_dashboard
+    from app.handlers.dashboard import show_dashboard
 
     await show_dashboard(
         callback.message,
