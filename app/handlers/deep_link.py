@@ -86,11 +86,22 @@ async def handle_deep_link(
         async with async_session() as session:
             nation = await session.get(Nation, nation_id)
             if nation is None or not nation.is_active:
-                await message.answer(rtl_html("⚠️ این ملت دیگر فعال نیست."), parse_mode="HTML")
+                await message.answer(
+                    rtl_html("⚠️ این ملت دیگر فعال نیست."),
+                    parse_mode="HTML",
+                )
                 return True
 
         await state.update_data(preferred_nation_id=nation_id)
-        return False
+        await message.answer(
+            rtl_html(
+                f"🌍 <b>ملت «{nation.name}» انتخاب شد.</b>\n\n"
+                "برای ادامه، «شروع بازی» را بزن."
+            ),
+            reply_markup=__import__("app.keyboards.inline", fromlist=["welcome_keyboard"]).welcome_keyboard(),
+            parse_mode="HTML",
+        )
+        return True
 
     return False
 
