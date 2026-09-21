@@ -56,15 +56,17 @@ async def cleanup():
                         NationTelegramMember.nation_id.in_(nation_ids)
                     )
                 )
+
+            await session.execute(
+                delete(User).where(User.user_id == USER_ID)
+            )
+
+            if nation_ids:
                 await session.execute(
                     delete(Nation).where(
                         Nation.nation_id.in_(nation_ids)
                     )
                 )
-
-            await session.execute(
-                delete(User).where(User.user_id == USER_ID)
-            )
 
 
 @pytest.mark.asyncio
