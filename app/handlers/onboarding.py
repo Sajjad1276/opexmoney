@@ -1457,4 +1457,4 @@ async def _get_holding_amount(user_id: int, nation_id: int) -> Decimal:
     async with async_session() as session:
         async with session.begin():
             holding = await session.scalar(select(CurrencyHolding).where(CurrencyHolding.user_id == user_id, CurrencyHolding.nation_id == nation_id))
-        return holding.amount if holding else Decimal("500"
+        return holding.amount if holding else Decimal("500")
