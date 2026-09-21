@@ -7,7 +7,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import BotGroup, Nation, NationFoundingDraft, User
-from app.services.nation.nation_service import create_nation as create_nation_core
 from app.utils.validators import validate_currency_code
 
 
@@ -72,7 +71,7 @@ async def get_or_create_draft(
                 founder_user_id=founder_user_id,
                 launch_token=token_urlsafe(24),
                 status="WAITING_GROUP",
-                flag_emoji="🏴",
+                flag_emoji=(flag_emoji or "🏴").strip() or "🏴",
                 expires_at=_utcnow() + DRAFT_TTL,
             )
             session.add(draft)
@@ -358,12 +357,13 @@ async def finalize_draft(
         # one transaction. The DB unique constraint remains the final
         # concurrency guard against duplicate currency codes.
         async with session.begin_nested():
-            nation = await create_nation_core(
+            nation = await create_nation(
                 session=session,
-                founder_user_id=founder_user_id,
-                group_id=group_id,
-                nation_name=nation_name,
+                founder_id=founder_user_id,
+                name=nation_name,
                 currency_code=draft.currency_code,
+                is_private=False,
+                group_chat_id=group_id,
                 flag_emoji=flag_emoji,
             )
 
@@ -511,6 +511,7 @@ async def create_nation(
     currency_code: str,
     is_private: bool,
     group_chat_id: int | None,
+    flag_emoji: str = "🏴",
 ) -> Nation:
     eligibility = await check_nation_creation_eligibility(session, founder_id)
     if not eligibility.eligible:
