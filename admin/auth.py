@@ -43,12 +43,15 @@ class Settings(BaseSettings):
         if not self.ADMIN_USER_IDS:
             return []
         return [
-            int(x.strip())
-            for x in self.ADMIN_USER_IDS.split(",")
-            if x.strip()
+            int(value.strip())
+            for value in self.ADMIN_USER_IDS.split(",")
+            if value.strip()
         ]
 
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        extra="ignore",
+    )
 
 
 settings = Settings()
@@ -58,18 +61,22 @@ def validate_init_data(init_data_raw: str, bot_token: str) -> dict:
     decoded = unquote(init_data_raw)
     parts = decoded.split("&")
 
-    pairs: list[tuple[str, str]] = []
+    remaining_pairs: list[tuple[str, str]] = []
     received_hash: str | None = None
     auth_date_raw: str | None = None
 
     for part in parts:
         if "=" not in part:
             raise ValueError("Invalid initData")
+
         key, value = part.split("=", 1)
+
         if key == "hash":
             received_hash = value
             continue
-        pairs.append((key, value))
+
+        remaining_pairs.append((key, value))
+
         if key == "auth_date":
             auth_date_raw = value
 
@@ -87,9 +94,13 @@ def validate_init_data(init_data_raw: str, bot_token: str) -> dict:
     if time.time() - auth_date > 86400:
         raise ValueError("initData expired")
 
-    sorted_pairs = sorted(pairs, key=lambda item: item[0])
+    sorted_pairs = sorted(
+        remaining_pairs,
+        key=lambda item: item[0],
+    )
     data_check_string = "\n".join(
-        f"{key}={value}" for key, value in sorted_pairs
+        f"{key}={value}"
+        for key, value in sorted_pairs
     )
 
     secret_key = hmac.new(
@@ -107,8 +118,9 @@ def validate_init_data(init_data_raw: str, bot_token: str) -> dict:
     if not hmac.compare_digest(expected, received_hash):
         raise ValueError("Invalid hash")
 
-    user_raw = None
-    for key, value in pairs:
+    user_raw: str | None = None
+
+    for key, value in remaining_pairs:
         if key == "user":
             user_raw = value
             break
@@ -144,8 +156,10 @@ async def check_rate_limit(user_id: int, redis: Redis) -> None:
 
     try:
         count = await redis.incr(key)
+
         if count == 1:
             await redis.expire(key, 60)
+
         if count > 120:
             raise TooManyRequests()
     except TooManyRequests:
@@ -179,9 +193,13 @@ async def get_admin_user(
                 and dev_admin_id in settings.admin_ids
             ):
                 await check_rate_limit(dev_admin_id, redis)
-                return AdminUser(user_id=dev_admin_id, username="")
+                return AdminUser(
+                    user_id=dev_admin_id,
+                    username="",
+                )
 
         init_data = request.headers.get("X-Telegram-Init-Data")
+
         if not init_data:
             raise HTTPException(
                 status_code=401,
@@ -189,7 +207,10 @@ async def get_admin_user(
             )
 
         try:
-            user_data = validate_init_data(init_data, settings.BOT_TOKEN)
+            user_data = validate_init_data(
+                init_data,
+                settings.BOT_TOKEN,
+            )
         except ValueError as exc:
             raise HTTPException(
                 status_code=401,
@@ -216,6 +237,7 @@ async def get_admin_user(
             user_id=user_id,
             username=str(user_data.get("username", "")),
         )
+
     except HTTPException:
         raise
     except Exception:
@@ -226,4 +248,4 @@ async def get_admin_user(
         ) from None
 
 
-# ── END OF auth.py ──
+── END OF auth.py ──
