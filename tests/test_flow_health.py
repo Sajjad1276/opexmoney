@@ -156,6 +156,21 @@ def test_first_trade_keyboard_starts_the_trade_directly():
     assert callbacks == ["confirm_first_trade", "skip_first_trade"]
 
 
+def test_main_menu_has_no_more_button_and_max_five_rows():
+    markup = main_menu_keyboard()
+    rows = markup.keyboard
+    texts = [button.text for row in rows for button in row]
+    assert "☰ بیشتر" not in texts
+    assert len(rows) <= 5
+
+
+def test_nation_panel_hides_nation_scoped_sections_without_nation():
+    markup = nation_panel_keyboard(False, None)
+    texts = [button.text for row in markup.inline_keyboard for button in row]
+    assert "🏦 خزانه" not in texts
+    assert "📜 قانون اساسی" not in texts
+
+
 def test_main_reply_keyboard_has_only_text_buttons():
     markup = main_menu_keyboard()
     rows = markup.keyboard
