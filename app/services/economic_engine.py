@@ -188,13 +188,17 @@ async def calculate_rate_delta(
         nation.nation_id,
     )
 
-    raw_delta = (
+    market_score = (
         activity_score * Decimal("0.30")
         + trade_score * Decimal("0.25")
         + growth_score * Decimal("0.20")
         + pressure_signal * Decimal("0.15")
         + foreign_signal * Decimal("0.10")
-    ) * settings.rate_base_step
+    )
+    # Preserve the existing neutral-market baseline: a zero score remains
+    # a -0.50 offset, so a nation with no activity/trading does not jump
+    # from 1.0000 to 1.0000 merely because the factor weighting changed.
+    raw_delta = (market_score - Decimal("0.50")) * settings.rate_base_step
     volatility_multiplier = Decimal(str(
         await resolve(
             session,
