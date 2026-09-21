@@ -64,8 +64,27 @@ async def _send_governance_home(call: CallbackQuery | None, message: Message | N
     async with async_session() as session:
         async with session.begin():
             user = await session.get(User, user_id)
+            from app.services.nation_service import get_user_active_nation_context
+            nation_context = (
+                await get_user_active_nation_context(
+                    session,
+                    user_id,
+                    repair=True,
+                    lock=True,
+                )
+                if user is not None
+                else None
+            )
     if user is None:
         text = "🔴 حساب پیدا نشد. /start بزن."
+        if call:
+            await call.answer(text, show_alert=True)
+        else:
+            await message.answer(text)
+        return
+
+    if nation_context is None:
+        text = "⛔ این بخش فقط برای اعضای یک ملت در دسترس است."
         if call:
             await call.answer(text, show_alert=True)
         else:
