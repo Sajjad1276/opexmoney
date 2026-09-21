@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from decimal import Decimal
 from secrets import token_urlsafe
 
 from sqlalchemy import select
