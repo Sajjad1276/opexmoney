@@ -64,7 +64,6 @@ async def _send_governance_home(call: CallbackQuery | None, message: Message | N
     async with async_session() as session:
         async with session.begin():
             user = await session.get(User, user_id)
-            from app.services.nation_service import get_user_active_nation_context
             nation_context = (
                 await get_user_active_nation_context(
                     session,
