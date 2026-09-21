@@ -139,6 +139,10 @@ def validate_init_data(init_data_raw: str, bot_token: str) -> dict:
     return user_data
 
 
+# Backward-compatible public name used by the admin test and existing callers.
+validate_telegram_init_data = validate_init_data
+
+
 def check_is_admin(user_data: dict) -> int:
     try:
         user_id = int(user_data["id"])
