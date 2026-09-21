@@ -29,6 +29,7 @@ jobs:
     env:
       BOT_TOKEN: test-token
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/opex_test
+      REDIS_URL: redis://localhost:6379/0
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
