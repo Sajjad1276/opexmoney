@@ -289,7 +289,7 @@ async def show_dashboard(
         async with session.begin():
             dashboard = await build_live_dashboard(
                 session,
-                message.from_user.id,
+                user.user_id,
             )
 
     text = render_live_dashboard(dashboard)
