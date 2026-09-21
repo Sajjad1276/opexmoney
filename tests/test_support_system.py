@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.keyboards.inline import support_panel_keyboard, support_result_keyboard
+from app.services.support.code_repair import _policy_ok
 from app.services.support.models import (
     RepairAction,
     RepairResult,

@@ -33,9 +33,6 @@ def main_menu_keyboard() -> ReplyKeyboardMarkup:
                 KeyboardButton(text="🎓 آکادمی"),
             ],
             [
-                KeyboardButton(text="🛟 پشتیبانی هوشمند"),
-            ],
-            [
                 KeyboardButton(text="☰ بیشتر"),
             ],
         ],

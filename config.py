@@ -20,6 +20,11 @@ class Settings(BaseSettings):
     ai_cache_ttl_seconds: int = 120
     ai_last_message_ttl_seconds: int = 1800
     support_ai_enabled: bool = True
+    support_engineering_enabled: bool = True
+    support_github_token: str | None = None
+    github_token: str | None = None
+    support_github_repo: str = "Sajjad1276/opexmoney"
+    support_engineering_timeout_seconds: int = 420
     support_max_report_chars: int = 1200
     support_telemetry_ttl_seconds: int = 3600
 

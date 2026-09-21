@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import traceback
 from collections import defaultdict, deque
 from datetime import datetime, timezone
 from typing import Any
@@ -83,6 +84,9 @@ async def record_error(
         "event": _safe_text(event or "", 180) or None,
         "error_type": type(exception).__name__,
         "message": _safe_text(str(exception), 500),
+        "traceback": "".join(
+            traceback.format_exception(type(exception), exception, exception.__traceback__)
+        )[-8000:],
     }
     _errors[int(user_id)].append(item)
 

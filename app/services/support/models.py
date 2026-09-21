@@ -48,7 +48,17 @@ class RepairResult:
 
 
 @dataclass(frozen=True)
+class EngineeringResult:
+    status: str
+    summary: str
+    changed_files: tuple[str, ...] = ()
+    branch: str | None = None
+    pull_request: int | None = None
+
+
+@dataclass(frozen=True)
 class SupportResult:
     response_text: str
     diagnosis: SupportDiagnosis
     repair: RepairResult
+    engineering: EngineeringResult | None = None
