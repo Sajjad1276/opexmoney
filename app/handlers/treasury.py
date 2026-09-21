@@ -305,65 +305,6 @@ async def _render_treasury(
         return False
 
 
-@router.message(F.text == "🏦 خزانه")
-async def open_treasury_from_main_menu(
-    message: Message,
-    state: FSMContext,
-) -> None:
-    await state.clear()
-
-    try:
-        async with async_session() as session:
-            async with session.begin():
-                context = await get_user_active_nation_context(
-                    session,
-                    message.from_user.id,
-                    repair=True,
-                    lock=True,
-                )
-
-                if context is None:
-                    logger.warning(
-                        "TREASURY|resolve_failed|registered_user_without_active_nation"
-                    )
-                    await message.answer(
-                        "⚠️ هنوز ملت فعالی برای حسابت پیدا نشد.\n"
-                        "از «🌍 ملت‌ها» ملت فعال خودت را باز کن."
-                    )
-                    return
-
-                nation, role, source = context
-                nation_id = nation.nation_id
-                logger.info(
-                    "TREASURY|resolved|nation=%s|role=%s|source=%s",
-                    nation_id,
-                    role,
-                    source,
-                )
-
-                treasury = await get_treasury(session, nation_id)
-                if treasury is None:
-                    await message.answer("⚠️ خزانه هنوز راه‌اندازی نشده.")
-                    return
-
-                logs = await get_treasury_logs(session, nation_id, limit=5)
-                text = build_treasury_msg(treasury, logs)
-                markup = treasury_keyboard(nation_id, role)
-
-        await send_submenu_panel(
-            message,
-            text,
-            reply_markup=markup,
-            parse_mode="HTML",
-        )
-    except Exception:
-        logger.exception(
-            "Failed to open treasury from main menu for user=%s",
-            message.from_user.id,
-        )
-        await message.answer("⚠️ نمایش خزانه انجام نشد. دوباره تلاش کن.")
-
-
 @router.callback_query(F.data.regexp(r"^treasury:show:\d+(?::(?:dashboard|nations|management))?$"))
 async def show_treasury(callback: CallbackQuery, state: FSMContext) -> None:
     try:
