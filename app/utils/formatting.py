@@ -183,8 +183,7 @@ def format_market_page(user, overview: dict, active: int, trade_count: int) -> s
     if not currencies:
         return "⚠️ هنوز ارز فعالی برای نمایش بازار وجود ندارد."
 
-    beginner = trade_count < 2
-    if beginner:
+    if trade_count < 2:
         lines = [
             "💹 <b>بازار OPEX</b>",
             "<blockquote>⁠</blockquote>",
@@ -199,11 +198,12 @@ def format_market_page(user, overview: dict, active: int, trade_count: int) -> s
         ]
         for item in currencies[:6]:
             nation = item["nation"]
+            price = fmt_rate(item["current_rate"])
             change = float(item["change_24h"])
+            direction = _direction_emoji(change)
             lines.append(
-                f"{_direction(change)} <b>{html.escape(nation.currency_code)}</b> · "
-                f"<b>{fmt_rate(item['current_rate'])} دلار</b> · "
-                format_change_text(change, "24h")
+                f"{direction} <b>{html.escape(nation.currency_code)}</b> · "
+                f"<b>{price} دلار</b> · {format_change_text(change, '24h')}"
             )
         lines.extend([
             "",
@@ -214,26 +214,30 @@ def format_market_page(user, overview: dict, active: int, trade_count: int) -> s
     lines = [
         "💹 <b>بازار OPEX</b>",
         "<blockquote>⁠</blockquote>",
-        f"💰 دلار: <b>{fmt_amount(user.xr_balance)}</b>",
+        f"💰 دلار: <b>{fmt_amount(user.xr_balance)}</b> · "
+        f"{html.escape(user.home_nation_id and currencies[0]['nation'].currency_code or '—')}",
         "",
         "<blockquote>⁠</blockquote>",
-        overview.get("mood", ""),
+        overview["mood"],
         "<blockquote>⁠</blockquote>",
     ]
     winner_code, winner_pct = overview["top_mover"]["winner"]
     loser_code, loser_pct = overview["top_mover"]["loser"]
     if winner_code:
-        lines.append(f"🏆 بهترین: <b>{html.escape(winner_code)}</b> ▲ {format_percent_value(winner_pct)}")
+        lines.append(f"🏆 بهترین: {_format_mover(winner_code, winner_pct)}")
     if loser_code:
-        lines.append(f"💀 بدترین: <b>{html.escape(loser_code)}</b> ▼ {format_percent_value(loser_pct)}")
+        lines.append(f"💀 بدترین: {_format_mover(loser_code, loser_pct)}")
     lines.append("")
 
     for item in currencies:
         nation = item["nation"]
+        code = html.escape(nation.currency_code)
+        price = fmt_rate(item["current_rate"])
         change = float(item["change_24h"])
+        direction = _direction_emoji(change)
+        risk_title = html.escape(_risk_title(item["risk_label"]))
         lines.extend([
-            f"{_direction(change)} <b>{html.escape(nation.currency_code)}</b> [{html.escape(_risk_title(item['risk_label']))}] "
-            f"<b>{fmt_rate(item['current_rate'])} OPX</b>",
+            f"{direction} <b>{code}</b> [{risk_title}]  <b>{price} OPX</b>",
             f"   {format_change_text(change, '24h')}",
             f"   📊 حجم ۲۴ ساعت: <b>{format_volume(item['volume_24h'])} OPX</b>",
             f"   <i>{html.escape(item['insight'])}</i>",
@@ -242,12 +246,27 @@ def format_market_page(user, overview: dict, active: int, trade_count: int) -> s
         if sum(len(line) + 1 for line in lines) > 3300:
             lines.append("… فقط بخشی از ارزها در این صفحه نمایش داده شد.")
             break
+
     lines.extend([
         "<blockquote>⁠</blockquote>",
         f"⏱ بروزرسانی نرخ‌ها هر ۱۵ دقیقه · 👥 {to_fa(active)} عضو فعال ملت اصلی",
     ])
     return "\n".join(lines)
 
+
+def _direction_emoji(change: float) -> str:
+    if change > 0:
+        return "🟢"
+    if change < 0:
+        return "🔴"
+    return "🟡"
+
+
+def _format_mover(code: str | None, pct: float) -> str:
+    if not code:
+        return "—"
+    arrow = "▲" if pct > 0 else "▼" if pct < 0 else "➡️"
+    return f"{html.escape(code)} {arrow} {format_percent_value(pct)}"
 
 def format_listed_currencies(page) -> str:
     if page.total_count == 0:
