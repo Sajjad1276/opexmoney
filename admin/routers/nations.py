@@ -64,19 +64,6 @@ async def list_nations(
         raise HTTPException(status_code=400, detail="Invalid sort field")
     sort_expr = sort_expr.asc() if order == "asc" else sort_expr.desc()
 
-    active_war = (
-        select(NationWar.id)
-        .where(
-            NationWar.status == "active",
-            or_(
-                NationWar.nation_id == Nation.nation_id,
-                NationWar.opponent_nation_id == Nation.nation_id,
-            ),
-        )
-        .correlate(Nation)
-        .exists()
-    )
-
     rows = (
         await db.execute(
             select(Nation).where(Nation.deleted_at.is_(None), Nation.is_active.is_(True))
@@ -91,7 +78,19 @@ async def list_nations(
         opened = float(nation.rate_24h_open or 0)
         current = float(nation.exchange_rate or 0)
         change = ((current - opened) / opened * 100) if opened else 0.0
-        at_war = bool(await db.scalar(select(active_war.where(Nation.nation_id == nation.nation_id))))
+        at_war = bool(
+            await db.scalar(
+                select(NationWar.id)
+                .where(
+                    NationWar.status == "active",
+                    or_(
+                        NationWar.nation_id == nation.nation_id,
+                        NationWar.opponent_nation_id == nation.nation_id,
+                    ),
+                )
+                .limit(1)
+            )
+        )
         items.append(
             NationListItem(
                 nation_id=nation.nation_id,
