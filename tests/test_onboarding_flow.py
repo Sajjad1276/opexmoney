@@ -7,7 +7,8 @@ from types import SimpleNamespace
 import pytest
 from sqlalchemy import delete, select
 
-import app.handlers.start as start_module
+import app.handlers.onboarding as onboarding_module
+import app.handlers.start_flow as start_flow_module
 from app.database.models import CurrencyHolding, Nation, Transaction, User, UserActivity
 from app.database.session import async_session
 from app.states.onboarding import OnboardingStates
@@ -158,7 +159,7 @@ async def test_registration_to_first_trade_journey():
     call = FakeCall(USER_ID, f"confirm_nation:{nation_id}")
     bot = FakeBot()
 
-    await start_module.confirm_nation(call, state, bot)
+    await onboarding_module.confirm_nation(call, state, bot)
 
     async with async_session() as session:
         user = await session.get(User, USER_ID)
@@ -183,11 +184,11 @@ async def test_registration_to_first_trade_journey():
     assert call.message.edits
 
     tutorial = FakeCall(USER_ID, "first_trade_tutorial")
-    await start_module.first_trade_tutorial(tutorial, state)
+    await start_flow_module.first_trade_tutorial(tutorial, state)
     assert tutorial.message.edits
 
     confirm = FakeCall(USER_ID, "confirm_first_trade")
-    await start_module.confirm_first_trade(confirm, state)
+    await start_flow_module.confirm_first_trade(confirm, state)
 
     async with async_session() as session:
         user = await session.get(User, USER_ID)
