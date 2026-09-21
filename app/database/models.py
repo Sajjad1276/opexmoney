@@ -25,8 +25,9 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.dialects.postgresql import ENUM as PGEnum, JSONB
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, synonym
+from sqlalchemy.orm import Mapped, mapped_column, relationship, synonym
 from sqlalchemy.types import TypeDecorator
+from .session import Base
 
 
 def utcnow() -> datetime:
@@ -95,15 +96,6 @@ def enum_type(enum_cls: type[StrEnum], name: str) -> SAEnum:
         create_constraint=True,
         values_callable=lambda values: [item.value for item in values],
     )
-
-
-class Base(DeclarativeBase):
-    def __repr__(self) -> str:
-        values = []
-        for column in self.__table__.primary_key.columns:
-            values.append(f"{column.key}={getattr(self, column.key, None)!r}")
-        identity = ", ".join(values) or "no-primary-key"
-        return f"<{type(self).__name__} {identity}>"
 
 
 class ActivityType(StrEnum):
