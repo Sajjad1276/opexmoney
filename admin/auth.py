@@ -139,8 +139,49 @@ def validate_init_data(init_data_raw: str, bot_token: str) -> dict:
     return user_data
 
 
-# Backward-compatible public name used by the admin test and existing callers.
-validate_telegram_init_data = validate_init_data
+def validate_telegram_init_data(init_data_raw: str) -> int:
+    """Validate Telegram init data and return an authorized admin user id.
+
+    This preserves the older public API used by existing callers and tests.
+    """
+    bot_token = os.getenv("BOT_TOKEN") or settings.BOT_TOKEN
+
+    try:
+        user_data = validate_init_data(init_data_raw, bot_token)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=401,
+            detail=str(exc),
+        ) from exc
+
+    raw_admin_ids = os.getenv("ADMIN_USER_IDS", settings.ADMIN_USER_IDS)
+    try:
+        admin_ids = {
+            int(value.strip())
+            for value in raw_admin_ids.split(",")
+            if value.strip()
+        }
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=500,
+            detail="Invalid admin configuration",
+        ) from exc
+
+    try:
+        user_id = int(user_data["id"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid user data",
+        ) from exc
+
+    if user_id not in admin_ids:
+        raise HTTPException(
+            status_code=403,
+            detail="Forbidden",
+        )
+
+    return user_id
 
 
 def check_is_admin(user_data: dict) -> int:
@@ -183,6 +224,12 @@ async def get_admin_user(
     request: Request,
     redis: Redis = Depends(get_redis),
 ) -> AdminUser:
+    if request is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Missing auth",
+        )
+
     try:
         dev_admin_id_raw = request.headers.get("X-Dev-Admin-Id")
 
