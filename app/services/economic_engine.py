@@ -10,6 +10,7 @@ from app.database.models import (
     BehaviorSnapshot,
     Nation,
     NationMemberHistory,
+    NationTelegramMember,
     NationRank,
     RateHistory,
     User,
@@ -48,23 +49,51 @@ async def update_nation_rates(
     ).scalars().all()
 
     for nation in nations:
-        active = (
-            await session.scalar(
-                select(func.count(distinct(UserActivity.user_id))).where(
-                    UserActivity.nation_id == nation.nation_id,
-                    UserActivity.created_at >= since_24h,
+        if nation.is_ai:
+            active = (
+                await session.scalar(
+                    select(func.count(distinct(UserActivity.user_id))).where(
+                        UserActivity.nation_id == nation.nation_id,
+                        UserActivity.created_at >= since_24h,
+                    )
                 )
+                or 0
             )
-            or 0
-        )
-        total = (
-            await session.scalar(
-                select(func.count(User.user_id)).where(
-                    User.home_nation_id == nation.nation_id
+            total = (
+                await session.scalar(
+                    select(func.count(User.user_id)).where(
+                        User.home_nation_id == nation.nation_id
+                    )
                 )
+                or 0
             )
-            or 0
-        )
+        else:
+            total = (
+                await session.scalar(
+                    select(func.count(NationTelegramMember.id)).where(
+                        NationTelegramMember.nation_id == nation.nation_id,
+                        NationTelegramMember.is_active.is_(True),
+                    )
+                )
+                or 0
+            )
+            active = (
+                await session.scalar(
+                    select(func.count(distinct(UserActivity.user_id)))
+                    .join(
+                        NationTelegramMember,
+                        NationTelegramMember.telegram_user_id == UserActivity.user_id,
+                    )
+                    .where(
+                        UserActivity.nation_id == nation.nation_id,
+                        UserActivity.created_at >= since_24h,
+                        NationTelegramMember.nation_id == nation.nation_id,
+                        NationTelegramMember.is_active.is_(True),
+                    )
+                )
+                or 0
+            )
+            nation.member_count = int(total)
 
         f_activity = (
             Decimal(active) / Decimal(total)
@@ -237,12 +266,24 @@ async def get_active_members(
     hours: int = 24,
 ) -> int:
     since = datetime.utcnow() - timedelta(hours=hours)
-    return int(
-        await session.scalar(
-            select(func.count(distinct(UserActivity.user_id))).where(
-                UserActivity.nation_id == nation_id,
-                UserActivity.created_at >= since,
-            )
+    nation = await session.get(Nation, nation_id)
+    if nation is None:
+        return 0
+
+    stmt = (
+        select(func.count(distinct(UserActivity.user_id)))
+        .where(
+            UserActivity.nation_id == nation_id,
+            UserActivity.created_at >= since,
         )
-        or 0
     )
+    if not nation.is_ai:
+        stmt = stmt.join(
+            NationTelegramMember,
+            NationTelegramMember.telegram_user_id == UserActivity.user_id,
+        ).where(
+            NationTelegramMember.nation_id == nation_id,
+            NationTelegramMember.is_active.is_(True),
+        )
+
+    return int(await session.scalar(stmt) or 0)
