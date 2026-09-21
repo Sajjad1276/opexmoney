@@ -142,7 +142,13 @@ async def back_to_nations_panel(call: CallbackQuery) -> None:
                 await call.answer("⚠️ اول باید وارد بازی بشی.", show_alert=True)
                 return
             is_manager = _can_manage(user)
-            nation_id = user.home_nation_id
+            context = await get_user_active_nation_context(
+                session,
+                call.from_user.id,
+                repair=True,
+                lock=True,
+            )
+            nation_id = context[0].nation_id if context is not None else None
     if call.message:
         await call.message.edit_text(
             "🌍 <b>ملت‌ها</b>\nاینجا می‌تونی ملت‌ها رو بررسی کنی.\nاز گزینه‌ها برای ادامه استفاده کن.",
