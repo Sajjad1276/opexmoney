@@ -209,9 +209,7 @@ async def give_bonus(
 ) -> UpdatedActionResponse:
     _confirm_or_raise(confirm)
 
-    from decimal import Decimal
-
-    amount_xr = Decimal(str(payload.amount_xr))
+    amount_xr = payload.amount_xr
 
     if payload.user_ids == "all":
         result = await db.execute(
