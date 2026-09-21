@@ -20,7 +20,6 @@ from app.database.models import (
     CurrencyHolding,
     Nation,
     Transaction,
-    TradePreview,
     User,
     UserActivity,
 )
@@ -40,6 +39,13 @@ from app.services.market_service import (
     get_listed_currencies_page,
     get_user_sell_holdings,
 )
+from app.services.trade_service import (
+    execute_buy,
+    execute_sell,
+    parse_trade_amount,
+    prepare_buy_preview,
+    prepare_sell_preview,
+)
 from app.services.alert_service import (
     create_price_alert,
     delete_price_alert,
@@ -54,13 +60,10 @@ from app.services.market_intelligence import (
     get_risk_label,
 )
 from app.services.mission_service import increment_mission
-from app.services.user_service import sync_user_balance
-from app.services.rules.resolver import resolve
-from app.services.temporal_service import get_peak_multiplier
+
 from app.states.market import MarketStates
 from app.utils.ui import close_inline_panel, remember_inline_panel, send_submenu_panel
 from app.utils.formatting import (
-    calc_trade,
     fmt_amount,
     fmt_pct,
     fmt_rate,
@@ -93,26 +96,6 @@ async def safe_edit(call, text, markup=None):
 def _fmt_rule_percent(value: Decimal) -> str:
     normalized = Decimal(str(value)).normalize()
     return to_fa(f"{normalized:f}") + "٪"
-
-
-async def _trade_parameters(
-    session,
-    *,
-    user_id: int,
-    nation_id: int,
-) -> tuple[Decimal, Decimal]:
-    fee_rate = Decimal(
-        str(
-            await resolve(
-                session,
-                "market.tx_fee",
-                nation_id=nation_id,
-                player_id=user_id,
-            )
-        )
-    )
-    peak_multiplier = await get_peak_multiplier(session, user_id)
-    return fee_rate, peak_multiplier
 
 
 def _direction_emoji(change: float) -> str:
@@ -806,102 +789,44 @@ async def make_buy_preview(
     *,
     user_id: int | None = None,
 ):
-    try:
-        spend = Decimal(
-            raw.strip()
-            .replace("٬", "")
-            .replace(",", "")
-            .replace("٫", ".")
-        )
-    except InvalidOperation:
-        await message.answer("🔴 فقط عدد بنویس — مثلاً: 250", parse_mode="HTML")
-        return
-
-    if spend < 10:
-        await message.answer(
-            "🔴 حداقل مقدار خرید 10 دلار است.",
-            parse_mode="HTML",
-        )
-        return
-
     actor_user_id = user_id if user_id is not None else message.from_user.id
-
-    async with async_session() as session:
-        async with session.begin():
-            user = await session.get(User, actor_user_id)
-            nation = await session.get(Nation, nation_id)
-
-            if not user or not nation:
-                await message.answer(
-                    "⚠️ اطلاعات معامله پیدا نشد.",
-                    parse_mode="HTML",
-                )
-                return
-
-            if spend > user.xr_balance:
-                await message.answer(
-                    f"🔴 موجودی کافی نیست.\n"
-                    f"موجودی: {fmt_amount(user.xr_balance)} دلار\n"
-                    f"مبلغ وارد شده: {fmt_amount(spend)} دلار\n\n"
-                    "مبلغ کمتری وارد کن.",
-                    parse_mode="HTML",
-                )
-                return
-
-            fee_rate, peak_multiplier = await _trade_parameters(
-                session,
-                user_id=user.user_id,
-                nation_id=nation_id,
-            )
-            calc = calc_trade(
-                spend,
-                nation.exchange_rate,
-                True,
-                fee_rate_percent=fee_rate,
-                benefit_multiplier=peak_multiplier,
-            )
-            holding = await session.scalar(
-                select(CurrencyHolding).where(
-                    CurrencyHolding.user_id == user.user_id,
-                    CurrencyHolding.nation_id == nation_id,
-                )
-            )
-            current = holding.amount if holding else Decimal("0")
-
-            session.add(
-                TradePreview(
-                    user_id=user.user_id,
+    try:
+        spend = parse_trade_amount(raw)
+        async with async_session() as session:
+            async with session.begin():
+                result = await prepare_buy_preview(
+                    session,
+                    user_id=actor_user_id,
                     nation_id=nation_id,
-                    side="buy",
                     spend=spend,
-                    preview_rate=nation.exchange_rate,
                 )
-            )
-
-            peak_signal = (
-                "\n📈 <i>بازار الان با تو راه میاد.</i>\n"
-                if peak_multiplier > Decimal("1")
-                else ""
-            )
-            text = (
-                "📈 <b>تأیید خرید</b>\n"
-                "<blockquote>⁠</blockquote>\n"
-                f"📤 پرداخت:   <b>{fmt_amount(spend)} دلار</b>\n"
-                f"📥 دریافت:   <b>{fmt_amount(calc['receive'])} "
-                f"{html.escape(nation.currency_code)}</b>\n\n"
-                "<blockquote>⁠</blockquote>\n"
-                f"💹 نرخ: <code>1 {html.escape(nation.currency_code)} = "
-                f"{fmt_rate(nation.exchange_rate)} دلار</code>\n"
-                f"📋 کارمزد: <b>{fmt_amount(calc['fee'])} دلار</b> "
-                f"({_fmt_rule_percent(fee_rate)})\n"
-                f"{peak_signal}\n"
-                "<blockquote>⁠</blockquote>\n"
-                "<b>موجودی بعد از معامله:</b>\n"
-                f"دلار: <b>{fmt_amount(user.xr_balance - spend)}</b>\n"
-                f"{html.escape(nation.currency_code)}: "
-                f"<b>{fmt_amount(current + calc['receive'])}</b>\n"
-                "<blockquote>⁠</blockquote>"
-            )
+                peak_signal = (
+                    "\n📈 <i>بازار الان با تو راه میاد.</i>\n"
+                    if result.peak_multiplier > Decimal("1")
+                    else ""
+                )
+                text = (
+                    "📈 <b>تأیید خرید</b>\n"
+                    "<blockquote>⁠</blockquote>\n"
+                    f"📤 پرداخت:   <b>{fmt_amount(result.spend)} دلار</b>\n"
+                    f"📥 دریافت:   <b>{fmt_amount(result.receive)} "
+                    f"{html.escape(result.nation.currency_code)}</b>\n\n"
+                    "<blockquote>⁠</blockquote>\n"
+                    f"💹 نرخ: <code>1 {html.escape(result.nation.currency_code)} = "
+                    f"{fmt_rate(result.nation.exchange_rate)} دلار</code>\n"
+                    f"📋 کارمزد: <b>{fmt_amount(result.fee)} دلار</b> "
+                    f"({_fmt_rule_percent(result.fee_rate)})\n"
+                    f"{peak_signal}\n"
+                    "<blockquote>⁠</blockquote>\n"
+                    "<b>موجودی بعد از معامله:</b>\n"
+                    f"دلار: <b>{fmt_amount(result.user.xr_balance - result.spend)}</b>\n"
+                    f"{html.escape(result.nation.currency_code)}: "
+                    f"<b>{fmt_amount(result.current_holding + result.receive)}</b>\n"
+                    "<blockquote>⁠</blockquote>"
+                )
+    except ValueError as exc:
+        await message.answer(f"🔴 {html.escape(str(exc))}", parse_mode="HTML")
+        return
 
     await close_inline_panel(state, message.bot)
     await state.clear()
@@ -975,143 +900,37 @@ async def confirm_buy(call, state=None):
     _, nation_id_raw, spend_raw = call.data.split("_", 2)
     nation_id = int(nation_id_raw)
     spend = Decimal(spend_raw)
-    text = None
 
-    async with async_session() as session:
-        async with session.begin():
-            user = (
-                await session.execute(
-                    select(User)
-                    .where(User.user_id == call.from_user.id)
-                    .with_for_update()
-                )
-            ).scalar_one_or_none()
-            nation = await session.get(Nation, nation_id, with_for_update=True)
-            preview = (
-                await session.scalar(
-                    select(TradePreview)
-                    .where(
-                        TradePreview.user_id == call.from_user.id,
-                        TradePreview.nation_id == nation_id,
-                        TradePreview.side == "buy",
-                        TradePreview.spend == spend,
-                    )
-                    .order_by(TradePreview.created_at.desc())
-                    .limit(1)
-                )
-                if user
-                else None
-            )
-
-            if not user or not nation or not preview:
-                await call.answer(
-                    "⏱ پیش‌نمایش منقضی شد. دوباره مقدار رو وارد کن.",
-                    show_alert=True,
-                )
-                return
-
-            if (
-                abs(nation.exchange_rate - preview.preview_rate)
-                / preview.preview_rate
-                > Decimal("0.01")
-            ):
-                await call.answer(
-                    "⚠️ نرخ تغییر کرد. پیش‌نمایش جدید رو تأیید کن.",
-                    show_alert=True,
-                )
-                return
-
-            if user.xr_balance < spend:
-                await call.answer("🔴 موجودی کافی نیست.", show_alert=True)
-                return
-
-            fee_rate, peak_multiplier = await _trade_parameters(
-                session,
-                user_id=user.user_id,
-                nation_id=nation_id,
-            )
-            calc = calc_trade(
-                spend,
-                nation.exchange_rate,
-                True,
-                fee_rate_percent=fee_rate,
-                benefit_multiplier=peak_multiplier,
-            )
-            holding = await session.scalar(
-                select(CurrencyHolding)
-                .where(
-                    CurrencyHolding.user_id == user.user_id,
-                    CurrencyHolding.nation_id == nation_id,
-                )
-                .with_for_update()
-            )
-            if holding is None:
-                holding = CurrencyHolding(
-                    user_id=user.user_id,
-                    nation_id=nation_id,
-                    amount=Decimal("0"),
-                )
-                session.add(holding)
-                await session.flush()
-
-            user.xr_balance -= spend
-            holding.amount += calc["receive"]
-            nation.trade_volume_24h += spend
-
-            session.add(
-                Transaction(
-                    user_id=user.user_id,
-                    nation_id=nation_id,
-                    transaction_type="buy",
-                    spend_xr=spend,
-                    amount=calc["receive"],
-                    fee_xr=calc["fee"],
-                    rate=nation.exchange_rate,
-                )
-            )
-            session.add(
-                UserActivity(
-                    user_id=user.user_id,
-                    nation_id=nation_id,
-                    activity_type="trade",
-                )
-            )
-            await session.delete(preview)
-
-            peak_signal = (
-                "\n📈 بازار الان با تو راه میاد."
-                if peak_multiplier > Decimal("1")
-                else ""
-            )
-            text = (
-                "✅ <b>خرید انجام شد.</b>\n"
-                "<blockquote>⁠</blockquote>\n"
-                f"📤 پرداختی: <s>{fmt_amount(spend)} دلار</s>\n"
-                f"📥 دریافتی: <b>{fmt_amount(calc['receive'])} "
-                f"{html.escape(nation.currency_code)}</b>\n"
-                f"{peak_signal}\n"
-                "<blockquote>⁠</blockquote>\n"
-                "💰 موجودی:\n"
-                f"دلار: <b>{fmt_amount(user.xr_balance)}</b>\n"
-                f"{html.escape(nation.currency_code)}: "
-                f"<b>{fmt_amount(holding.amount)}</b>"
-            )
-
-            try:
-                await increment_mission(session, user.user_id, "DAILY_TRADE_1")
-                await increment_mission(session, user.user_id, "WEEKLY_BUY_5")
-                await increment_mission(
+    try:
+        async with async_session() as session:
+            async with session.begin():
+                result = await execute_buy(
                     session,
-                    user.user_id,
-                    "WEEKLY_TRADE_VOLUME",
-                    amount=int(calc["receive"]),
+                    user_id=call.from_user.id,
+                    nation_id=nation_id,
+                    spend=spend,
                 )
-                await increment_mission(session, user.user_id, "FIRST_TRADE")
-            except Exception:
-                logger.exception(
-                    "Mission trigger failed after buy for user %s",
-                    user.user_id,
+                peak_signal = (
+                    "\n📈 بازار الان با تو راه میاد."
+                    if result.peak_multiplier > Decimal("1")
+                    else ""
                 )
+                text = (
+                    "✅ <b>خرید انجام شد.</b>\n"
+                    "<blockquote>⁠</blockquote>\n"
+                    f"📤 پرداختی: <s>{fmt_amount(result.spend)} دلار</s>\n"
+                    f"📥 دریافتی: <b>{fmt_amount(result.receive)} "
+                    f"{html.escape(result.nation.currency_code)}</b>\n"
+                    f"{peak_signal}\n"
+                    "<blockquote>⁠</blockquote>\n"
+                    "💰 موجودی:\n"
+                    f"دلار: <b>{fmt_amount(result.user.xr_balance)}</b>\n"
+                    f"{html.escape(result.nation.currency_code)}: "
+                    f"<b>{fmt_amount(result.holding.amount)}</b>"
+                )
+    except ValueError as exc:
+        await call.answer(f"🔴 {html.escape(str(exc))}", show_alert=True)
+        return
 
     await safe_edit(call, text, market_keyboard_for_nation(nation_id))
     await call.answer("✅ خرید انجام شد")
@@ -1229,100 +1048,46 @@ async def make_sell_preview(
     *,
     user_id: int | None = None,
 ):
-    try:
-        amount = Decimal(
-            raw.strip()
-            .replace("٬", "")
-            .replace(",", "")
-            .replace("٫", ".")
-        )
-    except InvalidOperation:
-        await message.answer("🔴 فقط عدد بنویس — مثلاً: 50", parse_mode="HTML")
-        return
-
-    if amount <= 0:
-        await message.answer(
-            "🔴 مقدار باید بیشتر از صفر باشه.",
-            parse_mode="HTML",
-        )
-        return
-
     actor_user_id = user_id if user_id is not None else message.from_user.id
-
-    async with async_session() as session:
-        async with session.begin():
-            nation = await session.get(Nation, nation_id)
-            user = await session.get(User, actor_user_id)
-            holding = await session.scalar(
-                select(CurrencyHolding).where(
-                    CurrencyHolding.user_id == actor_user_id,
-                    CurrencyHolding.nation_id == nation_id,
-                )
-            )
-            if not nation or not user or not holding:
-                await message.answer(
-                    "⚠️ موجودی این ارز پیدا نشد.",
-                    parse_mode="HTML",
-                )
-                return
-            if holding.amount < amount:
-                await message.answer(
-                    f"🔴 موجودی کافی نیست.\n"
-                    f"موجودی: {fmt_amount(holding.amount)} "
-                    f"{html.escape(nation.currency_code)}\n"
-                    f"مبلغ وارد شده: {fmt_amount(amount)} "
-                    f"{html.escape(nation.currency_code)}",
-                    parse_mode="HTML",
-                )
-                return
-
-            fee_rate, peak_multiplier = await _trade_parameters(
-                session,
-                user_id=user.user_id,
-                nation_id=nation_id,
-            )
-            calc = calc_trade(
-                amount,
-                nation.exchange_rate,
-                False,
-                fee_rate_percent=fee_rate,
-                benefit_multiplier=peak_multiplier,
-            )
-            session.add(
-                TradePreview(
-                    user_id=user.user_id,
+    try:
+        amount = parse_trade_amount(raw)
+        async with async_session() as session:
+            async with session.begin():
+                result = await prepare_sell_preview(
+                    session,
+                    user_id=actor_user_id,
                     nation_id=nation_id,
-                    side="sell",
-                    spend=amount,
-                    preview_rate=nation.exchange_rate,
+                    amount=amount,
                 )
-            )
-            xr_after = user.xr_balance + calc["receive"]
-            currency_after = holding.amount - amount
-            peak_signal = (
-                "\n📈 <i>بازار الان با تو راه میاد.</i>\n"
-                if peak_multiplier > Decimal("1")
-                else ""
-            )
-            text = (
-                "📉 <b>تأیید فروش</b>\n"
-                "<blockquote>⁠</blockquote>\n"
-                f"📤 فروش:     <b>{fmt_amount(amount)} "
-                f"{html.escape(nation.currency_code)}</b>\n"
-                f"📥 دریافت:   <b>{fmt_amount(calc['receive'])} دلار</b>\n\n"
-                "<blockquote>⁠</blockquote>\n"
-                f"💹 نرخ: <code>1 {html.escape(nation.currency_code)} = "
-                f"{fmt_rate(nation.exchange_rate)} دلار</code>\n"
-                f"📋 کارمزد: <b>{fmt_amount(calc['fee'])} دلار</b> "
-                f"({_fmt_rule_percent(fee_rate)})\n"
-                f"{peak_signal}\n"
-                "<blockquote>⁠</blockquote>\n"
-                "<b>موجودی بعد از معامله:</b>\n"
-                f"دلار: <b>{fmt_amount(xr_after)}</b>\n"
-                f"{html.escape(nation.currency_code)}: "
-                f"<b>{fmt_amount(currency_after)}</b>\n"
-                "<blockquote>⁠</blockquote>"
-            )
+                xr_after = result.user.xr_balance + result.receive
+                currency_after = result.current_holding - result.spend
+                peak_signal = (
+                    "\n📈 <i>بازار الان با تو راه میاد.</i>\n"
+                    if result.peak_multiplier > Decimal("1")
+                    else ""
+                )
+                text = (
+                    "📉 <b>تأیید فروش</b>\n"
+                    "<blockquote>⁠</blockquote>\n"
+                    f"📤 فروش:     <b>{fmt_amount(result.spend)} "
+                    f"{html.escape(result.nation.currency_code)}</b>\n"
+                    f"📥 دریافت:   <b>{fmt_amount(result.receive)} دلار</b>\n\n"
+                    "<blockquote>⁠</blockquote>\n"
+                    f"💹 نرخ: <code>1 {html.escape(result.nation.currency_code)} = "
+                    f"{fmt_rate(result.nation.exchange_rate)} دلار</code>\n"
+                    f"📋 کارمزد: <b>{fmt_amount(result.fee)} دلار</b> "
+                    f"({_fmt_rule_percent(result.fee_rate)})\n"
+                    f"{peak_signal}\n"
+                    "<blockquote>⁠</blockquote>\n"
+                    "<b>موجودی بعد از معامله:</b>\n"
+                    f"دلار: <b>{fmt_amount(xr_after)}</b>\n"
+                    f"{html.escape(result.nation.currency_code)}: "
+                    f"<b>{fmt_amount(currency_after)}</b>\n"
+                    "<blockquote>⁠</blockquote>"
+                )
+    except ValueError as exc:
+        await message.answer(f"🔴 {html.escape(str(exc))}", parse_mode="HTML")
+        return
 
     await close_inline_panel(state, message.bot)
     await state.clear()
@@ -1385,142 +1150,37 @@ async def confirm_sell(call, state=None):
     _, nation_id_raw, amount_raw = call.data.split("_", 2)
     nation_id = int(nation_id_raw)
     amount = Decimal(amount_raw)
-    text = None
 
-    async with async_session() as session:
-        async with session.begin():
-            user = (
-                await session.execute(
-                    select(User)
-                    .where(User.user_id == call.from_user.id)
-                    .with_for_update()
-                )
-            ).scalar_one_or_none()
-            nation = await session.get(
-                Nation,
-                nation_id,
-                with_for_update=True,
-            )
-            preview = (
-                await session.scalar(
-                    select(TradePreview)
-                    .where(
-                        TradePreview.user_id == call.from_user.id,
-                        TradePreview.nation_id == nation_id,
-                        TradePreview.side == "sell",
-                        TradePreview.spend == amount,
-                    )
-                    .order_by(TradePreview.created_at.desc())
-                    .limit(1)
-                )
-                if user
-                else None
-            )
-            holding = (
-                await session.scalar(
-                    select(CurrencyHolding)
-                    .where(
-                        CurrencyHolding.user_id == call.from_user.id,
-                        CurrencyHolding.nation_id == nation_id,
-                    )
-                    .with_for_update()
-                )
-                if user
-                else None
-            )
-
-            if not user or not nation or not preview or not holding:
-                await call.answer(
-                    "⏱ پیش‌نمایش منقضی شد. دوباره مقدار رو وارد کن.",
-                    show_alert=True,
-                )
-                return
-
-            if (
-                abs(nation.exchange_rate - preview.preview_rate)
-                / preview.preview_rate
-                > Decimal("0.01")
-            ):
-                await call.answer(
-                    "⚠️ نرخ تغییر کرد. پیش‌نمایش جدید رو تأیید کن.",
-                    show_alert=True,
-                )
-                return
-
-            if holding.amount < amount:
-                await call.answer("🔴 موجودی کافی نیست.", show_alert=True)
-                return
-
-            fee_rate, peak_multiplier = await _trade_parameters(
-                session,
-                user_id=user.user_id,
-                nation_id=nation_id,
-            )
-            calc = calc_trade(
-                amount,
-                nation.exchange_rate,
-                False,
-                fee_rate_percent=fee_rate,
-                benefit_multiplier=peak_multiplier,
-            )
-            holding.amount -= amount
-            user.xr_balance += calc["receive"]
-            nation.trade_volume_24h += amount * nation.exchange_rate
-
-            session.add(
-                Transaction(
-                    user_id=user.user_id,
-                    nation_id=nation_id,
-                    transaction_type="sell",
-                    spend_xr=amount * nation.exchange_rate,
-                    amount=amount,
-                    fee_xr=calc["fee"],
-                    rate=nation.exchange_rate,
-                )
-            )
-            session.add(
-                UserActivity(
-                    user_id=user.user_id,
-                    nation_id=nation_id,
-                    activity_type="trade",
-                )
-            )
-            await sync_user_balance(session, user.user_id)
-            await session.delete(preview)
-
-            peak_signal = (
-                "\n📈 بازار الان با تو راه میاد."
-                if peak_multiplier > Decimal("1")
-                else ""
-            )
-            text = (
-                "✅ <b>فروش انجام شد.</b>\n"
-                "<blockquote>⁠</blockquote>\n"
-                f"📤 فروختی:  <b>{fmt_amount(amount)} "
-                f"{html.escape(nation.currency_code)}</b>\n"
-                f"📥 دریافتی: <b>{fmt_amount(calc['receive'])} دلار</b>\n"
-                f"{peak_signal}\n"
-                "<blockquote>⁠</blockquote>\n"
-                "💰 موجودی:\n"
-                f"دلار: <b>{fmt_amount(user.xr_balance)}</b>\n"
-                f"{html.escape(nation.currency_code)}: "
-                f"<b>{fmt_amount(holding.amount)}</b>"
-            )
-
-            try:
-                await increment_mission(session, user.user_id, "DAILY_TRADE_1")
-                await increment_mission(
+    try:
+        async with async_session() as session:
+            async with session.begin():
+                result = await execute_sell(
                     session,
-                    user.user_id,
-                    "WEEKLY_TRADE_VOLUME",
-                    amount=int(amount),
+                    user_id=call.from_user.id,
+                    nation_id=nation_id,
+                    amount=amount,
                 )
-                await increment_mission(session, user.user_id, "FIRST_TRADE")
-            except Exception:
-                logger.exception(
-                    "Mission trigger failed after sell for user %s",
-                    user.user_id,
+                peak_signal = (
+                    "\n📈 بازار الان با تو راه میاد."
+                    if result.peak_multiplier > Decimal("1")
+                    else ""
                 )
+                text = (
+                    "✅ <b>فروش انجام شد.</b>\n"
+                    "<blockquote>⁠</blockquote>\n"
+                    f"📤 فروختی:  <b>{fmt_amount(result.spend)} "
+                    f"{html.escape(result.nation.currency_code)}</b>\n"
+                    f"📥 دریافتی: <b>{fmt_amount(result.receive)} دلار</b>\n"
+                    f"{peak_signal}\n"
+                    "<blockquote>⁠</blockquote>\n"
+                    "💰 موجودی:\n"
+                    f"دلار: <b>{fmt_amount(result.user.xr_balance)}</b>\n"
+                    f"{html.escape(result.nation.currency_code)}: "
+                    f"<b>{fmt_amount(result.holding.amount)}</b>"
+                )
+    except ValueError as exc:
+        await call.answer(f"🔴 {html.escape(str(exc))}", show_alert=True)
+        return
 
     await safe_edit(call, text, market_keyboard_for_nation(nation_id))
     await call.answer("✅ فروش انجام شد")
