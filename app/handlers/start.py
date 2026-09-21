@@ -29,7 +29,6 @@ from app.utils.name_filter import TRADER_NAME_RE, is_blocked_trader_name, is_val
 from app.keyboards.inline import (
     cancel_keyboard,
     first_trade_keyboard,
-    more_menu_keyboard,
     suggested_name_keyboard,
     nation_selection_keyboard,
     trade_confirmation_keyboard,
@@ -914,39 +913,6 @@ async def choose_custom_name(call: CallbackQuery, state: FSMContext) -> None:
             reply_markup=cancel_keyboard(),
             parse_mode="HTML",
         )
-
-
-@router.message(F.text == "☰ بیشتر")
-async def open_more_menu(message: Message) -> None:
-    await message.answer(
-        rtl_html("☰ <b>بخش‌های بیشتر</b>\n\nقابلیت‌های مدیریتی و جزئی‌تر اینجا قرار دارن."),
-        reply_markup=more_menu_keyboard(),
-        parse_mode="HTML",
-    )
-
-
-@router.callback_query(F.data == "missions_open")
-async def open_missions_from_more(call: CallbackQuery) -> None:
-    if call.message:
-        try:
-            await call.message.delete()
-        except Exception:
-            logger.debug("Could not delete more-menu panel", exc_info=True)
-        from app.handlers.missions import show_missions
-        await show_missions(call.message)
-    await call.answer()
-
-
-@router.callback_query(F.data == "treasury_open")
-async def open_treasury_from_more(call: CallbackQuery, state: FSMContext) -> None:
-    if call.message:
-        try:
-            await call.message.delete()
-        except Exception:
-            logger.debug("Could not delete more-menu panel", exc_info=True)
-        from app.handlers.treasury import open_treasury_from_main_menu
-        await open_treasury_from_main_menu(call.message, state)
-    await call.answer()
 
 
 @router.message(F.text == "🎯 قدم بعدی")
