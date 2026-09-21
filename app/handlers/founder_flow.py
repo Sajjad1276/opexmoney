@@ -13,7 +13,6 @@ from aiogram.filters import CommandStart
 from aiogram.filters.state import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, ChatMemberUpdated, Message
-from sqlalchemy import select
 
 from app.database.models import Nation, User
 from app.database.session import async_session
@@ -759,41 +758,31 @@ async def check_founder_group(
         await call.answer(error, show_alert=True)
         return
 
-    conflict_message = None
-
-    async with async_session() as session:
-        async with session.begin():
-            draft = await get_active_draft(
+    try:
+        async with async_session() as session:
+            active_draft = await get_active_draft(
                 session,
                 call.from_user.id,
-                lock=True,
+                lock=False,
             )
-            if draft is None:
-                conflict_message = "⚠️ فرآیند تأسیس منقضی شده. دوباره شروع کن."
-            elif draft.group_id != group_id:
-                conflict_message = "⚠️ گروه این فرآیند تغییر کرده. دوباره از لینک تأسیس استفاده کن."
-            else:
-                existing_nation = await session.scalar(
-                    select(Nation)
-                    .where(
-                        Nation.group_id == group_id,
-                        Nation.is_active.is_(True),
-                    )
-                    .with_for_update()
-                    .limit(1)
+            if active_draft is None:
+                raise ValueError("⚠️ فرآیند تأسیس منقضی شده. دوباره شروع کن.")
+            if active_draft.group_id not in (None, group_id):
+                raise ValueError(
+                    "⚠️ گروه این فرآیند تغییر کرده. دوباره از لینک تأسیس استفاده کن."
                 )
-                if existing_nation is not None:
-                    draft.status = "CANCELLED"
-                    await session.flush()
-                    conflict_message = "⚠️ این گروه قبلاً پایتخت یک ملت شده."
-                else:
-                    draft.nation_name = draft.group_title or "گروه"
-                    draft.status = "NAMING"
-                    draft.expires_at = datetime.utcnow() + timedelta(minutes=30)
-                    await session.flush()
 
-    if conflict_message is not None:
-        await call.answer(conflict_message, show_alert=True)
+            draft = await bind_group(
+                session,
+                founder_user_id=call.from_user.id,
+                token=active_draft.launch_token,
+                group_id=group_id,
+                group_title=active_draft.group_title or "گروه",
+                group_username=active_draft.group_username,
+                group_type=active_draft.group_type or "supergroup",
+            )
+    except ValueError as exc:
+        await call.answer(str(exc), show_alert=True)
         return
 
     await state.set_state(FounderStates.SET_CURRENCY_CODE)
