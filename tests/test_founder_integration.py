@@ -4,8 +4,9 @@ import secrets
 import pytest
 from sqlalchemy import delete, select
 
-from app.database.models import CurrencyHolding, Nation, User, UserActivity
+from app.database.models import CurrencyHolding, Nation, NationFoundingDraft, User, UserActivity
 from app.database.session import async_session
+from app.services.nation.founder_service import create_nation as create_nation_backend, get_or_create_draft
 from app.services.nation_service import create_nation
 from app.services.user_service import is_user_registered
 
@@ -170,12 +171,54 @@ async def test_founder_constraints_reject_duplicate_group_and_currency():
             )
 
 
+@pytest.mark.asyncio
+async def test_founder_backend_starts_draft_and_persists_selected_flag():
+    founder_id = 910007
+    group_id = -100910011
+
+    async with async_session() as session:
+        async with session.begin():
+            session.add(
+                User(
+                    user_id=founder_id,
+                    username="testfounder7",
+                    balance=Decimal("500.00"),
+                    xr_balance=Decimal("500.00"),
+                    home_nation_id=None,
+                    role="player",
+                )
+            )
+
+    async with async_session() as session:
+        draft = await get_or_create_draft(session, founder_id)
+        assert draft.status == "WAITING_GROUP"
+        assert draft.flag_emoji == "🏴"
+
+    async with async_session() as session:
+        nation = await create_nation_backend(
+            session=session,
+            founder_id=founder_id,
+            name="Founder Backend Nation",
+            currency_code="FBK",
+            is_private=False,
+            group_chat_id=group_id,
+            flag_emoji="🇯🇵",
+        )
+        assert nation.flag_emoji == "🇯🇵"
+
+    async with async_session() as session:
+        saved_nation = await session.get(Nation, nation.nation_id)
+        assert saved_nation is not None
+        assert saved_nation.flag_emoji == "🇯🇵"
+
+
 @pytest.fixture(autouse=True)
 async def cleanup_test_rows():
     yield
     async with async_session() as session:
         async with session.begin():
-            await session.execute(delete(CurrencyHolding).where(CurrencyHolding.user_id >= 910001, CurrencyHolding.user_id <= 910006))
-            await session.execute(delete(UserActivity).where(UserActivity.user_id >= 910001, UserActivity.user_id <= 910006))
-            await session.execute(delete(User).where(User.user_id >= 910001, User.user_id <= 910006))
-            await session.execute(delete(Nation).where(Nation.group_id >= -100910010, Nation.group_id <= -100910001))
+            await session.execute(delete(CurrencyHolding).where(CurrencyHolding.user_id >= 910001, CurrencyHolding.user_id <= 910007))
+            await session.execute(delete(UserActivity).where(UserActivity.user_id >= 910001, UserActivity.user_id <= 910007))
+            await session.execute(delete(NationFoundingDraft).where(NationFoundingDraft.founder_user_id >= 910001, NationFoundingDraft.founder_user_id <= 910007))
+            await session.execute(delete(User).where(User.user_id >= 910001, User.user_id <= 910007))
+            await session.execute(delete(Nation).where(Nation.group_id >= -100910011, Nation.group_id <= -100910001))
