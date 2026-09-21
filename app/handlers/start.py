@@ -9,7 +9,7 @@ from app.handlers.dashboard import show_dashboard
 from app.handlers.deep_link import extract_start_param, handle_deep_link
 from app.keyboards.inline import welcome_keyboard
 from app.repositories.user_repository import UserRepository
-from app.services.user_service import is_fully_registered
+from app.services.user_service import is_fully_registered, username_exists
 from app.utils.formatting import imperial_datetime, rtl_html
 
 router = Router(name="start")
@@ -35,4 +35,4 @@ async def cmd_start(message: Message, state: FSMContext) -> None:
         f"🕐 {imperial_time}"
     )
     await message.answer(rtl_html(text), reply_markup=welcome_keyboard(), parse_mode=ParseMode.HTML)
-__all__ = ["router", "cmd_start"]
+__all__ = ["router", "cmd_start", "username_exists"]
