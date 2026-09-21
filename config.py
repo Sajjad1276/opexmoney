@@ -48,6 +48,12 @@ class Settings(BaseSettings):
     rate_max: Decimal = Decimal("50.00")
     rate_base_step: Decimal = Decimal("0.04")
 
+    # Nation founding eligibility. Kept configurable so game design can change
+    # without touching persistence or handlers.
+    nation_creation_trade_threshold: Decimal = Decimal("500")
+    nation_creation_cost: Decimal = Decimal("500")
+    bot_username: str = "OpexMoney_bot"
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     @property
