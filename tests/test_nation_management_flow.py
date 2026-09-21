@@ -7,8 +7,11 @@ import pytest
 from sqlalchemy import delete, select
 
 import app.handlers.nation_management as nm
+import app.services.support.diagnostic_service as support_diagnostics
 from app.services.dashboard_service import _resolve_verified_nation
+from app.services.support.diagnostic_service import diagnose_support_issue
 from app.services.nation_service import get_user_active_nation_context
+from app.services.support.models import SupportCategory
 from app.database.models import (
     CurrencyHolding,
     Nation,
@@ -181,6 +184,41 @@ async def test_dashboard_resolves_founder_without_telegram_projection():
 
             assert nation is not None
             assert nation.nation_id == nation_id
+
+
+@pytest.mark.asyncio
+async def test_support_repairs_missing_internal_membership(monkeypatch):
+    nation_id = await _seed_nation()
+
+    async def fake_telemetry(user_id: int) -> dict:
+        return {"events": [], "errors": []}
+
+    monkeypatch.setattr(
+        support_diagnostics,
+        "get_recent_telemetry",
+        fake_telemetry,
+    )
+
+    async with async_session() as session:
+        async with session.begin():
+            await session.execute(
+                delete(NationMember).where(
+                    NationMember.nation_id == nation_id,
+                    NationMember.user_id == FOUNDER_ID,
+                )
+            )
+            diagnosis = await diagnose_support_issue(
+                session,
+                user_id=FOUNDER_ID,
+                report="",
+                previous_fsm_state=None,
+            )
+
+            checks = {check.name: check for check in diagnosis.checks}
+            assert diagnosis.category is not SupportCategory.ACCOUNT
+            assert checks["home_nation"].ok is True
+            assert checks["active_membership"].ok is True
+            assert checks["home_membership_sync"].ok is True
 
 
 @pytest.mark.asyncio
