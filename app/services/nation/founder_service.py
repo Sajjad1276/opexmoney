@@ -460,7 +460,10 @@ async def check_nation_creation_eligibility(
         return EligibilityResult(False, "اول باید اسم معامله‌گرت رو ثبت کنی.", ["username"])
 
     total_traded = await _trade_volume_for_user(session, user_id)
-    balance = Decimal(str(user.xr_balance or Decimal("0")))
+    balance = max(
+        Decimal(str(user.xr_balance or Decimal("0"))),
+        Decimal(str(user.balance or Decimal("0"))),
+    )
 
     traded_ok = total_traded >= Decimal(str(settings.nation_creation_trade_threshold))
     balance_ok = balance >= Decimal(str(settings.nation_creation_cost))
