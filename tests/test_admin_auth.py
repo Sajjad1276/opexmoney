@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import time
 from urllib.parse import quote
 
 import pytest
@@ -14,7 +15,7 @@ from fastapi import HTTPException
 def build_init_data(bot_token: str, user_id: int) -> str:
     user = json.dumps({"id": user_id, "first_name": "Admin"}, separators=(",", ":"))
     raw = {
-        "auth_date": "1760000000",
+        "auth_date": str(int(time.time())),
         "user": user,
         "query_id": "AAH_test",
     }
