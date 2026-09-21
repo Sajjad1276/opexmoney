@@ -9,6 +9,7 @@ from sqlalchemy import delete, select
 import app.handlers.nation_management as nm
 from app.services.nation_service import get_user_active_nation_context
 from app.database.models import (
+    CurrencyHolding,
     Nation,
     NationJoinRequest,
     NationLog,
@@ -203,7 +204,7 @@ async def test_nation_context_repairs_player_from_home_nation_and_holding():
             user = await session.get(User, PLAYER_A_ID, with_for_update=True)
             user.home_nation_id = nation_id
             session.add(
-                __import__("app.database.models", fromlist=["CurrencyHolding"]).CurrencyHolding(
+                CurrencyHolding(
                     user_id=PLAYER_A_ID,
                     nation_id=nation_id,
                     amount=Decimal("500"),
