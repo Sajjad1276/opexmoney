@@ -247,5 +247,3 @@ async def get_admin_user(
             detail="Authentication error",
         ) from None
 
-
-── END OF auth.py ──
