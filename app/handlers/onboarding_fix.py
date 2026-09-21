@@ -189,19 +189,20 @@ async def accept_valid_name(message: Message, state: FSMContext) -> None:
 
             user = await session.get(User, message.from_user.id)
             if user is None:
-                session.add(
-                    User(
-                        user_id=message.from_user.id,
-                        username=username,
-                        home_nation_id=None,
-                        balance=0,
-                        xr_balance=0,
-                        role="player",
-                    )
+                user = User(
+                    user_id=message.from_user.id,
+                    username=username,
+                    home_nation_id=None,
+                    balance=Decimal("0.00"),
+                    xr_balance=Decimal("500.00"),
+                    role="player",
                 )
+                session.add(user)
                 await session.flush()
             else:
                 user.username = username
+                if user.home_nation_id is None and Decimal(str(user.xr_balance or 0)) == 0:
+                    user.xr_balance = Decimal("500.00")
 
             await ensure_temporal_profile(
                 session,
@@ -209,12 +210,13 @@ async def accept_valid_name(message: Message, state: FSMContext) -> None:
             )
 
     await state.update_data(username=username)
-
     await message.answer(
         NAME_ACCEPTED_TEXT.format(username=html.escape(username)),
         parse_mode="HTML",
     )
 
+    # Existing Telegram membership can still be synchronized automatically.
+    # Choosing a nation in onboarding is no longer required.
     async with async_session() as session:
         async with session.begin():
             synced_nations = await sync_registered_user_memberships(
@@ -222,27 +224,26 @@ async def accept_valid_name(message: Message, state: FSMContext) -> None:
                 message.from_user.id,
             )
 
-    if synced_nations:
-        async with async_session() as session:
-            async with session.begin():
-                registered_user = await get_user(
-                    session,
-                    message.from_user.id,
-                )
-        await state.clear()
-        if registered_user is not None:
-            await message.answer(
-                rtl_text(
-                    "عضویت تلگرامی‌ات شناسایی شد و ملت‌های مرتبط با حسابت همگام شدند."
-                ),
-                parse_mode="HTML",
-            )
-            from app.handlers.start import show_dashboard
-            await show_dashboard(message, registered_user)
-            return
-
     async with async_session() as session:
-        await show_nation_selection(message, session, state)
+        async with session.begin():
+            registered_user = await get_user(
+                session,
+                message.from_user.id,
+            )
+
+    await state.clear()
+
+    if synced_nations:
+        await message.answer(
+            rtl_text(
+                "عضویت تلگرامی‌ات شناسایی شد و ملت مرتبط با حسابت همگام شد."
+            ),
+            parse_mode="HTML",
+        )
+
+    if registered_user is not None:
+        from app.handlers.start import show_dashboard
+        await show_dashboard(message, registered_user)
 
 
 
