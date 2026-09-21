@@ -323,19 +323,10 @@ async def continue_registration(
         )
         return
 
-    await state.update_data(
-        user_id=user.user_id,
-        username=user.username,
-    )
-
-    if "holding" not in missing:
-        await state.clear()
-        await show_dashboard(message, user)
-        return
-
-    # A persisted home nation means the user is not really at the nation
-    # selection step. Repair the missing holding from the existing balance.
-    if user.home_nation_id is not None:
+    # Nation membership is optional. If an old record still carries a home
+    # nation but lost its holding, repair that holding. Otherwise the player
+    # continues directly to the dashboard with no nation.
+    if "holding" in missing and user.home_nation_id is not None:
         async with async_session() as session:
             async with session.begin():
                 nation = await session.get(Nation, user.home_nation_id)
@@ -353,31 +344,10 @@ async def continue_registration(
                             amount=user.balance,
                         )
                     )
-        await state.clear()
-        await show_dashboard(message, user)
-        return
 
-    async with async_session() as session:
-        async with session.begin():
-            nations = await get_active_nations(session, limit=3)
+    await state.clear()
+    await show_dashboard(message, user)
 
-    await state.set_state(OnboardingStates.SELECT_NATION)
-
-    if not nations:
-        await message.answer(
-            "🌍 <b>هنوز هیچ ملتی تأسیس نشده!</b>\n\n"
-            "تو می‌تونی اولین بنیان‌گذار تاریخ باشی\n"
-            "و اولین ملت OPEX MONEY رو بسازی.",
-            reply_markup=nation_selection_keyboard([]),
-            parse_mode="HTML",
-        )
-        return
-
-    await message.answer(
-        nation_list_text(message.from_user, user.username, nations),
-        reply_markup=nation_selection_keyboard(nations),
-        parse_mode="HTML",
-    )
 
 
 @router.message(CommandStart())
