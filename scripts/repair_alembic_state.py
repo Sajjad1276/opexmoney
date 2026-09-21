@@ -26,6 +26,7 @@ REVISION_CHAIN = [
     "0017_telegram_membership",
     "0018_market_query_indexes",
     "0019_foundation_v2",
+    "0020_rate_history_factors",
 ]
 
 BASE_TABLES = {
@@ -284,6 +285,17 @@ async def detect_revision(conn: asyncpg.Connection) -> str | None:
     if await all_tables_exist(conn, foundation_v2_tables):
         if await all_columns_exist(conn, foundation_v2_columns):
             highest = "0019_foundation_v2"
+
+    rate_history_factor_columns = {
+        ("rate_history", "dominant_cause"),
+        ("rate_history", "pressure_signal"),
+        ("rate_history", "foreign_signal"),
+        ("rate_history", "activity_score"),
+        ("rate_history", "trade_score"),
+        ("rate_history", "growth_score"),
+    }
+    if await all_columns_exist(conn, rate_history_factor_columns):
+        highest = "0020_rate_history_factors"
 
     return highest
 
