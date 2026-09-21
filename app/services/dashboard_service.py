@@ -59,6 +59,7 @@ async def _resolve_verified_nation(
     )
     return context[0] if context is not None else None
 
+
 async def _national_rank(
     session: AsyncSession,
     *,
