@@ -152,7 +152,7 @@ async def portfolio_back(callback: CallbackQuery) -> None:
 
     unregister_portfolio_panel(callback.from_user.id)
     await callback.answer()
-    from app.handlers.start import show_dashboard
+    from app.handlers.dashboard import show_dashboard
     async with async_session() as session:
         async with session.begin():
             user = await session.get(User, callback.from_user.id)
