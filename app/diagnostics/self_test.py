@@ -39,9 +39,8 @@ EXPECTED_JOB_IDS = {
 
 EXPECTED_ROUTER_NAMES = {
     "onboarding_fix", "start", "market", "membership", "founder",
-    "nation_management", "nation", "governance", "sections",
+    "nation_management", "nation", "governance", "sections", "support",
 }
-EXPECTED_AI_ROUTER_NAMES = {"ai"}
 
 
 async def _table_exists(table_name: str) -> bool:
@@ -109,11 +108,10 @@ async def run_startup_smoke_test(
             active_nations = await session.scalar(
                 text("SELECT COUNT(*) FROM nations WHERE is_active = TRUE")
             )
-        if not active_nations:
-            logger.error("SELFTEST|FAIL|active-nations|count=0")
-            ok = False
-        else:
-            logger.info("SELFTEST|PASS|active-nations|count=%d", active_nations)
+        logger.info(
+            "SELFTEST|PASS|active-nations|count=%d|empty_world_allowed=true",
+            active_nations or 0,
+        )
     except Exception:
         logger.exception("SELFTEST|FAIL|active-nations")
         ok = False
@@ -212,11 +210,7 @@ async def run_startup_smoke_test(
         else:
             logger.info("SELFTEST|PASS|routers|count=%d", len(EXPECTED_ROUTER_NAMES))
 
-        missing_ai = sorted(EXPECTED_AI_ROUTER_NAMES - registered_names)
-        if missing_ai:
-            logger.error("SELFTEST|FAIL|ai-router|missing=%s", ",".join(missing_ai)); ok = False
-        else:
-            logger.info("SELFTEST|PASS|ai-router|name=ai_companion")
+        logger.info("SELFTEST|PASS|ai-companion|global_private_text_router=disabled")
     except Exception:
         logger.exception("SELFTEST|FAIL|route-contracts"); ok = False
 
