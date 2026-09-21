@@ -25,6 +25,7 @@ REVISION_CHAIN = [
     "0016_ai_world",
     "0017_telegram_membership",
     "0018_market_query_indexes",
+    "0019_foundation_v2",
 ]
 
 BASE_TABLES = {
@@ -249,6 +250,35 @@ async def detect_revision(conn: asyncpg.Connection) -> str | None:
         and await index_exists(conn, "ix_trade_previews_lookup")
     ):
         highest = "0018_market_query_indexes"
+
+    foundation_v2_tables = {
+        "nation_invite_links",
+        "currency_market_states",
+        "price_movement_receipts",
+        "world_events",
+        "ai_usage_logs",
+        "decision_snapshots",
+        "shop_items",
+        "user_purchases",
+    }
+    foundation_v2_columns = {
+        ("nations", "deleted_at"),
+        ("users", "ai_tier"),
+        ("users", "deleted_at"),
+        ("nation_members", "left_at"),
+        ("nation_join_requests", "requested_at"),
+        ("nation_join_requests", "resolved_at"),
+        ("nation_join_requests", "resolved_by"),
+        ("price_alerts", "is_triggered"),
+        ("price_alerts", "triggered_at"),
+    }
+    if await all_tables_exist(conn, foundation_v2_tables):
+        columns_ready = all(
+            await column_exists(conn, table_name, column_name)
+            for table_name, column_name in foundation_v2_columns
+        )
+        if columns_ready:
+            highest = "0019_foundation_v2"
 
     return highest
 
