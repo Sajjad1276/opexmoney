@@ -25,6 +25,11 @@ async def _join_user(*args, **kwargs):
 async def _set_member_role(*args, **kwargs):
     return await _flow._set_member_role(*args, **kwargs)
 
+async def confirm_dissolve(call: CallbackQuery, bot):
+    _flow._notify_founder = _notify_founder
+    _flow.publish_nation_event_analysis = publish_nation_event_analysis
+    return await _flow.confirm_dissolve(call, bot)
+
 async def kick_member(call: CallbackQuery, bot):
     _flow._notify_founder = _notify_founder
     _flow.publish_nation_event_analysis = publish_nation_event_analysis
@@ -35,6 +40,7 @@ __all__ = [
     "_join_user",
     "_set_member_role",
     "kick_member",
+    "confirm_dissolve",
     "_welcome_member",
     "_notify_founder",
     "publish_nation_event_analysis",
