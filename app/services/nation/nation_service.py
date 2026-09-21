@@ -19,7 +19,6 @@ from app.database.models import (
     NationLog,
     NationMember,
     NationMemberRole,
-    NationTelegramMember,
     Transaction,
     User,
     UserActivity,
