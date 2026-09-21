@@ -5,6 +5,7 @@ from aiogram.enums import ParseMode
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
+from app.database.models import User
 from app.database.session import async_session
 from app.keyboards.inline import support_panel_keyboard, support_result_keyboard
 from app.services.support.support_service import support_service
@@ -137,10 +138,7 @@ async def support_back(
 
     async with async_session() as session:
         async with session.begin():
-            user = await session.get(
-                __import__("app.database.models", fromlist=["User"]).User,
-                callback.from_user.id,
-            )
+            user = await session.get(User, callback.from_user.id)
 
     if user is None:
         await callback.answer("⚠️ حساب پیدا نشد.", show_alert=True)
