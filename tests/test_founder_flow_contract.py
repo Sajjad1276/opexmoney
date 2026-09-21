@@ -31,6 +31,8 @@ def test_founder_finalization_uses_canonical_founder_service():
 def test_founder_button_callbacks_have_handlers():
     source = (ROOT / "app/handlers/founder_flow.py").read_text(encoding="utf-8")
     callbacks = {
+        "start_founder": "start_founder",
+        "found_nation": "start_founder",
         "founder_has_group": "founder_has_group",
         "founder_no_group": "founder_no_group",
         "founder_check_group": "check_founder_group",
