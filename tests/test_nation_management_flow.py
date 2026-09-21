@@ -7,6 +7,7 @@ import pytest
 from sqlalchemy import delete, select
 
 import app.handlers.nation_management as nm
+from app.services.dashboard_service import _resolve_verified_nation
 from app.services.nation_service import get_user_active_nation_context
 from app.database.models import (
     CurrencyHolding,
@@ -165,6 +166,21 @@ async def cleanup():
                 await session.execute(
                     delete(Nation).where(Nation.nation_id.in_(nation_ids))
                 )
+
+
+@pytest.mark.asyncio
+async def test_dashboard_resolves_founder_without_telegram_projection():
+    nation_id = await _seed_nation()
+
+    async with async_session() as session:
+        async with session.begin():
+            user = await session.get(User, FOUNDER_ID)
+            assert user is not None
+
+            nation = await _resolve_verified_nation(session, user)
+
+            assert nation is not None
+            assert nation.nation_id == nation_id
 
 
 @pytest.mark.asyncio
