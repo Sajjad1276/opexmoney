@@ -81,7 +81,7 @@ async def _trade_parameters(
         )
     )
     peak_multiplier = Decimal(
-        str(await get_peak_multiplier(session, user_id, nation_id))
+        str(await get_peak_multiplier(session, user_id))
     )
     return fee_rate, peak_multiplier
 
