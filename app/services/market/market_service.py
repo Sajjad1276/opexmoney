@@ -12,6 +12,7 @@ from app.database.session import async_session
 from app.services.alert_service import create_price_alert, delete_price_alert, list_price_alerts
 from app.services.chart_service import get_chart_data
 from app.services.market_intelligence import get_market_overview
+from app.services.nation_service import get_user_active_nation_context
 
 
 @dataclass(frozen=True)
@@ -76,14 +77,25 @@ async def get_market_page_data(user_id: int) -> MarketPageData:
     async with async_session() as session:
         async with session.begin():
             user = await session.get(User, user_id)
-            if user is None or user.home_nation_id is None:
+            if user is None:
                 return MarketPageData(user, {"currencies": []}, 0, 0)
-            overview = await get_market_overview(session, user.home_nation_id, limit=20)
+
+            context = await get_user_active_nation_context(
+                session,
+                user_id,
+                repair=False,
+                lock=False,
+            )
+            nation_id = context[0].nation_id if context is not None else None
+            if nation_id is None:
+                return MarketPageData(user, {"currencies": []}, 0, 0)
+
+            overview = await get_market_overview(session, nation_id, limit=20)
             trade_count = int(await session.scalar(
                 select(func.count(Transaction.id)).where(Transaction.user_id == user_id)
             ) or 0)
             from app.services.economic_engine import get_active_members
-            active = await get_active_members(session, user.home_nation_id)
+            active = await get_active_members(session, nation_id)
             return MarketPageData(user, overview, trade_count, active)
 
 
