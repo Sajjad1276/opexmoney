@@ -173,6 +173,12 @@ async def test_nation_context_repairs_founder_without_telegram_projection():
 
     async with async_session() as session:
         async with session.begin():
+            await session.execute(
+                delete(NationMember).where(
+                    NationMember.nation_id == nation_id,
+                    NationMember.user_id == FOUNDER_ID,
+                )
+            )
             context = await get_user_active_nation_context(
                 session,
                 FOUNDER_ID,
