@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import BotGroup, Nation, NationFoundingDraft, User
-from app.services.nation.nation_service import create_nation
+from app.services.nation.nation_service import create_nation as create_nation_core
 from app.utils.validators import validate_currency_code
 
 
@@ -417,6 +417,7 @@ from app.database.models import (
     NationMemberRole,
     Transaction,
     UserActivity,
+    ActivityType,
 )
 from app.repositories.transaction_repository import TransactionRepository
 from app.repositories.user_repository import UserRepository
@@ -436,12 +437,6 @@ async def _trade_volume_for_user(
 ) -> Decimal:
     since = datetime.utcnow() - timedelta(days=30)
     from app.database.models import Transaction
-    total = await session.scalar(
-        select(Transaction.amount).where(
-            Transaction.user_id == user_id,
-            Transaction.created_at >= since,
-        ).order_by(Transaction.created_at.desc())
-    )
     rows = (
         await session.execute(
             select(Transaction.amount).where(
@@ -576,7 +571,7 @@ async def create_nation(
         is_active=True,
         join_policy="INVITE_ONLY" if is_private else "OPEN",
         personality="neutral",
-        invite_code=f"OPX-{secrets.token_urlsafe(12)}",
+        invite_code=f"OPX-{token_urlsafe(12)}",
         treasury=Decimal("0.00"),
     )
     session.add(nation)
