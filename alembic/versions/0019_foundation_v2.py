@@ -104,6 +104,28 @@ def upgrade() -> None:
         "nation_members",
         sa.Column("left_at", sa.DateTime(timezone=True), nullable=True),
     )
+    op.execute(
+        """
+        WITH ranked AS (
+            SELECT
+                id,
+                ROW_NUMBER() OVER (
+                    PARTITION BY user_id
+                    ORDER BY joined_at DESC, id DESC
+                ) AS row_number
+            FROM nation_members
+            WHERE is_active = TRUE
+        )
+        UPDATE nation_members AS nm
+        SET
+            is_active = FALSE,
+            left_at = CURRENT_TIMESTAMP
+        FROM ranked
+        WHERE nm.id = ranked.id
+          AND ranked.row_number > 1
+        """
+    )
+
     op.create_index(
         "uq_nation_members_active_user",
         "nation_members",
@@ -112,9 +134,9 @@ def upgrade() -> None:
         postgresql_where=sa.text("is_active = TRUE"),
     )
 
-    op.rename_column("nation_join_requests", "created_at", "requested_at")
-    op.rename_column("nation_join_requests", "reviewed_at", "resolved_at")
-    op.rename_column("nation_join_requests", "reviewed_by", "resolved_by")
+    op.alter_column("nation_join_requests", "created_at", new_column_name="requested_at")
+    op.alter_column("nation_join_requests", "reviewed_at", new_column_name="resolved_at")
+    op.alter_column("nation_join_requests", "reviewed_by", new_column_name="resolved_by")
     op.create_check_constraint(
         "ck_nation_join_request_status",
         "nation_join_requests",
@@ -505,9 +527,9 @@ def downgrade() -> None:
         "nation_join_requests",
         type_="check",
     )
-    op.rename_column("nation_join_requests", "resolved_by", "reviewed_by")
-    op.rename_column("nation_join_requests", "resolved_at", "reviewed_at")
-    op.rename_column("nation_join_requests", "requested_at", "created_at")
+    op.alter_column("nation_join_requests", "resolved_by", new_column_name="reviewed_by")
+    op.alter_column("nation_join_requests", "resolved_at", new_column_name="reviewed_at")
+    op.alter_column("nation_join_requests", "requested_at", new_column_name="created_at")
 
     op.drop_index("uq_nation_members_active_user", table_name="nation_members")
     op.drop_column("nation_members", "left_at")
