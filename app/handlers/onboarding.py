@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import User
 from app.database.session import async_session
-from app.handlers.start import _safe_edit_caption, _safe_edit_text, start as restart_flow, user_mention
+from app.utils.ui import safe_edit_caption as _safe_edit_caption, safe_edit_text as _safe_edit_text, user_mention
 from app.keyboards.inline import cancel_keyboard, nation_selection_keyboard
 from app.services.membership_service import sync_registered_user_memberships
 from app.handlers.start import cmd_start as restart_flow
