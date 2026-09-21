@@ -67,15 +67,6 @@ def _alter_existing_timestamp_columns(timezone_enabled: bool) -> None:
 def upgrade() -> None:
     _alter_existing_timestamp_columns(True)
 
-    op.create_foreign_key(
-        "fk_nations_founder_user_id",
-        "nations",
-        "users",
-        ["founder_user_id"],
-        ["user_id"],
-        ondelete="SET NULL",
-    )
-
     op.add_column(
         "nations",
         sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
@@ -542,10 +533,5 @@ def downgrade() -> None:
 
     op.drop_index("ix_nations_active_deleted", table_name="nations")
     op.drop_column("nations", "deleted_at")
-    op.drop_constraint(
-        "fk_nations_founder_user_id",
-        "nations",
-        type_="foreignkey",
-    )
 
     _alter_existing_timestamp_columns(False)

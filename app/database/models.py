@@ -171,7 +171,6 @@ class Nation(Base):
     currency_code: Mapped[str] = mapped_column(String(4), nullable=False)
     founder_user_id: Mapped[int | None] = mapped_column(
         BigInteger,
-        ForeignKey("users.user_id", ondelete="SET NULL"),
         nullable=True,
     )
     exchange_rate: Mapped[Decimal] = mapped_column(
@@ -220,12 +219,6 @@ class Nation(Base):
         default=utcnow,
         server_default=func.now(),
         nullable=False,
-    )
-
-    founder: Mapped["User | None"] = relationship(
-        "User",
-        foreign_keys=[founder_user_id],
-        lazy="selectin",
     )
 
 
