@@ -34,7 +34,7 @@ def test_startup_does_not_seed_ai_world() -> None:
 
 
 def test_onboarding_does_not_force_nation_selection() -> None:
-    source = (ROOT / "app/handlers/onboarding_fix.py").read_text(encoding="utf-8")
+    source = (ROOT / "app/handlers/onboarding.py").read_text(encoding="utf-8")
     start = source.index("async def accept_valid_name")
     end = source.index("\n\n\n@router.callback_query", start)
     handler = source[start:end]
