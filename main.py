@@ -26,6 +26,7 @@ from ai import ai_router, companion
 from app.database.models import User
 from app.database.session import async_session, engine
 from app.diagnostics.flow_trace import FlowTraceMiddleware
+from app.diagnostics.support_telemetry import close_support_telemetry, record_error
 from app.diagnostics.self_test import run_startup_smoke_test
 from app.handlers.founder import founder_router
 from app.handlers.governance import governance_router
@@ -46,6 +47,7 @@ from app.handlers.nation_management import (
 from app.handlers.onboarding_fix import router as onboarding_fix_router
 from app.handlers.sections import router as sections_router
 from app.handlers.start import router as start_router
+from app.handlers.support import router as support_router
 from app.handlers.treasury import router as treasury_router
 from app.services.economic_engine import (
     create_behavior_snapshot,
@@ -363,6 +365,17 @@ async def main() -> None:
     async def errors_handler(event: ErrorEvent):
         update = event.update
         exception = event.exception
+        user = getattr(update, "from_user", None)
+        if user is not None:
+            try:
+                await record_error(
+                    user.id,
+                    "dispatcher",
+                    exception,
+                    "callback" if getattr(update, "callback_query", None) else "message",
+                )
+            except Exception:
+                logger.debug("Support telemetry error recording failed", exc_info=True)
         logger.error(
             "Update %s caused error %s",
             update,
@@ -398,6 +411,7 @@ async def main() -> None:
     dp.include_router(nation_router)
     dp.include_router(governance_router)
     dp.include_router(sections_router)
+    dp.include_router(support_router)
     dp.include_router(academy_router)
     dp.include_router(ai_router)
 
@@ -431,6 +445,7 @@ async def main() -> None:
         if ranking_redis is not None:
             await ranking_redis.aclose()
         await companion.close()
+        await close_support_telemetry()
         await bot.session.close()
         await engine.dispose()
 

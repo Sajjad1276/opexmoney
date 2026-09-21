@@ -72,8 +72,67 @@ def more_menu_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="📜 قوانین", callback_data="governance_main"),
             InlineKeyboardButton(text="⚙️ تنظیمات", callback_data="settings:back"),
         ],
+        [
+            InlineKeyboardButton(
+                text="🛟 پشتیبانی هوشمند",
+                callback_data="support_open",
+                style=ButtonStyle.PRIMARY,
+            )
+        ],
         [InlineKeyboardButton(text="🏠 منوی اصلی", callback_data="back_to_dashboard")],
     ])
+
+
+def support_panel_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="🔎 بررسی آخرین مشکل",
+                    callback_data="support_check_recent",
+                    style=ButtonStyle.PRIMARY,
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="❌ بستن",
+                    callback_data="support_close",
+                    style=ButtonStyle.DANGER,
+                )
+            ],
+        ]
+    )
+
+
+def support_result_keyboard(*, market_retry: bool = False) -> InlineKeyboardMarkup:
+    rows = [
+        [
+            InlineKeyboardButton(
+                text="✍️ گزارش مشکل جدید",
+                callback_data="support_new_report",
+                style=ButtonStyle.PRIMARY,
+            )
+        ]
+    ]
+    if market_retry:
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text="💹 باز کردن بازار دوباره",
+                    callback_data="market_main",
+                    style=ButtonStyle.SUCCESS,
+                )
+            ]
+        )
+    rows.append(
+        [
+            InlineKeyboardButton(
+                text="🏠 منوی اصلی",
+                callback_data="back_to_dashboard",
+            )
+        ]
+    )
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def welcome_keyboard() -> InlineKeyboardMarkup:
