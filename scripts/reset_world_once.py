@@ -74,13 +74,45 @@ async def reset_database() -> None:
                     """
                 )
             }
-            targets = sorted((EXPECTED_WORLD_TABLES & existing) - PRESERVE)
-            if targets:
-                await conn.execute(
-                    "TRUNCATE TABLE "
-                    + ", ".join(f'public."{name}"' for name in targets)
-                    + " RESTART IDENTITY"
+            targets = (EXPECTED_WORLD_TABLES & existing) - PRESERVE
+
+            # Delete in child-before-parent order so preserved users remain intact.
+            rows = await conn.fetch(
+                """
+                SELECT tc.table_name AS child_table,
+                       ccu.table_name AS parent_table
+                FROM information_schema.table_constraints tc
+                JOIN information_schema.constraint_column_usage ccu
+                  ON ccu.constraint_name = tc.constraint_name
+                 AND ccu.constraint_schema = tc.constraint_schema
+                WHERE tc.constraint_type = 'FOREIGN KEY'
+                  AND tc.table_schema = 'public'
+                  AND ccu.table_schema = 'public'
+                """
+            )
+            children_of = {table: set() for table in targets}
+            for child, parent in rows:
+                if child in targets and parent in targets and child != parent:
+                    children_of[parent].add(child)
+
+            remaining = set(targets)
+            delete_order: list[str] = []
+            while remaining:
+                leaves = sorted(
+                    table
+                    for table in remaining
+                    if not (children_of.get(table, set()) & remaining)
                 )
+                if not leaves:
+                    raise RuntimeError(
+                        "reset delete order has an FK cycle: "
+                        + ", ".join(sorted(remaining))
+                    )
+                delete_order.extend(leaves)
+                remaining.difference_update(leaves)
+
+            for table in delete_order:
+                await conn.execute(f'DELETE FROM public."{table}"')
 
             await conn.execute(
                 """
