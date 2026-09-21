@@ -8,7 +8,7 @@ from sqlalchemy import select
 
 from app.database.models import Nation, NationMemberRole, User
 from app.database.session import async_session
-from app.handlers.start import show_dashboard
+from app.handlers.dashboard import show_dashboard
 from app.keyboards.inline import nation_panel_keyboard
 from app.services.user_service import is_fully_registered
 from app.utils.formatting import fmt_pct, fmt_rate, get_rate_change, get_rate_emoji
