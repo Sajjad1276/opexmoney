@@ -201,11 +201,15 @@ async def give_bonus(
 ) -> UpdatedActionResponse:
     _confirm_or_raise(confirm)
 
+    from decimal import Decimal
+
+    amount_xr = Decimal(str(payload.amount_xr))
+
     if payload.user_ids == "all":
         result = await db.execute(
             update(User)
             .where(User.deleted_at.is_(None), User.is_ai.is_(False))
-            .values(xr_balance=User.xr_balance + payload.amount_xr)
+            .values(xr_balance=User.xr_balance + amount_xr)
         )
     else:
         unique_ids = sorted(set(payload.user_ids))
@@ -214,7 +218,7 @@ async def give_bonus(
         result = await db.execute(
             update(User)
             .where(User.user_id.in_(unique_ids), User.deleted_at.is_(None))
-            .values(xr_balance=User.xr_balance + payload.amount_xr)
+            .values(xr_balance=User.xr_balance + amount_xr)
         )
 
     updated = int(result.rowcount or 0)
@@ -224,7 +228,7 @@ async def give_bonus(
         action="admin_give_bonus",
         rule_key="give_bonus",
         old_value=None,
-        new_value=str(payload.amount_xr),
+        new_value=str(amount_xr),
         reason=payload.note,
     )
     await db.commit()
@@ -290,16 +294,21 @@ async def reset_market_rates(
             return UpdatedActionResponse(updated=0)
         nations = [nation]
 
+    old_rates = {nation.nation_id: nation.exchange_rate for nation in nations}
     for nation in nations:
+        nation.rate_prev = old_rates[nation.nation_id]
         nation.exchange_rate = payload.new_rate
-        nation.rate_prev = payload.new_rate
 
     _audit(
         db,
         admin_user,
         action="admin_reset_market_rates",
         rule_key="reset_market_rates",
-        old_value="mixed" if len(nations) != 1 else str(nations[0].exchange_rate),
+        old_value=(
+            "mixed"
+            if len(nations) != 1
+            else str(old_rates[nations[0].nation_id])
+        ),
         new_value=str(payload.new_rate),
         reason=str(payload.nation_id),
     )
