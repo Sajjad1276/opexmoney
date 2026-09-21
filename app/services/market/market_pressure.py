@@ -380,7 +380,7 @@ async def build_price_receipt(
         reverse=True,
     )
 
-    period_minutes = 15 * limit
+    period_minutes = 15 * len(rows) if rows else 0
     return PriceReceipt(
         currency_code=nation.currency_code,
         period_label=f"{_fa_digits(period_minutes)} دقیقه گذشته",
