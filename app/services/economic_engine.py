@@ -276,7 +276,8 @@ async def update_nation_rates(
         await persist_rate_update(session, delta, now)
         history = _RATE_FACTOR_HISTORY[nation.nation_id]
         history.append(delta)
-        del _RATE_FACTOR_HISTORY[nation.nation_id][:_MAX_FACTOR_HISTORY * -1]
+        if len(history) > _MAX_FACTOR_HISTORY:
+            del history[:-_MAX_FACTOR_HISTORY]
         deltas.append(delta)
     return deltas
 
