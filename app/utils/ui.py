@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import html
+
 from aiogram import Bot
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, ReplyKeyboardRemove
 
@@ -111,3 +114,36 @@ async def send_submenu_panel(
             pass
 
     return panel
+
+
+
+def user_mention(user) -> str:
+    return f'<a href="tg://user?id={user.id}">{html.escape(user.first_name or "معامله‌گر")}</a>'
+
+
+async def safe_edit_text(call, text: str, reply_markup=None) -> bool:
+    try:
+        if call.message is None or not hasattr(call.message, "edit_text"):
+            return False
+        await call.message.edit_text(
+            text,
+            reply_markup=reply_markup,
+            parse_mode="HTML",
+        )
+        return True
+    except TelegramBadRequest:
+        return False
+
+
+async def safe_edit_caption(call, caption: str, reply_markup=None) -> bool:
+    try:
+        if call.message is None or not hasattr(call.message, "edit_caption"):
+            return False
+        await call.message.edit_caption(
+            caption=caption,
+            reply_markup=reply_markup,
+            parse_mode="HTML",
+        )
+        return True
+    except TelegramBadRequest:
+        return False
