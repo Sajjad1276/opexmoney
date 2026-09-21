@@ -17,7 +17,7 @@ from sqlalchemy import select
 
 from app.database.models import Nation, User
 from app.database.session import async_session
-from app.handlers.start import show_dashboard
+from app.handlers.dashboard import show_dashboard
 from app.keyboards.inline import (
     add_to_group_keyboard,
     founder_cancel_keyboard,
