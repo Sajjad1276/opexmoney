@@ -35,9 +35,6 @@ def main_menu_keyboard() -> ReplyKeyboardMarkup:
             [
                 KeyboardButton(text="🛟 پشتیبانی هوشمند"),
             ],
-            [
-                KeyboardButton(text="☰ بیشتر"),
-            ],
         ],
         resize_keyboard=True,
         is_persistent=True,
