@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 from decimal import Decimal, ROUND_HALF_UP
 
 from app.services.rules.effects import apply_trade_benefit, calculate_trade_fee
@@ -158,3 +159,294 @@ def progress_bar(current: int, total: int, length: int = 6) -> str:
         return "░" * length
     filled = min(round(current / total * length), length)
     return "█" * filled + "░" * (length - filled)
+
+
+def _rule_percent(value: Decimal) -> str:
+    return to_fa(f"{Decimal(str(value)).normalize():f}") + "٪"
+
+
+def _direction(change: float) -> str:
+    if change > 0:
+        return "🟢"
+    if change < 0:
+        return "🔴"
+    return "🟡"
+
+
+def _risk_title(label: str) -> str:
+    return label.split(" ", 1)[1] if " " in label else label
+
+
+def format_market_page(user, overview: dict, active: int, trade_count: int) -> str:
+    currencies = overview.get("currencies") or []
+    if not currencies:
+        return "⚠️ هنوز ارز فعالی برای نمایش بازار وجود ندارد."
+
+    beginner = trade_count < 2
+    if beginner:
+        lines = [
+            "💹 <b>بازار OPEX</b>",
+            "<blockquote>⁠</blockquote>",
+            "اینجا با <b>دلار</b> ارز ملت‌ها رو می‌خری و می‌فروشی.",
+            "🧠 قانون ساده: وقتی قیمت یک ارز بالا بره، ارزش دارایی‌ات بیشتر می‌شه؛ اگر پایین بیاد، کمتر می‌شه.",
+            "",
+            f"💎 دلار تو: <b>{fmt_amount(user.xr_balance)}</b>",
+            "",
+            "📌 <b>برای شروع فقط این دو چیز رو ببین:</b>",
+            "قیمت فعلی و تغییر ۲۴ ساعت اخیر.",
+            "",
+        ]
+        for item in currencies[:6]:
+            nation = item["nation"]
+            change = float(item["change_24h"])
+            lines.append(
+                f"{_direction(change)} <b>{html.escape(nation.currency_code)}</b> · "
+                f"<b>{fmt_rate(item['current_rate'])} دلار</b> · "
+                f"{item['change_24h']:+.2f}%"
+            )
+        lines.extend(["", "🎯 <b>حرکت پیشنهادی:</b> یک ارز رو انتخاب کن و خرید اولت رو امتحان کن."])
+        return "\n".join(lines)
+
+    lines = [
+        "💹 <b>بازار OPEX</b>",
+        "<blockquote>⁠</blockquote>",
+        f"💰 دلار: <b>{fmt_amount(user.xr_balance)}</b>",
+        "",
+        "<blockquote>⁠</blockquote>",
+        overview.get("mood", ""),
+        "<blockquote>⁠</blockquote>",
+    ]
+    winner_code, winner_pct = overview["top_mover"]["winner"]
+    loser_code, loser_pct = overview["top_mover"]["loser"]
+    if winner_code:
+        lines.append(f"🏆 بهترین: <b>{html.escape(winner_code)}</b> ▲ {format_percent_value(winner_pct)}")
+    if loser_code:
+        lines.append(f"💀 بدترین: <b>{html.escape(loser_code)}</b> ▼ {format_percent_value(loser_pct)}")
+    lines.append("")
+
+    for item in currencies:
+        nation = item["nation"]
+        change = float(item["change_24h"])
+        lines.extend([
+            f"{_direction(change)} <b>{html.escape(nation.currency_code)}</b> [{html.escape(_risk_title(item['risk_label']))}] "
+            f"<b>{fmt_rate(item['current_rate'])} OPX</b>",
+            f"   {format_change_text(change, '24h')}",
+            f"   📊 حجم ۲۴ ساعت: <b>{format_volume(item['volume_24h'])} OPX</b>",
+            f"   <i>{html.escape(item['insight'])}</i>",
+            "",
+        ])
+        if sum(len(line) + 1 for line in lines) > 3300:
+            lines.append("… فقط بخشی از ارزها در این صفحه نمایش داده شد.")
+            break
+    lines.extend([
+        "<blockquote>⁠</blockquote>",
+        f"⏱ بروزرسانی نرخ‌ها هر ۱۵ دقیقه · 👥 {to_fa(active)} عضو فعال ملت اصلی",
+    ])
+    return "\n".join(lines)
+
+
+def format_listed_currencies(page) -> str:
+    if page.total_count == 0:
+        return "📋 <b>ارزهای لیست شده</b>\n\nفعلاً هیچ ارز فعالی برای نمایش وجود ندارد."
+    start_index = page.page * 100 + 1
+    lines = [
+        "📋 <b>ارزهای لیست شده</b>",
+        "",
+        f"تعداد کل: <b>{to_fa(page.total_count)}</b> ارز",
+        "مرتب‌سازی: <b>کمترین قیمت فعلی → بیشترین قیمت فعلی</b>",
+        "",
+        "برای استفاده در بخش‌های دیگر، روی خود کد ارز بزن تا راحت کپی شود.",
+        "",
+    ]
+    lines.extend(
+        f"{to_fa(index)}. <code>{html.escape(code)}</code>"
+        for index, code in enumerate(page.currency_codes, start=start_index)
+    )
+    return "\n".join(lines)
+
+
+def format_alert_currency_prompt() -> str:
+    return "🔔 <b>ثبت هشدار قیمت</b>\n\nکد ارز را بنوی.\nمثال: <code>OPX</code>"
+
+
+def format_chart_currency_prompt() -> str:
+    return "📊 <b>نمودار ارز</b>\n\nکد ارز را بنوی.\nمثال: <code>OPX</code>"
+
+
+def format_alert_target_prompt(code: str, current_rate: Decimal | None = None) -> str:
+    if current_rate is not None:
+        return (
+            f"🔔 <b>قیمت هدف {html.escape(code)}</b>\n\n"
+            f"قیمت فعلی: <b>{fmt_rate(current_rate)} OPX</b>\n"
+            "قیمت موردنظر برای هشدار را بنوی.\n"
+            "مثال: <code>1.5</code>"
+        )
+    return (
+        "🔔 <b>هشدار قیمت</b>\n\n"
+        f"قیمت هدف برای <b>{html.escape(code)}</b> را بنوی.\n"
+        "مثال: <code>1.5</code> یا <code>1.5 below</code>"
+    )
+
+
+def format_alert_created(alert, *, command: bool = False) -> str:
+    arrow = "▲" if alert.direction == "above" else "▼"
+    if command:
+        return f"✅ هشدار ثبت شد\n🔔 {html.escape(alert.currency_code)} · هدف: <b>{fmt_rate(alert.target_price)} OPX</b> {arrow}"
+    return f"✅ هشدار {html.escape(alert.currency_code)} ثبت شد.\nهدف: <b>{fmt_rate(alert.target_price)} OPX</b> {arrow}"
+
+
+def format_alert_list(alerts) -> tuple[str, list[tuple[str, str]]]:
+    lines = ["🔔 <b>هشدارهای قیمت من</b>", "<blockquote>⁠</blockquote>"]
+    actions: list[tuple[str, str]] = []
+    if not alerts:
+        lines.append("هنوز هشداری ثبت نکردی.")
+    else:
+        for alert in alerts[:20]:
+            status = "✅ فعال شده" if alert.triggered else "⏳ فعال"
+            arrow = "▲" if alert.direction == "above" else "▼"
+            lines.append(
+                f"• <b>{html.escape(alert.currency_code)}</b> · "
+                f"{fmt_rate(alert.target_price)} OPX {arrow} · {status}"
+            )
+            actions.append(
+                (f"🗑 حذف {alert.currency_code} #{alert.id}", f"alert:delete:{alert.id}")
+            )
+    return "\n".join(lines), actions
+
+
+def format_buy_market(user, nations) -> str:
+    lines = [
+        "📈 <b>خرید ارز</b>",
+        "<blockquote>⁠</blockquote>",
+        f"💰 دلار موجود: <b>{fmt_amount(user.xr_balance)}</b>",
+        "",
+        "<b>کدوم ارز می‌خوای بخری؟</b>",
+    ]
+    lines.extend(
+        f"🏛 <code>{html.escape(n.currency_code)}</code> · {html.escape(n.name)} · "
+        f"<b>{fmt_rate(n.exchange_rate)} دلار</b>"
+        for n in nations
+    )
+    return "\n".join(lines)
+
+
+def format_buy_currency(nation, user) -> str:
+    return (
+        f"📈 <b>خرید <code>{html.escape(nation.currency_code)}</code></b>\n"
+        "<blockquote>⁠</blockquote>\n"
+        f"💹 نرخ: <code>1 {html.escape(nation.currency_code)} = {fmt_rate(nation.exchange_rate)} دلار</code>\n"
+        f"💰 موجودی: <b>{fmt_amount(user.xr_balance)} دلار</b>\n\n"
+        "<b>چقدر دلار خرج می‌کنی؟</b>\n<i>حداقل 10 دلار</i>"
+    )
+
+
+def format_buy_preview(result) -> str:
+    signal = "\n📈 <i>بازار الان با تو راه میاد.</i>\n" if result.peak_multiplier > Decimal("1") else ""
+    return (
+        "📈 <b>تأیید خرید</b>\n"
+        "<blockquote>⁠</blockquote>\n"
+        f"📤 پرداخت:   <b>{fmt_amount(result.spend)} دلار</b>\n"
+        f"📥 دریافت:   <b>{fmt_amount(result.receive)} {html.escape(result.nation.currency_code)}</b>\n\n"
+        "<blockquote>⁠</blockquote>\n"
+        f"💹 نرخ: <code>1 {html.escape(result.nation.currency_code)} = {fmt_rate(result.nation.exchange_rate)} دلار</code>\n"
+        f"📋 کارمزد: <b>{fmt_amount(result.fee)} دلار</b> ({_rule_percent(result.fee_rate)})\n"
+        f"{signal}\n"
+        "<blockquote>⁠</blockquote>\n"
+        "<b>موجودی بعد از معامله:</b>\n"
+        f"دلار: <b>{fmt_amount(result.user.xr_balance - result.spend)}</b>\n"
+        f"{html.escape(result.nation.currency_code)}: <b>{fmt_amount(result.current_holding + result.receive)}</b>\n"
+        "<blockquote>⁠</blockquote>"
+    )
+
+
+def format_buy_completed(result) -> str:
+    signal = "\n📈 بازار الان با تو راه میاد." if result.peak_multiplier > Decimal("1") else ""
+    return (
+        "✅ <b>خرید انجام شد.</b>\n"
+        "<blockquote>⁠</blockquote>\n"
+        f"📤 پرداختی: <s>{fmt_amount(result.spend)} دلار</s>\n"
+        f"📥 دریافتی: <b>{fmt_amount(result.receive)} {html.escape(result.nation.currency_code)}</b>\n"
+        f"{signal}\n"
+        "<blockquote>⁠</blockquote>\n"
+        "💰 موجودی:\n"
+        f"دلار: <b>{fmt_amount(result.user.xr_balance)}</b>\n"
+        f"{html.escape(result.nation.currency_code)}: <b>{fmt_amount(result.holding.amount)}</b>"
+    )
+
+
+def format_sell_market(active_holdings, inactive_holdings) -> str:
+    lines = ["📉 <b>فروش ارز</b>", "<blockquote>⁠</blockquote>"]
+    if not active_holdings and not inactive_holdings:
+        return "📉 <b>فروش ارز</b>\n<blockquote>⁠</blockquote>\nهنوز ارزی برای فروش نداری.\n\nاز 📈 خرید ارز شروع کن."
+    if active_holdings:
+        lines.append("<b>ارزهای قابل فروش:</b>")
+        lines.extend(
+            f"💱 <code>{html.escape(h.currency_code)}</code> · موجودی: <b>{fmt_amount(h.amount)}</b>"
+            for h in active_holdings
+        )
+    if inactive_holdings:
+        lines.extend(["", "🚫 <b>ارزهای غیرقابل فروش:</b>"])
+        lines.extend(
+            f"• <code>{html.escape(h.currency_code)}</code> ({html.escape(h.nation_name)}) · ملت این ارز منحل شده - قابل فروش نیست"
+            for h in inactive_holdings
+        )
+    return "\n".join(lines)
+
+
+def format_sell_currency(nation, holding) -> str:
+    return (
+        f"📉 <b>فروش <code>{html.escape(nation.currency_code)}</code></b>\n"
+        "<blockquote>⁠</blockquote>\n"
+        f"💹 نرخ: <code>1 {html.escape(nation.currency_code)} = {fmt_rate(nation.exchange_rate)} دلار</code>\n"
+        f"💰 موجودی: <b>{fmt_amount(holding.amount)} {html.escape(nation.currency_code)}</b>\n\n"
+        "<b>چقدر می‌فروشی؟</b>"
+    )
+
+
+def format_sell_preview(result) -> str:
+    xr_after = result.user.xr_balance + result.receive
+    currency_after = result.current_holding - result.spend
+    signal = "\n📈 <i>بازار الان با تو راه میاد.</i>\n" if result.peak_multiplier > Decimal("1") else ""
+    return (
+        "📉 <b>تأیید فروش</b>\n"
+        "<blockquote>⁠</blockquote>\n"
+        f"📤 فروش:     <b>{fmt_amount(result.spend)} {html.escape(result.nation.currency_code)}</b>\n"
+        f"📥 دریافت:   <b>{fmt_amount(result.receive)} دلار</b>\n\n"
+        "<blockquote>⁠</blockquote>\n"
+        f"💹 نرخ: <code>1 {html.escape(result.nation.currency_code)} = {fmt_rate(result.nation.exchange_rate)} دلار</code>\n"
+        f"📋 کارمزد: <b>{fmt_amount(result.fee)} دلار</b> ({_rule_percent(result.fee_rate)})\n"
+        f"{signal}\n"
+        "<blockquote>⁠</blockquote>\n"
+        "<b>موجودی بعد از معامله:</b>\n"
+        f"دلار: <b>{fmt_amount(xr_after)}</b>\n"
+        f"{html.escape(result.nation.currency_code)}: <b>{fmt_amount(currency_after)}</b>\n"
+        "<blockquote>⁠</blockquote>"
+    )
+
+
+def format_sell_completed(result) -> str:
+    signal = "\n📈 بازار الان با تو راه میاد." if result.peak_multiplier > Decimal("1") else ""
+    return (
+        "✅ <b>فروش انجام شد.</b>\n"
+        "<blockquote>⁠</blockquote>\n"
+        f"📤 فروختی:  <b>{fmt_amount(result.spend)} {html.escape(result.nation.currency_code)}</b>\n"
+        f"📥 دریافتی: <b>{fmt_amount(result.receive)} دلار</b>\n"
+        f"{signal}\n"
+        "<blockquote>⁠</blockquote>\n"
+        "💰 موجودی:\n"
+        f"دلار: <b>{fmt_amount(result.user.xr_balance)}</b>\n"
+        f"{html.escape(result.nation.currency_code)}: <b>{fmt_amount(result.holding.amount)}</b>"
+    )
+
+
+def format_market_history(user, rows) -> str:
+    lines = ["📜 <b>تاریخچه</b>", "<blockquote>⁠</blockquote>"]
+    if not rows:
+        lines.append("هنوز معامله‌ای انجام ندادی.")
+    for transaction, code in rows:
+        icon = "📈" if transaction.transaction_type == "buy" else "📉"
+        lines.append(
+            f"{icon} <code>{html.escape(code)}</code> · "
+            f"{fmt_amount(transaction.amount)} · {fmt_rate(transaction.rate)} دلار"
+        )
+    return "\n".join(lines)
