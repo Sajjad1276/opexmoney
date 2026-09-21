@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import ast
 import asyncio
 import base64
@@ -30,14 +29,21 @@ PROTECTED_PREFIXES = (
     "tests/",
     "app/services/support/",
 )
-PROTECTED_FILES = {"config.py", "Dockerfile", "requirements.txt", "requirements-dev.txt"}
+PROTECTED_FILES = {
+    "config.py",
+    "Dockerfile",
+    "requirements.txt",
+    "requirements-dev.txt",
+}
 ALLOWED_PREFIXES = ("app/", "ai/")
+
 MAX_FILES = 6
 MAX_SOURCE_CHARS = 14000
 MAX_TOTAL_SOURCE_CHARS = 48000
 MAX_CI_LOG_CHARS = 18000
 DEFAULT_REPAIR_ATTEMPTS = 3
 DEFAULT_CI_POLL_SECONDS = 8
+
 _REPAIR_LOCK = asyncio.Lock()
 
 
@@ -62,11 +68,17 @@ def _encoded(value: str) -> str:
     return urllib.parse.quote(value, safe="")
 
 
-def _request_json_sync(path: str, *, method: str = "GET", body: dict[str, Any] | None = None, timeout: float = 30) -> dict[str, Any]:
+def _request_json_sync(
+    path: str,
+    *,
+    method: str = "GET",
+    body: dict[str, Any] | None = None,
+    timeout: float = 30,
+) -> dict[str, Any]:
     token = _github_token()
     if not token:
         raise RuntimeError("GitHub repair credential is not configured")
-    url = f"https://api.github.com{path}"
+
     headers = {
         "Authorization": f"Bearer {token}",
         "Accept": "application/vnd.github+json",
@@ -74,14 +86,25 @@ def _request_json_sync(path: str, *, method: str = "GET", body: dict[str, Any] |
         "Content-Type": "application/json",
         "User-Agent": "opex-money-smart-support",
     }
-    data = json.dumps(body, ensure_ascii=False).encode("utf-8") if body is not None else None
-    request = urllib.request.Request(url, data=data, headers=headers, method=method)
+    data = (
+        json.dumps(body, ensure_ascii=False).encode("utf-8")
+        if body is not None
+        else None
+    )
+    request = urllib.request.Request(
+        f"https://api.github.com{path}",
+        data=data,
+        headers=headers,
+        method=method,
+    )
+
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
             raw = response.read().decode("utf-8")
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")[:1000]
         raise RuntimeError(f"GitHub API {exc.code}: {detail}") from exc
+
     return json.loads(raw) if raw else {}
 
 
@@ -89,14 +112,19 @@ def _request_text_sync(path: str, *, timeout: float = 30) -> str:
     token = _github_token()
     if not token:
         raise RuntimeError("GitHub repair credential is not configured")
-    url = f"https://api.github.com{path}"
+
     headers = {
         "Authorization": f"Bearer {token}",
         "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
         "User-Agent": "opex-money-smart-support",
     }
-    request = urllib.request.Request(url, headers=headers, method="GET")
+    request = urllib.request.Request(
+        f"https://api.github.com{path}",
+        headers=headers,
+        method="GET",
+    )
+
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
             return response.read().decode("utf-8", errors="replace")
@@ -105,8 +133,18 @@ def _request_text_sync(path: str, *, timeout: float = 30) -> str:
         raise RuntimeError(f"GitHub API {exc.code}: {detail}") from exc
 
 
-async def _api(path: str, *, method: str = "GET", body: dict[str, Any] | None = None) -> dict[str, Any]:
-    return await asyncio.to_thread(_request_json_sync, path, method=method, body=body)
+async def _api(
+    path: str,
+    *,
+    method: str = "GET",
+    body: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    return await asyncio.to_thread(
+        _request_json_sync,
+        path,
+        method=method,
+        body=body,
+    )
 
 
 async def _api_text(path: str) -> str:
@@ -117,7 +155,9 @@ def _safe_path(path: str) -> str:
     clean = path.replace("\\", "/").strip().lstrip("/")
     if not clean or clean.startswith("../") or "/../" in clean:
         raise ValueError("unsafe repository path")
-    if clean in PROTECTED_FILES or any(
+    if clean in PROTECTED_FILES:
+        raise ValueError(f"protected path: {clean}")
+    if any(
         clean == prefix[:-1] or clean.startswith(prefix)
         for prefix in PROTECTED_PREFIXES
     ):
@@ -134,15 +174,11 @@ def _validate_python(content: str, path: str) -> None:
         raise ValueError(f"generated Python is invalid: {path}: {exc}") from exc
 
 
-def _policy_ok(original: str, replacement: str, path: str) -> bool:
-    added = []
+def _policy_ok(original: str, replacement: str) -> bool:
     before = original.splitlines()
-    after = replacement.splitlines()
-    for line in after:
-        if line not in before:
-            added.append(line)
-
+    added = [line for line in replacement.splitlines() if line not in before]
     added_text = "\n".join(added)
+
     forbidden = (
         "eval(",
         "exec(",
@@ -172,17 +208,21 @@ def _policy_ok(original: str, replacement: str, path: str) -> bool:
     return True
 
 
-def _relevant_files(report: str, traceback: str, event: str) -> list[Path]:
+def _relevant_paths(report: str, traceback: str, event: str) -> list[str]:
     blob = f"{report}\n{traceback}\n{event}"
-    found: list[Path] = []
-    for match in re.findall(r"(?:app|ai)/[A-Za-z0-9_./-]+\.py", blob):
-        path = (ROOT / match).resolve()
-        if path.exists() and ROOT in path.parents and path not in found:
-            found.append(path)
+    found: list[str] = []
 
-    keys = []
+    for match in re.findall(r"(?:app|ai)/[A-Za-z0-9_./-]+\.py", blob):
+        clean = match.replace("\\", "/")
+        try:
+            _safe_path(clean)
+        except ValueError:
+            continue
+        if (ROOT / clean).exists() and clean not in found:
+            found.append(clean)
+
     lower = blob.casefold()
-    for key, names in {
+    groups = {
         "market": ("market", "trade"),
         "بازار": ("market", "trade"),
         "nation": ("nation",),
@@ -192,19 +232,86 @@ def _relevant_files(report: str, traceback: str, event: str) -> list[Path]:
         "treasury": ("treasury",),
         "خزانه": ("treasury",),
         "academy": ("academy",),
-    }.items():
-        if key in lower:
-            keys.extend(names)
+        "آکادمی": ("academy",),
+        "portfolio": ("portfolio",),
+        "دارایی": ("portfolio",),
+    }
+
+    keys: set[str] = set()
+    for keyword, names in groups.items():
+        if keyword in lower:
+            keys.update(names)
 
     for directory in (ROOT / "app", ROOT / "ai"):
+        if not directory.exists():
+            continue
         for path in directory.rglob("*.py"):
-            relative = path.relative_to(ROOT).as_posix().casefold()
-            if path not in found and any(key in relative for key in keys):
-                found.append(path)
-    return found[:6]
+            clean = path.relative_to(ROOT).as_posix()
+            try:
+                _safe_path(clean)
+            except ValueError:
+                continue
+            folded = clean.casefold()
+            if clean not in found and any(key in folded for key in keys):
+                found.append(clean)
+
+    return found[:MAX_FILES]
 
 
-async def _generate_patch(*, report: str, traceback: str, event: str, source: dict[str, str], ci_failure: str, attempt: int) -> dict[str, Any]:
+async def _base_ref() -> str:
+    result = await _api(f"/repos/{_repo()}/git/ref/heads/main")
+    return str(result["object"]["sha"])
+
+
+async def _read_repo_file(path: str, ref: str) -> str | None:
+    clean = _safe_path(path)
+    encoded_path = "/".join(_encoded(part) for part in clean.split("/"))
+    try:
+        result = await _api(
+            f"/repos/{_repo()}/contents/{encoded_path}?ref={_encoded(ref)}"
+        )
+    except RuntimeError as exc:
+        if "GitHub API 404" in str(exc):
+            return None
+        raise
+
+    encoded_content = result.get("content")
+    if not isinstance(encoded_content, str):
+        return None
+
+    return base64.b64decode(encoded_content.encode("ascii")).decode("utf-8")
+
+
+async def _source_snapshot(paths: list[str], ref: str) -> dict[str, str]:
+    source: dict[str, str] = {}
+    total = 0
+
+    for path in paths:
+        content = await _read_repo_file(path, ref)
+        if content is None:
+            continue
+
+        if len(content) > MAX_SOURCE_CHARS:
+            content = content[:MAX_SOURCE_CHARS] + "\n# [source truncated by support agent]"
+
+        if total + len(content) > MAX_TOTAL_SOURCE_CHARS:
+            break
+
+        source[path] = content
+        total += len(content)
+
+    return source
+
+
+async def _generate_patch(
+    *,
+    report: str,
+    traceback: str,
+    event: str,
+    source: dict[str, str],
+    ci_failure: str,
+    attempt: int,
+) -> dict[str, Any]:
     client = companion._get_client()
     if client is None:
         raise RuntimeError("Gemini unavailable")
@@ -249,6 +356,7 @@ CI FAILURE FROM PREVIOUS ATTEMPT:
 SOURCE:
 {source_text}
 """
+
     response = await client.aio.models.generate_content(
         model=settings.ai_model,
         contents=prompt,
@@ -261,6 +369,7 @@ SOURCE:
     text = (response.text or "").strip()
     if not text:
         raise ValueError("empty repair response")
+
     payload = json.loads(text)
     if not isinstance(payload, dict):
         raise ValueError("repair response is not an object")
@@ -275,13 +384,17 @@ async def _create_branch(branch: str, sha: str) -> None:
     )
 
 
-async def _apply_changes(branch: str, changes: list[tuple[str, str]]) -> str:
+async def _apply_changes(
+    branch: str,
+    changes: list[tuple[str, str]],
+) -> str:
     ref = await _api(f"/repos/{_repo()}/git/ref/heads/{_encoded(branch)}")
     parent_sha = str(ref["object"]["sha"])
+
     commit = await _api(f"/repos/{_repo()}/git/commits/{parent_sha}")
     base_tree = str(commit["tree"]["sha"])
 
-    tree_items = []
+    tree_items: list[dict[str, str]] = []
     for path, content in changes:
         blob = await _api(
             f"/repos/{_repo()}/git/blobs",
@@ -289,7 +402,12 @@ async def _apply_changes(branch: str, changes: list[tuple[str, str]]) -> str:
             body={"content": content, "encoding": "utf-8"},
         )
         tree_items.append(
-            {"path": path, "mode": "100644", "type": "blob", "sha": str(blob["sha"])}
+            {
+                "path": path,
+                "mode": "100644",
+                "type": "blob",
+                "sha": str(blob["sha"]),
+            }
         )
 
     tree = await _api(
@@ -297,6 +415,7 @@ async def _apply_changes(branch: str, changes: list[tuple[str, str]]) -> str:
         method="POST",
         body={"base_tree": base_tree, "tree": tree_items},
     )
+
     new_commit = await _api(
         f"/repos/{_repo()}/git/commits",
         method="POST",
@@ -306,6 +425,7 @@ async def _apply_changes(branch: str, changes: list[tuple[str, str]]) -> str:
             "parents": [parent_sha],
         },
     )
+
     commit_sha = str(new_commit["sha"])
     await _api(
         f"/repos/{_repo()}/git/refs/heads/{_encoded(branch)}",
@@ -315,8 +435,8 @@ async def _apply_changes(branch: str, changes: list[tuple[str, str]]) -> str:
     return commit_sha
 
 
-async def _create_pr(branch: str) -> tuple[int, str]:
-    pr = await _api(
+async def _create_pr(branch: str) -> int:
+    result = await _api(
         f"/repos/{_repo()}/pulls",
         method="POST",
         body={
@@ -330,78 +450,109 @@ async def _create_pr(branch: str) -> tuple[int, str]:
             ),
         },
     )
-    return int(pr["number"]), str(pr["head"]["sha"])
+    return int(result["number"])
 
 
 async def _ci_failure_evidence(run_id: int) -> str:
-    jobs = await _api(f"/repos/{_repo()}/actions/runs/{run_id}/jobs?per_page=100")
-    chunks = []
+    jobs = await _api(
+        f"/repos/{_repo()}/actions/runs/{run_id}/jobs?per_page=100"
+    )
+
+    blocks: list[str] = []
     total = 0
+
     for job in jobs.get("jobs", []):
         if job.get("conclusion") not in {"failure", "cancelled", "timed_out"}:
             continue
+
         failed_steps = [
             str(step.get("name"))
             for step in job.get("steps", [])
             if step.get("conclusion") in {"failure", "cancelled", "timed_out"}
         ]
+
         try:
-            logs = await _api_text(f"/repos/{_repo()}/actions/jobs/{int(job['id'])}/logs")
+            logs = await _api_text(
+                f"/repos/{_repo()}/actions/jobs/{int(job['id'])}/logs"
+            )
         except Exception as exc:
             logs = f"log retrieval failed: {exc}"
+
         block = (
             f"JOB: {job.get('name')}\n"
             f"FAILED STEPS: {', '.join(failed_steps) or 'unknown'}\n"
             f"LOG:\n{logs[-9000:]}"
         )
-        chunks.append(block)
+        blocks.append(block)
         total += len(block)
+
         if total >= MAX_CI_LOG_CHARS:
             break
-    return "\n\n".join(chunks)[-MAX_CI_LOG_CHARS:]
+
+    return "\n\n".join(blocks)[-MAX_CI_LOG_CHARS:]
 
 
-async def _wait_for_ci(*, branch: str, head_sha: str, deadline: float) -> tuple[str, str]:
+async def _wait_for_ci(
+    *,
+    branch: str,
+    head_sha: str,
+    deadline: float,
+) -> tuple[str, str]:
     while asyncio.get_running_loop().time() < deadline:
         try:
             runs_payload = await _api(
                 f"/repos/{_repo()}/actions/runs"
-                f"?head={urllib.parse.quote(branch, safe='')}&per_page=20"
+                f"?head={_encoded(branch)}&per_page=20"
             )
             runs = [
-                run for run in runs_payload.get("workflow_runs", [])
+                run
+                for run in runs_payload.get("workflow_runs", [])
                 if str(run.get("head_sha") or "") == head_sha
             ]
         except Exception:
             runs = []
 
         if runs:
-            active = [run for run in runs if run.get("status") != "completed"]
+            active = [
+                run for run in runs if run.get("status") != "completed"
+            ]
             if active:
                 await asyncio.sleep(DEFAULT_CI_POLL_SECONDS)
                 continue
+
             failures = [
-                run for run in runs
-                if run.get("conclusion") not in {"success", "neutral", "skipped"}
+                run
+                for run in runs
+                if run.get("conclusion")
+                not in {"success", "neutral", "skipped"}
             ]
             if failures:
-                return "failed", await _ci_failure_evidence(int(failures[0]["id"]))
+                return "failed", await _ci_failure_evidence(
+                    int(failures[0]["id"])
+                )
             return "passed", ""
 
         try:
-            checks = await _api(f"/repos/{_repo()}/commits/{head_sha}/check-runs")
-            check_runs = checks.get("check_runs", [])
+            check_payload = await _api(
+                f"/repos/{_repo()}/commits/{head_sha}/check-runs"
+            )
+            check_runs = check_payload.get("check_runs", [])
         except Exception:
             check_runs = []
 
         if check_runs:
-            active = [run for run in check_runs if run.get("status") != "completed"]
+            active = [
+                run for run in check_runs if run.get("status") != "completed"
+            ]
             if active:
                 await asyncio.sleep(DEFAULT_CI_POLL_SECONDS)
                 continue
+
             failures = [
-                run for run in check_runs
-                if run.get("conclusion") not in {"success", "neutral", "skipped"}
+                run
+                for run in check_runs
+                if run.get("conclusion")
+                not in {"success", "neutral", "skipped"}
             ]
             if failures:
                 return "failed", json.dumps(
@@ -419,76 +570,84 @@ async def _wait_for_ci(*, branch: str, head_sha: str, deadline: float) -> tuple[
     return "timeout", "CI did not finish before the repair deadline."
 
 
-def _prepare_changes(payload: dict[str, Any], current_source: dict[str, str]) -> list[tuple[str, str]]:
+def _prepare_changes(
+    payload: dict[str, Any],
+    current_source: dict[str, str],
+) -> list[tuple[str, str]]:
     raw_files = payload.get("files")
     if not isinstance(raw_files, list):
         raise ValueError("repair payload has no files list")
     if len(raw_files) > MAX_FILES:
         raise ValueError("repair touched too many files")
 
-    changes = []
+    changes: list[tuple[str, str]] = []
     for item in raw_files:
         if not isinstance(item, dict):
             raise ValueError("invalid repair file entry")
+
         path = _safe_path(str(item.get("path", "")))
         replacement = item.get("content")
+
         if not isinstance(replacement, str) or not replacement.strip():
             raise ValueError(f"empty generated file: {path}")
+
         original = current_source.get(path, "")
         _validate_python(replacement, path)
         if not _policy_ok(original, replacement):
             raise ValueError(f"repair policy rejected: {path}")
+
         changes.append((path, replacement))
 
     if len({path for path, _ in changes}) != len(changes):
         raise ValueError("duplicate repair file paths")
+
     return changes
 
-def _commit(branch: str, base_sha: str, base_tree: str, files: list[tuple[str, str]]) -> str:
-    tree_items = [
-        {"path": path, "mode": "100644", "type": "blob", "sha": _blob(content)}
-        for path, content in files
-    ]
-    tree = _api(
-        f"/repos/{settings.support_github_repo}/git/trees",
-        method="POST",
-        body={"base_tree": base_tree, "tree": tree_items},
+
+async def _merge_pr(pr_number: int) -> bool:
+    result = await _api(
+        f"/repos/{_repo()}/pulls/{pr_number}/merge",
+        method="PUT",
+        body={"merge_method": "squash"},
     )
-    commit = _api(
-        f"/repos/{settings.support_github_repo}/git/commits",
-        method="POST",
-        body={
-            "message": "auto-fix: repair reported game bug",
-            "tree": tree["sha"],
-            "parents": [base_sha],
-        },
-    )
-    _api(
-        f"/repos/{settings.support_github_repo}/git/refs/heads/{branch}",
-        method="PATCH",
-        body={"sha": commit["sha"], "force": False},
-    )
-    return commit["sha"]
+    return bool(result.get("merged"))
 
 
-async def repair_code(*, report: str, traceback: str, event: str) -> EngineeringResult:
+async def repair_code(
+    *,
+    report: str,
+    traceback: str,
+    event: str,
+) -> EngineeringResult:
     if not settings.support_engineering_enabled:
-        return EngineeringResult("disabled", "تعمیر خودکار کد غیرفعال است.")
+        return EngineeringResult(
+            "disabled",
+            "تعمیر خودکار کد غیرفعال است.",
+        )
+
     if not _github_token():
         return EngineeringResult(
             "credentials_missing",
             "دسترسی مهندسی GitHub برای اصلاح دائمی کد تنظیم نشده است.",
         )
+
     if _REPAIR_LOCK.locked():
-        return EngineeringResult("busy", "یک عملیات تعمیر خودکار دیگر در حال اجراست.")
+        return EngineeringResult(
+            "busy",
+            "یک عملیات تعمیر خودکار دیگر در حال اجراست.",
+        )
 
     await _REPAIR_LOCK.acquire()
-    try:
-        paths = _relevant_files(report, traceback, event)
-        if not paths:
-            return EngineeringResult("no_context", "فایل مرتبط برای اصلاح پیدا نشد.")
 
-        base_sha, _ = await _base_ref()
+    try:
+        paths = _relevant_paths(report, traceback, event)
+        if not paths:
+            return EngineeringResult(
+                "no_context",
+                "فایل مرتبط برای اصلاح پیدا نشد.",
+            )
+
+        base_sha = await _base_ref()
         branch = f"support/autofix-{uuid.uuid4().hex[:10]}"
         await _create_branch(branch, base_sha)
 
@@ -500,8 +659,8 @@ async def repair_code(*, report: str, traceback: str, event: str) -> Engineering
                 branch=branch,
             )
 
-        pr_number = None
-        changed_files = set()
+        pr_number: int | None = None
+        changed_files: set[str] = set()
         ci_failure = ""
         deadline = asyncio.get_running_loop().time() + max(
             60,
@@ -520,6 +679,7 @@ async def repair_code(*, report: str, traceback: str, event: str) -> Engineering
 
             current_ref = "main" if attempt == 1 else branch
             source = await _source_snapshot(paths, current_ref)
+
             payload = await _generate_patch(
                 report=report,
                 traceback=traceback,
@@ -543,7 +703,7 @@ async def repair_code(*, report: str, traceback: str, event: str) -> Engineering
             changed_files.update(path for path, _ in changes)
 
             if pr_number is None:
-                pr_number, _ = await _create_pr(branch)
+                pr_number = await _create_pr(branch)
 
             ci_status, ci_failure = await _wait_for_ci(
                 branch=branch,
@@ -560,6 +720,7 @@ async def repair_code(*, report: str, traceback: str, event: str) -> Engineering
                         pull_request=pr_number,
                         changed_files=tuple(sorted(changed_files)),
                     )
+
                 return EngineeringResult(
                     "merge_failed",
                     "اصلاحیه و تست‌ها موفق بودند اما merge خودکار انجام نشد.",
@@ -584,15 +745,16 @@ async def repair_code(*, report: str, traceback: str, event: str) -> Engineering
             pull_request=pr_number,
             changed_files=tuple(sorted(changed_files)),
         )
+
     except Exception as exc:
         logger.exception("Support code repair failed")
         return EngineeringResult(
             "error",
             f"تعمیر خودکار با خطای داخلی متوقف شد: {type(exc).__name__}.",
         )
+
     finally:
         _REPAIR_LOCK.release()
-
 
 
 __all__ = ["EngineeringResult", "repair_code"]
