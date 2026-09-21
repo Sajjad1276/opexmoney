@@ -490,6 +490,7 @@ async def founder_has_group(call: CallbackQuery, state: FSMContext, bot: Bot) ->
             await call.answer(str(exc), show_alert=True)
             return
         await state.set_state(FounderStates.WAITING_GROUP_ADMIN)
+        await state.update_data(founder_launch_token=draft.launch_token)
         await call.answer()
         if call.message:
             await _show_group_step(call.message, state, bot, draft, edit_call=call)
@@ -759,30 +760,46 @@ async def check_founder_group(
         return
 
     try:
-        async with async_session() as session:
-            active_draft = await get_active_draft(
-                session,
-                call.from_user.id,
-                lock=False,
-            )
-            if active_draft is None:
-                raise ValueError("⚠️ فرآیند تأسیس منقضی شده. دوباره شروع کن.")
-            if active_draft.group_id not in (None, group_id):
-                raise ValueError(
-                    "⚠️ گروه این فرآیند تغییر کرده. دوباره از لینک تأسیس استفاده کن."
+        launch_token = data.get("founder_launch_token")
+        if not launch_token:
+            async with async_session() as session:
+                active_draft = await get_active_draft(
+                    session,
+                    call.from_user.id,
+                    lock=False,
                 )
+                if active_draft is None:
+                    raise ValueError("⚠️ فرآیند تأسیس منقضی شده. دوباره شروع کن.")
+                launch_token = active_draft.launch_token
 
+        group = await bot.get_chat(group_id)
+        group_title = getattr(group, "title", None) or "گروه"
+        group_username = getattr(group, "username", None)
+        group_type = getattr(getattr(group, "type", None), "value", None) or "supergroup"
+
+        async with async_session() as session:
             draft = await bind_group(
                 session,
                 founder_user_id=call.from_user.id,
-                token=active_draft.launch_token,
+                token=launch_token,
                 group_id=group_id,
-                group_title=active_draft.group_title or "گروه",
-                group_username=active_draft.group_username,
-                group_type=active_draft.group_type or "supergroup",
+                group_title=group_title,
+                group_username=group_username,
+                group_type=group_type,
             )
     except ValueError as exc:
         await call.answer(str(exc), show_alert=True)
+        return
+    except Exception:
+        logger.exception(
+            "Founder group binding failed | founder=%s group=%s",
+            call.from_user.id,
+            group_id,
+        )
+        await call.answer(
+            "⚠️ اتصال گروه انجام نشد. دوباره بررسی کن.",
+            show_alert=True,
+        )
         return
 
     await state.set_state(FounderStates.SET_CURRENCY_CODE)
@@ -873,7 +890,7 @@ async def receive_founder_username(
                 user.username = value
 
     await state.set_state(FounderStates.WAITING_GROUP_ADMIN)
-    await state.update_data(founder_pending_group=None)
+    await state.update_data(founder_pending_group=None, founder_launch_token=draft.launch_token)
     try:
         async with async_session() as session:
             draft = await get_or_create_draft(session, message.from_user.id)
