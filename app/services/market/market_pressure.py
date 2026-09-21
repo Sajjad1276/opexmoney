@@ -269,9 +269,12 @@ def _emoji_for_value(value: Decimal) -> str:
 
 def _summary(
     currency_code: str,
-    dominant_cause: str,
+    dominant_cause: str | None,
     factors: dict[str, Decimal],
 ) -> str:
+    if dominant_cause is None:
+        return f"برای تغییر {currency_code} دلیل معناداری ثبت نشده"
+
     value = factors.get(dominant_cause, Decimal("0"))
 
     if dominant_cause == "activity_score":
@@ -335,8 +338,8 @@ async def build_price_receipt(
     }
     dominant_cause = (
         max(weighted_abs, key=weighted_abs.get)
-        if weighted_abs
-        else "activity_score"
+        if weighted_abs and max(weighted_abs.values()) > 0
+        else None
     )
 
     if len(rows) >= 2 and _to_decimal(rows[0].rate) > 0:
