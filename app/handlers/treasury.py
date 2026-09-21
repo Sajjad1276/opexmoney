@@ -21,7 +21,7 @@ from app.database.models import NationMember, NationMemberRole, User
 from app.database.session import async_session
 from app.services.nation_service import get_user_active_nation_context
 from app.handlers.nation_management import nation_admin_panel
-from app.handlers.start import show_dashboard
+from app.handlers.dashboard import show_dashboard
 from app.keyboards.inline import nation_panel_keyboard
 from app.services.user_service import is_fully_registered
 from app.services.treasury_service import (
