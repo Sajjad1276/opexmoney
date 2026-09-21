@@ -7,7 +7,9 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_founder_router_precedes_generic_start_router():
     source = (ROOT / "main.py").read_text(encoding="utf-8")
-    founder_pos = source.index("dp.include_router(founder_router)")
+    founder_positions = [m.start() for m in re.finditer(r"dp\\.include_router\\(founder_router\\)", source)]
+    assert len(founder_positions) == 1
+    founder_pos = founder_positions[0]
     start_pos = source.index("dp.include_router(start_router)")
     assert founder_pos < start_pos
 
