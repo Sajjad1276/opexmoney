@@ -203,9 +203,12 @@ def format_market_page(user, overview: dict, active: int, trade_count: int) -> s
             lines.append(
                 f"{_direction(change)} <b>{html.escape(nation.currency_code)}</b> · "
                 f"<b>{fmt_rate(item['current_rate'])} دلار</b> · "
-                f"{item['change_24h']:+.2f}%"
+                format_change_text(change, "24h")
             )
-        lines.extend(["", "🎯 <b>حرکت پیشنهادی:</b> یک ارز رو انتخاب کن و خرید اولت رو امتحان کن."])
+        lines.extend([
+            "",
+            "🎯 <b>حرکت پیشنهادی:</b> یک ارز رو انتخاب کن و خرید اولت رو امتحان کن.",
+        ])
         return "\n".join(lines)
 
     lines = [
