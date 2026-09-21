@@ -6,8 +6,9 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
 from app.database.session import async_session
-from app.database.models import Nation
+from app.database.models import Nation, User
 from app.handlers.dashboard import show_dashboard
+from app.core.redis import get_redis
 from app.services.nation.nation_invite_service import consume_invite_link
 from app.utils.formatting import rtl_html
 
@@ -30,7 +31,7 @@ async def _handle_invite_link(
     try:
         async with async_session() as session:
             async with session.begin():
-                redis = message.bot.get("redis")
+                redis = get_redis()
                 if redis is None:
                     raise ValueError("لینک دعوت در این لحظه در دسترس نیست.")
                 result = await consume_invite_link(
@@ -39,7 +40,7 @@ async def _handle_invite_link(
                     token,
                     message.from_user.id,
                 )
-                user = await session.get(__import__("app.database.models", fromlist=["User"]).User, message.from_user.id)
+                user = await session.get(User, message.from_user.id)
         await state.clear()
         await message.answer(
             rtl_html(result.message),
