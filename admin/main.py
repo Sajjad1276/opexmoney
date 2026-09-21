@@ -13,7 +13,6 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
 from app.database.session import async_session
-from admin.dependencies import get_redis
 from admin.routers import (
     actions,
     economy,
@@ -94,7 +93,7 @@ app.add_middleware(
     allow_origin_regex=r"^https://.*\\.up\\.railway\\.app$|^http://localhost:3000$",
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["*"] ,
+    allow_headers=["*"],
 )
 
 
@@ -123,7 +122,6 @@ async def global_exception_handler(request: Request, exc: Exception):
         "ADMIN_EXCEPTION|method=%s|path=%s",
         request.method,
         request.url.path,
-        exc_info=exc,
     )
     return JSONResponse(
         status_code=500,
