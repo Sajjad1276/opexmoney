@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import datetime, timezone
+from decimal import Decimal
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -231,7 +232,7 @@ async def give_bonus(
     updated = int(result.rowcount or 0)
     _audit(
         db,
-        admin_user,
+        await _audit_actor(db, admin_user),
         action="admin_give_bonus",
         rule_key="give_bonus",
         old_value=None,
@@ -262,7 +263,7 @@ async def ban_player(
         user.deleted_at = _now()
     _audit(
         db,
-        admin_user,
+        await _audit_actor(db, admin_user),
         action="admin_ban_player",
         rule_key="ban_player",
         old_value=old_value,
@@ -308,7 +309,7 @@ async def reset_market_rates(
 
     _audit(
         db,
-        admin_user,
+        await _audit_actor(db, admin_user),
         action="admin_reset_market_rates",
         rule_key="reset_market_rates",
         old_value=(
@@ -348,7 +349,7 @@ async def end_war(
     war.ended_at = _now()
     _audit(
         db,
-        admin_user,
+        await _audit_actor(db, admin_user),
         action="admin_end_war",
         rule_key="end_war",
         old_value=old_status,
