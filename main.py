@@ -348,7 +348,7 @@ def build_scheduler(bot: Bot) -> AsyncIOScheduler:
 async def main() -> None:
     # Intentional: Railway currently has no pre-deploy hook configured, so migrations stay here until one is properly configured.
     await ensure_database_schema()
-    await ensure_ai_population()
+    # AI civilization is opt-in. Startup must never create nations or users.
     bot = Bot(
         token=settings.bot_token,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
