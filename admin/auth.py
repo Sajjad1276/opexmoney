@@ -43,7 +43,7 @@ def validate_telegram_init_data(init_data: str) -> int:
         if not received_hash:
             raise _unauthorized()
 
-        data_check_string = "\\n".join(
+        data_check_string = "\n".join(
             f"{key}={value}" for key, value in sorted(data.items())
         )
         secret_key = hmac.new(
