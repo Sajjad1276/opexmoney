@@ -20,7 +20,7 @@ from app.services.settings_service import (
     is_username_taken,
 )
 from app.utils.name_filter import is_blocked_trader_name, is_valid_trader_name
-from app.handlers.onboarding_fix import BLOCKED_NAME, INVALID_NAME
+from app.handlers.onboarding import BLOCKED_NAME, INVALID_NAME
 from app.utils.formatting import fmt_amount, to_fa
 from app.utils.ui import close_inline_panel, remember_inline_panel, send_submenu_panel
 
