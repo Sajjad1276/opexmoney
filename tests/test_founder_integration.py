@@ -195,7 +195,8 @@ async def test_founder_backend_starts_draft_and_persists_selected_flag():
         assert draft.flag_emoji == "🏴"
 
     async with async_session() as session:
-        nation = await create_nation_backend(
+        async with session.begin():
+            nation = await create_nation_backend(
             session=session,
             founder_id=founder_id,
             name="Founder Backend Nation",
