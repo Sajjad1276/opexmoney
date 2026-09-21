@@ -7,6 +7,7 @@ import pytest
 from sqlalchemy import delete, select
 
 import app.handlers.nation_management as nm
+from app.services.nation_service import get_user_active_nation_context
 from app.database.models import (
     Nation,
     NationJoinRequest,
@@ -163,6 +164,74 @@ async def cleanup():
                 await session.execute(
                     delete(Nation).where(Nation.nation_id.in_(nation_ids))
                 )
+
+
+@pytest.mark.asyncio
+async def test_nation_context_repairs_founder_without_telegram_projection():
+    nation_id = await _seed_nation()
+
+    async with async_session() as session:
+        async with session.begin():
+            context = await get_user_active_nation_context(
+                session,
+                FOUNDER_ID,
+                repair=True,
+                lock=True,
+            )
+            assert context is not None
+            nation, role, source = context
+            assert nation.nation_id == nation_id
+            assert role == NationMemberRole.FOUNDER.value
+            assert source == "repaired_founder"
+
+            member = await session.scalar(
+                select(NationMember).where(
+                    NationMember.nation_id == nation_id,
+                    NationMember.user_id == FOUNDER_ID,
+                    NationMember.is_active.is_(True),
+                )
+            )
+            assert member is not None
+
+
+@pytest.mark.asyncio
+async def test_nation_context_repairs_player_from_home_nation_and_holding():
+    nation_id = await _seed_nation()
+
+    async with async_session() as session:
+        async with session.begin():
+            user = await session.get(User, PLAYER_A_ID, with_for_update=True)
+            user.home_nation_id = nation_id
+            session.add(
+                __import__("app.database.models", fromlist=["CurrencyHolding"]).CurrencyHolding(
+                    user_id=PLAYER_A_ID,
+                    nation_id=nation_id,
+                    amount=Decimal("500"),
+                )
+            )
+
+    async with async_session() as session:
+        async with session.begin():
+            context = await get_user_active_nation_context(
+                session,
+                PLAYER_A_ID,
+                repair=True,
+                lock=True,
+            )
+            assert context is not None
+            nation, role, source = context
+            assert nation.nation_id == nation_id
+            assert role == NationMemberRole.CITIZEN.value
+            assert source == "repaired_holding"
+
+            member = await session.scalar(
+                select(NationMember).where(
+                    NationMember.nation_id == nation_id,
+                    NationMember.user_id == PLAYER_A_ID,
+                    NationMember.is_active.is_(True),
+                )
+            )
+            assert member is not None
 
 
 @pytest.mark.asyncio
