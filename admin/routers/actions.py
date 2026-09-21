@@ -35,7 +35,7 @@ class GiveBonusRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     user_ids: list[int] | Literal["all"]
-    amount_xr: float = Field(gt=0)
+    amount_xr: Decimal = Field(gt=0)
     note: str = Field(min_length=1, max_length=255)
 
 
@@ -50,7 +50,7 @@ class ResetMarketRatesRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     nation_id: int | Literal["all"]
-    new_rate: float = Field(gt=0)
+    new_rate: Decimal = Field(gt=0)
 
 
 class EndWarRequest(BaseModel):
@@ -66,7 +66,7 @@ def _now() -> datetime:
 
 def _audit(
     db: AsyncSession,
-    admin_user: int,
+    actor_player_id: int | None,
     *,
     action: str,
     rule_key: str,
@@ -77,13 +77,19 @@ def _audit(
     db.add(
         GovernanceLedger(
             at=_now(),
-            actor_player_id=admin_user,
+            actor_player_id=actor_player_id,
             action=action,
             rule_key=rule_key,
             old_value=old_value,
             new_value=new_value,
             reason=reason,
         )
+    )
+
+
+async def _audit_actor(db: AsyncSession, admin_user: int) -> int | None:
+    return await db.scalar(
+        select(User.user_id).where(User.user_id == admin_user)
     )
 
 
@@ -174,9 +180,10 @@ async def broadcast(
         bot_token,
     )
 
+    audit_actor = await _audit_actor(db, admin_user)
     _audit(
         db,
-        admin_user,
+        audit_actor,
         action="admin_broadcast",
         rule_key="broadcast",
         old_value=None,
