@@ -27,6 +27,7 @@ from app.utils.ui import (
 from app.keyboards.inline import cancel_keyboard, nation_selection_keyboard, welcome_keyboard
 from app.services.membership_service import sync_registered_user_memberships
 from app.handlers.start import cmd_start as restart_flow
+from app.handlers.nation_management import _join_user
 from app.services.temporal_service import ensure_temporal_profile
 from app.services.nation_service import get_nation_rank
 from app.services.user_service import get_user, is_fully_registered, username_exists
