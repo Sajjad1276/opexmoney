@@ -18,8 +18,8 @@ from app.database.models import (
     User,
     UserActivity,
 )
+from app.services.market.market_pressure import _read_pressure_signals
 from app.services.market.market_state import get_currency_state
-from app.services.market.market_pressure import pressure_signal_from_state
 from app.services.economy_metrics import (
     calculate_total_volume,
     count_transactions,
@@ -44,6 +44,7 @@ class RateFactors:
     trade_score: Decimal
     growth_score: Decimal
     pressure_signal: Decimal
+    foreign_signal: Decimal
     dominant_cause: str
 
 
@@ -115,10 +116,21 @@ async def _member_counts(
     return total, active
 
 
-def _dominant_cause(factors: tuple[Decimal, Decimal, Decimal, Decimal]) -> str:
-    labels = ("فعالیت اعضا", "حجم معاملات", "رشد ملت", "فشار بازار")
-    values = [abs(value) for value in factors]
-    return labels[values.index(max(values))]
+def _dominant_cause(
+    activity_score: Decimal,
+    trade_score: Decimal,
+    growth_score: Decimal,
+    pressure_signal: Decimal,
+    foreign_signal: Decimal,
+) -> str:
+    weighted = {
+        "activity_score": abs(activity_score) * Decimal("0.30"),
+        "trade_score": abs(trade_score) * Decimal("0.25"),
+        "growth_score": abs(growth_score) * Decimal("0.20"),
+        "pressure_signal": abs(pressure_signal) * Decimal("0.15"),
+        "foreign_signal": abs(foreign_signal) * Decimal("0.10"),
+    }
+    return max(weighted, key=weighted.get)
 
 
 async def calculate_rate_delta(
@@ -165,18 +177,24 @@ async def calculate_rate_delta(
 
     market_state = await get_currency_state(
         session,
-        nation.nation_id,
+        nation_id=nation.nation_id,
         window_minutes=15,
     )
-    pressure_signal = pressure_signal_from_state(market_state)
 
-    score = (
-        activity_score * Decimal("0.4")
-        + trade_score * Decimal("0.3")
-        + growth_score * Decimal("0.3")
-        + pressure_signal * Decimal("0.05")
+    from app.core.redis import get_redis
+
+    pressure_signal, foreign_signal = await _read_pressure_signals(
+        get_redis(),
+        nation.nation_id,
     )
-    raw_delta = (score - Decimal("0.5")) * settings.rate_base_step
+
+    raw_delta = (
+        activity_score * Decimal("0.30")
+        + trade_score * Decimal("0.25")
+        + growth_score * Decimal("0.20")
+        + pressure_signal * Decimal("0.15")
+        + foreign_signal * Decimal("0.10")
+    ) * settings.rate_base_step
     volatility_multiplier = Decimal(str(
         await resolve(
             session,
@@ -203,12 +221,14 @@ async def calculate_rate_delta(
         trade_score=trade_score,
         growth_score=growth_score,
         pressure_signal=pressure_signal,
-        dominant_cause=_dominant_cause((
-            activity_score * Decimal("0.4"),
-            trade_score * Decimal("0.3"),
-            growth_score * Decimal("0.3"),
-            pressure_signal * Decimal("0.05"),
-        )),
+        foreign_signal=foreign_signal,
+        dominant_cause=_dominant_cause(
+            activity_score,
+            trade_score,
+            growth_score,
+            pressure_signal,
+            foreign_signal,
+        ),
     )
     return RateDelta(
         nation_id=nation.nation_id,
@@ -247,6 +267,12 @@ async def persist_rate_update(
             volume=nation.trade_volume_24h,
             active_members=active,
             calculated_at=now,
+            dominant_cause=delta.factors.dominant_cause,
+            pressure_signal=delta.factors.pressure_signal,
+            foreign_signal=delta.factors.foreign_signal,
+            activity_score=delta.factors.activity_score,
+            trade_score=delta.factors.trade_score,
+            growth_score=delta.factors.growth_score,
         )
     )
     session.add(
@@ -426,10 +452,11 @@ async def build_price_receipt(
 
     deltas = _RATE_FACTOR_HISTORY.get(nation_id, [])[-limit:]
     component_specs = (
-        ("فعالیت اعضا", Decimal("0.4"), "activity_score"),
-        ("حجم معاملات", Decimal("0.3"), "trade_score"),
-        ("رشد ملت", Decimal("0.3"), "growth_score"),
-        ("فشار بازار", Decimal("0.05"), "pressure_signal"),
+        ("فعالیت اعضا", Decimal("0.30"), "activity_score"),
+        ("حجم معاملات", Decimal("0.25"), "trade_score"),
+        ("رشد ملت", Decimal("0.20"), "growth_score"),
+        ("فشار بازار", Decimal("0.15"), "pressure_signal"),
+        ("تقاضای خارجی", Decimal("0.10"), "foreign_signal"),
     )
     totals: dict[str, Decimal] = {
         label: Decimal("0") for label, _, _ in component_specs

@@ -205,6 +205,11 @@ def format_market_page(user, overview: dict, active: int, trade_count: int) -> s
                 f"{direction} <b>{html.escape(nation.currency_code)}</b> · "
                 f"<b>{price} دلار</b> · {format_change_text(change, '24h')}"
             )
+            cause_line = item.get("cause_line")
+            if cause_line:
+                lines.append(
+                    f"   دلیل: {html.escape(cause_line)}"
+                )
         lines.extend([
             "",
             "🎯 <b>حرکت پیشنهادی:</b> یک ارز رو انتخاب کن و خرید اولت رو امتحان کن.",
@@ -240,6 +245,13 @@ def format_market_page(user, overview: dict, active: int, trade_count: int) -> s
             f"{direction} <b>{code}</b> [{risk_title}]  <b>{price} OPX</b>",
             f"   {format_change_text(change, '24h')}",
             f"   📊 حجم ۲۴ ساعت: <b>{format_volume(item['volume_24h'])} OPX</b>",
+        ])
+        cause_line = item.get("cause_line")
+        if cause_line:
+            lines.append(
+                f"   دلیل: {html.escape(cause_line)}"
+            )
+        lines.extend([
             f"   <i>{html.escape(item['insight'])}</i>",
             "",
         ])

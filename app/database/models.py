@@ -579,6 +579,35 @@ class RateHistory(Base):
     calculated_at: Mapped[datetime] = mapped_column(
         UTCDateTime(), default=utcnow, server_default=func.now(), nullable=False
     )
+    dominant_cause: Mapped[str | None] = mapped_column(
+        String(50),
+        nullable=True,
+    )
+    pressure_signal: Mapped[Decimal | None] = mapped_column(
+        Numeric(8, 6),
+        default=Decimal("0"),
+        nullable=True,
+    )
+    foreign_signal: Mapped[Decimal | None] = mapped_column(
+        Numeric(8, 6),
+        default=Decimal("0"),
+        nullable=True,
+    )
+    activity_score: Mapped[Decimal | None] = mapped_column(
+        Numeric(8, 6),
+        default=Decimal("0"),
+        nullable=True,
+    )
+    trade_score: Mapped[Decimal | None] = mapped_column(
+        Numeric(8, 6),
+        default=Decimal("0"),
+        nullable=True,
+    )
+    growth_score: Mapped[Decimal | None] = mapped_column(
+        Numeric(8, 6),
+        default=Decimal("0"),
+        nullable=True,
+    )
 
     nation: Mapped["Nation"] = relationship("Nation", lazy="selectin")
 

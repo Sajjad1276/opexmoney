@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.models import CurrencyHolding, Nation, TradePreview, Transaction, User, UserActivity
 from app.database.session import async_session
 from app.services.mission_service import increment_mission
+from app.services.market.market_pressure import record_trade_pressure
 from app.services.temporal_service import get_peak_multiplier
 from app.services.user_service import sync_user_balance
 from app.services.rules.resolver import resolve
@@ -110,6 +111,12 @@ async def execute_buy(session: AsyncSession, *, user_id: int, nation_id: int, sp
             await increment_mission(session, user_id, key, amount=amount)
         except Exception:
             continue
+    await record_trade_pressure(
+        nation_id=nation.nation_id,
+        side="buy",
+        volume=spend,
+        buyer_home_nation_id=user.home_nation_id,
+    )
     return TradeExecutionResult(nation, user, holding, "buy", spend, Decimal(str(calc["receive"])), Decimal(str(calc["fee"])), peak_multiplier, nation.exchange_rate)
 
 
@@ -159,6 +166,12 @@ async def execute_sell(session: AsyncSession, *, user_id: int, nation_id: int, a
             await increment_mission(session, user_id, key, amount=mission_amount)
         except Exception:
             continue
+    await record_trade_pressure(
+        nation_id=nation.nation_id,
+        side="sell",
+        volume=amount * Decimal(str(nation.exchange_rate)),
+        buyer_home_nation_id=None,
+    )
     return TradeExecutionResult(nation, user, holding, "sell", amount, Decimal(str(calc["receive"])), Decimal(str(calc["fee"])), peak_multiplier, nation.exchange_rate)
 
 

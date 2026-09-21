@@ -406,6 +406,22 @@ async def get_market_overview(
 
     visible = snapshot[: max(1, min(int(limit), 20))]
 
+    from app.services.market.market_pressure import build_price_receipt
+
+    for item in visible:
+        try:
+            receipt = await build_price_receipt(
+                session,
+                item["nation"].nation_id,
+                last_n=1,
+            )
+            if receipt.lines:
+                item["cause_line"] = (
+                    f"{receipt.lines[0].label} {receipt.lines[0].emoji}"
+                )
+        except Exception:
+            item["cause_line"] = None
+
     return {
         "mood": mood,
         "top_mover": {

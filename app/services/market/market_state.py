@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
 from decimal import Decimal
+from typing import Any
 
 from sqlalchemy import distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database.models import CurrencyHolding, Nation, NationTelegramMember, Transaction, User, UserActivity
+from app.database.models import CurrencyHolding, Nation, RateHistory, UserActivity
 
 
 @dataclass(frozen=True)
@@ -22,102 +22,140 @@ class CurrencyMarketState:
     national_activity: int
 
 
-def _safe_ratio(value: Decimal, denominator: Decimal) -> Decimal:
-    if denominator <= 0:
+def _to_decimal(value: Any) -> Decimal:
+    if value is None:
         return Decimal("0")
-    return value / denominator
+    if isinstance(value, bytes):
+        value = value.decode("utf-8")
+    try:
+        return Decimal(str(value))
+    except Exception:
+        return Decimal("0")
+
+
+def _clamp(value: Decimal, low: Decimal, high: Decimal) -> Decimal:
+    return max(low, min(high, value))
+
+
+async def _read_pressure(redis, nation_id: int) -> tuple[Decimal, Decimal, Decimal]:
+    if redis is None:
+        return Decimal("0"), Decimal("0"), Decimal("0")
+
+    try:
+        pressure = await redis.hgetall(f"pressure:{int(nation_id)}")
+    except Exception:
+        return Decimal("0"), Decimal("0"), Decimal("0")
+
+    if not isinstance(pressure, dict):
+        return Decimal("0"), Decimal("0"), Decimal("0")
+
+    return (
+        _to_decimal(pressure.get("buy_volume")),
+        _to_decimal(pressure.get("sell_volume")),
+        _to_decimal(pressure.get("foreign_buy")),
+    )
+
+
+async def _get_redis():
+    from app.core.redis import get_redis
+    return get_redis()
+
+
+async def _calculate_volatility(
+    session: AsyncSession,
+    nation_id: int,
+) -> Decimal:
+    rows = list(reversed((
+        await session.execute(
+            select(RateHistory.rate)
+            .where(RateHistory.nation_id == nation_id)
+            .order_by(RateHistory.calculated_at.desc())
+            .limit(4)
+        )
+    ).scalars().all()))
+
+    rates = [_to_decimal(rate) for rate in rows if _to_decimal(rate) > 0]
+    if len(rates) < 2:
+        return Decimal("0")
+
+    changes = [
+        (rates[index] - rates[index - 1]) / rates[index - 1]
+        for index in range(1, len(rates))
+        if rates[index - 1] > 0
+    ]
+    if not changes:
+        return Decimal("0")
+
+    mean = sum(changes, Decimal("0")) / Decimal(len(changes))
+    variance = sum(
+        (change - mean) ** 2
+        for change in changes
+    ) / Decimal(len(changes))
+    try:
+        volatility = variance.sqrt()
+    except Exception:
+        volatility = Decimal("0")
+    return _clamp(abs(volatility), Decimal("0"), Decimal("1"))
 
 
 async def get_currency_state(
     session: AsyncSession,
-    nation_id: int,
+    redis=None,
+    nation_id: int | None = None,
     window_minutes: int = 15,
 ) -> CurrencyMarketState:
+    # Backward-compatible support for the old get_currency_state(session, nation_id) call.
+    if nation_id is None and isinstance(redis, int):
+        nation_id = redis
+        redis = None
+
+    if nation_id is None:
+        raise ValueError("شناسه ملت مشخص نشده است.")
+
     nation = await session.get(Nation, nation_id)
     if nation is None:
         raise ValueError("ملت پیدا نشد.")
 
-    since = datetime.utcnow() - timedelta(minutes=max(1, window_minutes))
+    if redis is None:
+        redis = await _get_redis()
 
-    buy_pressure = Decimal(str(await session.scalar(
-        select(func.coalesce(func.sum(Transaction.spend_xr), 0)).where(
-            Transaction.nation_id == nation_id,
-            Transaction.transaction_type == "buy",
-            Transaction.created_at >= since,
-        )
-    ) or 0))
-    sell_pressure = Decimal(str(await session.scalar(
-        select(func.coalesce(func.sum(Transaction.spend_xr), 0)).where(
-            Transaction.nation_id == nation_id,
-            Transaction.transaction_type == "sell",
-            Transaction.created_at >= since,
-        )
-    ) or 0))
-    foreign_demand = Decimal(str(await session.scalar(
-        select(func.coalesce(func.sum(Transaction.spend_xr), 0))
-        .join(User, User.user_id == Transaction.user_id)
-        .where(
-            Transaction.nation_id == nation_id,
-            Transaction.transaction_type == "buy",
-            Transaction.created_at >= since,
-            User.home_nation_id != nation_id,
-        )
-    ) or 0))
-
-    liquidity = Decimal(str(await session.scalar(
-        select(func.coalesce(func.sum(CurrencyHolding.amount), 0)).where(
-            CurrencyHolding.nation_id == nation_id,
-            CurrencyHolding.amount > 0,
-        )
-    ) or 0))
-
-    activity_stmt = select(func.count(distinct(UserActivity.user_id))).where(
-        UserActivity.nation_id == nation_id,
-        UserActivity.created_at >= since,
+    buy_pressure, sell_pressure, foreign_demand = await _read_pressure(
+        redis,
+        nation_id,
     )
-    if not nation.is_ai:
-        activity_stmt = activity_stmt.join(
-            NationTelegramMember,
-            NationTelegramMember.telegram_user_id == UserActivity.user_id,
-        ).where(
-            NationTelegramMember.nation_id == nation_id,
-            NationTelegramMember.is_active.is_(True),
-        )
-    national_activity = int(await session.scalar(activity_stmt) or 0)
 
-    total_pressure = buy_pressure + sell_pressure
-    confidence = min(
-        Decimal("1"),
-        _safe_ratio(total_pressure, Decimal("1000"))
-        + _safe_ratio(Decimal(national_activity), Decimal("100")),
-    )
-    rates = list((
-        await session.execute(
-            select(Transaction.rate)
-            .where(
-                Transaction.nation_id == nation_id,
-                Transaction.created_at >= since,
+    liquidity = _to_decimal(await session.scalar(
+        select(
+            func.coalesce(
+                func.sum(CurrencyHolding.amount),
+                0,
             )
-            .order_by(Transaction.created_at.asc())
+        ).where(
+            CurrencyHolding.nation_id == nation_id,
         )
-    ).scalars().all())
-    changes = [
-        (
-            Decimal(str(rates[index])) - Decimal(str(rates[index - 1]))
-        ) / Decimal(str(rates[index - 1]))
-        for index in range(1, len(rates))
-        if Decimal(str(rates[index - 1])) > 0
-    ]
-    if changes:
-        mean = sum(changes, Decimal("0")) / Decimal(len(changes))
-        variance = sum(
-            (change - mean) ** 2
-            for change in changes
-        ) / Decimal(len(changes))
-        volatility = variance.sqrt()
-    else:
-        volatility = Decimal("0")
-    volatility = min(Decimal("1"), abs(volatility))
+    ))
+
+    from app.services.economic_engine import get_active_members
+
+    national_activity = await get_active_members(
+        session,
+        nation_id,
+        hours=max(1, int(window_minutes)),
+    )
+
+    liquidity_score = min(
+        liquidity / Decimal("100000"),
+        Decimal("1"),
+    )
+    activity_score = Decimal(national_activity) / Decimal("100")
+    confidence = _clamp(
+        (liquidity_score * Decimal("0.5"))
+        + (activity_score * Decimal("0.5")),
+        Decimal("0"),
+        Decimal("1"),
+    )
+
+    volatility = await _calculate_volatility(session, nation_id)
 
     return CurrencyMarketState(
         currency_code=nation.currency_code,
