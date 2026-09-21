@@ -94,7 +94,7 @@ def test_support_keyboard_contract() -> None:
         for row in support_panel_keyboard().inline_keyboard
         for button in row
     }
-    assert {"support_check_recent", "support_close"} <= callbacks
+    assert {"support_check_recent", "support_back"} <= callbacks
 
     result_callbacks = {
         button.callback_data
