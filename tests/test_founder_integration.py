@@ -11,24 +11,29 @@ from app.services.user_service import is_user_registered
 
 
 @pytest.mark.asyncio
-async def test_registration_requires_currency_holding():
+async def test_registration_does_not_require_currency_holding():
     async with async_session() as session:
         async with session.begin():
-            user = User(user_id=910001, username="testuser1")
-            session.add(user)
-
-    async with async_session() as session:
-        assert await is_user_registered(session, 910001) is False
-
-    async with async_session() as session:
-        async with session.begin():
-            nation = Nation(name="Origin", currency_code="ORG", group_id=-100910001, invite_code=secrets.token_urlsafe(8))
-            session.add(nation)
-            await session.flush()
-            session.add(CurrencyHolding(user_id=910001, nation_id=nation.nation_id, amount=Decimal("500")))
+            session.add(
+                User(
+                    user_id=910001,
+                    username="testuser1",
+                    home_nation_id=None,
+                    balance=Decimal("0"),
+                    xr_balance=Decimal("500"),
+                )
+            )
 
     async with async_session() as session:
         assert await is_user_registered(session, 910001) is True
+
+    async with async_session() as session:
+        holding = await session.scalar(
+            select(CurrencyHolding).where(
+                CurrencyHolding.user_id == 910001,
+            )
+        )
+        assert holding is None
 
 
 @pytest.mark.asyncio
