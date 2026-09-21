@@ -14,7 +14,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import Nation, User
 from app.database.session import async_session
-from app.handlers.start import _safe_edit_caption, _safe_edit_text, start as restart_flow, user_mention
+from app.handlers.start import _safe_edit_caption, _safe_edit_text, user_mention
+
 from app.keyboards.inline import cancel_keyboard, nation_selection_keyboard
 from app.services.membership_service import sync_registered_user_memberships
 from app.services.temporal_service import ensure_temporal_profile
@@ -168,7 +169,7 @@ async def accept_valid_name(message: Message, state: FSMContext) -> None:
 
     if user is not None:
         await state.clear()
-        from app.handlers.start import show_dashboard
+        from app.handlers.dashboard import show_dashboard
         await show_dashboard(message, user)
         return
 
