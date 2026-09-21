@@ -35,7 +35,7 @@ async def open_nations(message: Message) -> None:
                     session,
                     message.from_user.id,
                     repair=True,
-                lock=True,
+                    lock=True,
                 )
                 if registered
                 else None
@@ -163,7 +163,7 @@ async def my_nations(call: CallbackQuery) -> None:
                 session,
                 call.from_user.id,
                 repair=True,
-                    lock=True,
+                lock=True,
             )
             user = await session.get(User, call.from_user.id)
             nations = [context[0]] if context is not None else []
@@ -242,4 +242,3 @@ async def explore_nations(call: CallbackQuery) -> None:
             parse_mode="HTML",
         )
     await call.answer()
-
