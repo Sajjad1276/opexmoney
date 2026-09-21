@@ -27,6 +27,7 @@ EXPECTED_HANDLER_MODULES = {
     "ranking",
     "sections",
     "settings",
+    "support",
     "start",
     "treasury",
 }
@@ -241,7 +242,7 @@ def run_flow_health_test() -> FlowHealthReport:
             "Unregistered handler routers: " + ", ".join(missing_registration)
         )
 
-    expected_router_extras = {"ai"}
+    expected_router_extras = set()
     unexpected = sorted(
         _registered_router_modules()
         - EXPECTED_HANDLER_MODULES
