@@ -41,7 +41,7 @@ router = Router(name="onboarding")
 # Telegram does not expose a text-align control for bot messages. RLM markers
 # keep mixed Persian/Latin/emoji lines in an RTL paragraph direction and reduce
 # the visual jump to the left caused by mentions, numbers and symbols.
-RLM = "\u200f"
+RLM = "\u200f"\nONBOARDING_TIMEOUT = 300\nNATIONS_PER_PAGE = 5
 
 
 def rtl_text(text: str) -> str:
