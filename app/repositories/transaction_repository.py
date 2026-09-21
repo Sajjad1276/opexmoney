@@ -48,6 +48,19 @@ class TransactionRepository:
         )
         return list(result.scalars().all())
 
+    async def get_user_volume_since(
+        self,
+        user_id: int,
+        since: datetime,
+    ) -> Decimal:
+        total = await self.session.scalar(
+            select(func.coalesce(func.sum(Transaction.amount), 0)).where(
+                Transaction.user_id == user_id,
+                Transaction.created_at >= since,
+            )
+        )
+        return Decimal(str(total or 0))
+
     async def get_volume_since(
         self,
         nation_id: int,
