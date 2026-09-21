@@ -176,12 +176,3 @@ async def _safe_edit_caption(call: CallbackQuery, caption: str, reply_markup=Non
     except TelegramBadRequest as exc:
         logger.info("Caption edit failed: %s", exc)
         return False
-
-
-START_CAPTION = """🌐 <b>{bot_name}</b>
-سلام {user_name}.
-
-بازارهای OPEX هر روز
-میلیاردها واحد ارز جابه‌جا می‌کنن.
-تو کجا می‌ایستی؟"""
-)
