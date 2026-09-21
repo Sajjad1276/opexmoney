@@ -5,10 +5,14 @@ import secrets
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import Nation, NationJoinRequest, NationMember, NationMemberRole
-from app.services.nation.membership_service import MembershipResult, join_nation
+from app.services.nation.membership_service import (
+    MembershipResult,
+    _join_nation_internal,
+)
 
 
 INVITE_TTL_SECONDS = 86400
@@ -35,12 +39,14 @@ async def create_invite_link(
     request_id: int | None = None,
 ) -> InviteLink:
     founder_member = await session.scalar(
-        NationMember.__table__.select().where(
+        select(NationMember.id)
+        .where(
             NationMember.nation_id == nation_id,
             NationMember.user_id == founder_id,
             NationMember.is_active.is_(True),
             NationMember.role == NationMemberRole.FOUNDER,
         )
+        .limit(1)
     )
     if founder_member is None:
         raise ValueError("⛔ فقط بنیان‌گذار می‌تواند لینک دعوت بسازد.")
@@ -94,16 +100,13 @@ async def consume_invite_link(
     if nation is None or not nation.is_active:
         raise ValueError("⚠️ این ملت دیگر فعال نیست.")
 
-    result = await join_nation.__wrapped__(session, user_id, nation_id) if hasattr(join_nation, "__wrapped__") else None
-    if result is None:
-        from app.services.nation.membership_service import _join_nation_internal
-        result = await _join_nation_internal(
-            session,
-            user_id,
-            nation_id,
-            allow_private=True,
-            source="invite_link",
-        )
+    result = await _join_nation_internal(
+        session,
+        user_id,
+        nation_id,
+        allow_private=True,
+        source="invite_link",
+    )
 
     if request_id is not None:
         request = await session.get(NationJoinRequest, request_id, with_for_update=True)
