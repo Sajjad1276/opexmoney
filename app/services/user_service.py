@@ -46,8 +46,8 @@ async def get_registration_status(
     Return the persistent registration status.
 
     status:
-      - complete: user exists, has a non-empty username, and has at least one currency holding
-      - partial: user exists but is missing a required registration field
+      - complete: user exists and has a non-empty username
+      - partial: user exists but is missing a username
       - new: no user row exists
     """
     user = await session.get(User, telegram_id)
@@ -56,15 +56,7 @@ async def get_registration_status(
         return {"status": "new", "user": None, "missing": ["user"]}
 
     if not (user.username or "").strip():
-        return {"status": "partial", "user": user, "missing": ["username", "holding"]}
-
-    holding = await session.execute(
-        select(CurrencyHolding.id)
-        .where(CurrencyHolding.user_id == telegram_id)
-        .limit(1)
-    )
-    if holding.scalar_one_or_none() is None:
-        return {"status": "partial", "user": user, "missing": ["holding"]}
+        return {"status": "partial", "user": user, "missing": ["username"]}
 
     return {"status": "complete", "user": user, "missing": []}
 
@@ -92,18 +84,15 @@ async def is_fully_registered(
     Required conditions:
     1. User exists.
     2. User has a non-empty username.
-    3. User has at least one currency holding.
+
+    Nation membership and a CurrencyHolding are optional. A player can use the
+    game and the global market before joining or founding a nation.
     """
     user = await session.get(User, telegram_id)
     if not user or not (user.username or "").strip():
         return False
 
-    result = await session.execute(
-        select(CurrencyHolding)
-        .where(CurrencyHolding.user_id == telegram_id)
-        .limit(1)
-    )
-    return result.scalar_one_or_none() is not None
+    return True
 
 
 async def is_user_registered(
