@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections import defaultdict
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 
@@ -16,6 +18,8 @@ from app.database.models import (
     User,
     UserActivity,
 )
+from app.services.market.market_state import get_currency_state
+from app.services.market.market_pressure import pressure_signal_from_state
 from app.services.economy_metrics import (
     calculate_total_volume,
     count_transactions,
@@ -34,144 +38,244 @@ def clamp(value: Decimal, low: Decimal, high: Decimal) -> Decimal:
     return max(low, min(high, value))
 
 
+@dataclass(frozen=True)
+class RateFactors:
+    activity_score: Decimal
+    trade_score: Decimal
+    growth_score: Decimal
+    pressure_signal: Decimal
+    dominant_cause: str
+
+
+@dataclass(frozen=True)
+class RateDelta:
+    nation_id: int
+    old_rate: Decimal
+    new_rate: Decimal
+    delta_pct: Decimal
+    factors: RateFactors
+
+
+@dataclass(frozen=True)
+class ReceiptLine:
+    label: str
+    impact_pct: Decimal
+    direction: str
+
+
+@dataclass(frozen=True)
+class PriceReceipt:
+    currency_code: str
+    total_change_pct: Decimal
+    factors: list[ReceiptLine]
+
+
+_RATE_FACTOR_HISTORY: dict[int, list[RateDelta]] = defaultdict(list)
+_MAX_FACTOR_HISTORY = 20
+
+
+async def _member_counts(
+    session: AsyncSession,
+    nation: Nation,
+    since_24h: datetime,
+) -> tuple[int, int]:
+    if nation.is_ai:
+        total = int(await session.scalar(
+            select(func.count(User.user_id)).where(
+                User.home_nation_id == nation.nation_id,
+            )
+        ) or 0)
+        active = int(await session.scalar(
+            select(func.count(distinct(UserActivity.user_id))).where(
+                UserActivity.nation_id == nation.nation_id,
+                UserActivity.created_at >= since_24h,
+            )
+        ) or 0)
+        return total, active
+
+    total = int(await session.scalar(
+        select(func.count(NationTelegramMember.id)).where(
+            NationTelegramMember.nation_id == nation.nation_id,
+            NationTelegramMember.is_active.is_(True),
+        )
+    ) or 0)
+    active = int(await session.scalar(
+        select(func.count(distinct(UserActivity.user_id)))
+        .join(
+            NationTelegramMember,
+            NationTelegramMember.telegram_user_id == UserActivity.user_id,
+        )
+        .where(
+            UserActivity.nation_id == nation.nation_id,
+            UserActivity.created_at >= since_24h,
+            NationTelegramMember.nation_id == nation.nation_id,
+            NationTelegramMember.is_active.is_(True),
+        )
+    ) or 0)
+    return total, active
+
+
+def _dominant_cause(factors: tuple[Decimal, Decimal, Decimal, Decimal]) -> str:
+    labels = ("فعالیت اعضا", "حجم معاملات", "رشد ملت", "فشار بازار")
+    values = [abs(value) for value in factors]
+    return labels[values.index(max(values))]
+
+
+async def calculate_rate_delta(
+    session: AsyncSession,
+    nation: Nation,
+    now: datetime,
+) -> RateDelta:
+    since_24h = now - timedelta(hours=24)
+    since_7d = now - timedelta(days=7)
+    total, active = await _member_counts(session, nation, since_24h)
+
+    activity_score = (
+        Decimal(active) / Decimal(total)
+        if total
+        else Decimal("0")
+    )
+
+    trade_volume = Decimal(str(nation.trade_volume_24h or 0))
+    trade_score = min(
+        (trade_volume + Decimal("1")).log10() / Decimal("6"),
+        Decimal("1"),
+    )
+
+    old_members = await session.scalar(
+        select(NationMemberHistory.member_count)
+        .where(
+            NationMemberHistory.nation_id == nation.nation_id,
+            NationMemberHistory.recorded_at <= since_7d,
+        )
+        .order_by(NationMemberHistory.recorded_at.desc())
+        .limit(1)
+    )
+    if old_members in (None, 0):
+        growth_score = Decimal("0")
+    else:
+        current_members = total
+        growth_score = clamp(
+            Decimal(current_members - old_members) / Decimal(old_members),
+            Decimal("-0.5"),
+            Decimal("0.5"),
+        )
+
+    market_state = await get_currency_state(
+        session,
+        nation.nation_id,
+        window_minutes=15,
+    )
+    pressure_signal = pressure_signal_from_state(market_state)
+
+    score = (
+        activity_score * Decimal("0.4")
+        + trade_score * Decimal("0.3")
+        + growth_score * Decimal("0.3")
+        + pressure_signal * Decimal("0.05")
+    )
+    raw_delta = (score - Decimal("0.5")) * settings.rate_base_step
+    volatility_multiplier = Decimal(str(
+        await resolve(
+            session,
+            "rate.volatility_multiplier",
+            nation_id=nation.nation_id,
+        )
+    ))
+    raw_delta = apply_rate_volatility(raw_delta, volatility_multiplier)
+
+    new_rate = clamp(
+        Decimal(str(nation.exchange_rate)) * (Decimal("1") + raw_delta),
+        settings.rate_min,
+        settings.rate_max,
+    ).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+    old_rate = Decimal(str(nation.exchange_rate))
+    delta_pct = (
+        ((new_rate - old_rate) / old_rate) * Decimal("100")
+        if old_rate
+        else Decimal("0")
+    ).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+
+    factors = RateFactors(
+        activity_score=activity_score,
+        trade_score=trade_score,
+        growth_score=growth_score,
+        pressure_signal=pressure_signal,
+        dominant_cause=_dominant_cause((
+            activity_score * Decimal("0.4"),
+            trade_score * Decimal("0.3"),
+            growth_score * Decimal("0.3"),
+            pressure_signal * Decimal("0.05"),
+        )),
+    )
+    return RateDelta(
+        nation_id=nation.nation_id,
+        old_rate=old_rate,
+        new_rate=new_rate,
+        delta_pct=delta_pct,
+        factors=factors,
+    )
+
+
+async def persist_rate_update(
+    session: AsyncSession,
+    delta: RateDelta,
+    now: datetime,
+) -> None:
+    nation = await session.get(Nation, delta.nation_id)
+    if nation is None:
+        return
+
+    total, active = await _member_counts(
+        session,
+        nation,
+        now - timedelta(hours=24),
+    )
+    nation.rate_prev = nation.exchange_rate
+    nation.exchange_rate = delta.new_rate
+    nation.active_members_24h = active
+    nation.member_count = total
+    nation.last_rate_update = now
+
+    session.add(
+        RateHistory(
+            nation_id=nation.nation_id,
+            rate=delta.new_rate,
+            volume=nation.trade_volume_24h,
+            active_members=active,
+            calculated_at=now,
+        )
+    )
+    session.add(
+        NationMemberHistory(
+            nation_id=nation.nation_id,
+            member_count=total,
+            recorded_at=now,
+        )
+    )
+    await session.flush()
+
+
 async def update_nation_rates(
     session: AsyncSession,
     now: datetime | None = None,
-) -> None:
+) -> list[RateDelta]:
     now = now or datetime.utcnow()
-    since_24h = now - timedelta(hours=24)
-    since_7d = now - timedelta(days=7)
-
     nations = (
         await session.execute(
             select(Nation).where(Nation.is_active.is_(True))
         )
     ).scalars().all()
 
+    deltas: list[RateDelta] = []
     for nation in nations:
-        if nation.is_ai:
-            active = (
-                await session.scalar(
-                    select(func.count(distinct(UserActivity.user_id))).where(
-                        UserActivity.nation_id == nation.nation_id,
-                        UserActivity.created_at >= since_24h,
-                    )
-                )
-                or 0
-            )
-            total = (
-                await session.scalar(
-                    select(func.count(User.user_id)).where(
-                        User.home_nation_id == nation.nation_id
-                    )
-                )
-                or 0
-            )
-        else:
-            total = (
-                await session.scalar(
-                    select(func.count(NationTelegramMember.id)).where(
-                        NationTelegramMember.nation_id == nation.nation_id,
-                        NationTelegramMember.is_active.is_(True),
-                    )
-                )
-                or 0
-            )
-            active = (
-                await session.scalar(
-                    select(func.count(distinct(UserActivity.user_id)))
-                    .join(
-                        NationTelegramMember,
-                        NationTelegramMember.telegram_user_id == UserActivity.user_id,
-                    )
-                    .where(
-                        UserActivity.nation_id == nation.nation_id,
-                        UserActivity.created_at >= since_24h,
-                        NationTelegramMember.nation_id == nation.nation_id,
-                        NationTelegramMember.is_active.is_(True),
-                    )
-                )
-                or 0
-            )
-            nation.member_count = int(total)
-
-        f_activity = (
-            Decimal(active) / Decimal(total)
-            if total
-            else Decimal("0")
-        )
-
-        trade_volume = Decimal(str(nation.trade_volume_24h or 0))
-        f_trade = min(
-            (trade_volume + Decimal("1")).log10() / Decimal("6"),
-            Decimal("1"),
-        )
-
-        old_members = await session.scalar(
-            select(NationMemberHistory.member_count)
-            .where(
-                NationMemberHistory.nation_id == nation.nation_id,
-                NationMemberHistory.recorded_at <= since_7d,
-            )
-            .order_by(NationMemberHistory.recorded_at.desc())
-            .limit(1)
-        )
-        if old_members in (None, 0):
-            f_growth = Decimal("0")
-        else:
-            f_growth = clamp(
-                Decimal(nation.member_count - old_members) / Decimal(old_members),
-                Decimal("-0.5"),
-                Decimal("0.5"),
-            )
-
-        score = (
-            f_activity * Decimal("0.4")
-            + f_trade * Decimal("0.3")
-            + f_growth * Decimal("0.3")
-        )
-        delta = (score - Decimal("0.5")) * settings.rate_base_step
-
-        volatility_multiplier = Decimal(
-            str(
-                await resolve(
-                    session,
-                    "rate.volatility_multiplier",
-                    nation_id=nation.nation_id,
-                )
-            )
-        )
-        delta = apply_rate_volatility(delta, volatility_multiplier)
-
-        new_rate = clamp(
-            nation.exchange_rate * (Decimal("1") + delta),
-            settings.rate_min,
-            settings.rate_max,
-        ).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
-
-        nation.rate_prev = nation.exchange_rate
-        nation.exchange_rate = new_rate
-        nation.active_members_24h = int(active)
-        nation.last_rate_update = now
-
-        session.add(
-            RateHistory(
-                nation_id=nation.nation_id,
-                rate=new_rate,
-                volume=nation.trade_volume_24h,
-                active_members=int(active),
-                calculated_at=now,
-            )
-        )
-        session.add(
-            NationMemberHistory(
-                nation_id=nation.nation_id,
-                member_count=nation.member_count,
-                recorded_at=now,
-            )
-        )
-
-    await session.flush()
+        delta = await calculate_rate_delta(session, nation, now)
+        await persist_rate_update(session, delta, now)
+        history = _RATE_FACTOR_HISTORY[nation.nation_id]
+        history.append(delta)
+        del _RATE_FACTOR_HISTORY[nation.nation_id][:_MAX_FACTOR_HISTORY * -1]
+        deltas.append(delta)
+    return deltas
 
 
 async def create_behavior_snapshot(
@@ -287,3 +391,64 @@ async def get_active_members(
         )
 
     return int(await session.scalar(stmt) or 0)
+
+
+async def build_price_receipt(
+    session: AsyncSession,
+    nation_id: int,
+    last_n_updates: int = 3,
+) -> PriceReceipt:
+    nation = await session.get(Nation, nation_id)
+    if nation is None:
+        raise ValueError("ملت پیدا نشد.")
+
+    limit = max(1, int(last_n_updates))
+    history_rows = list(reversed((
+        await session.execute(
+            select(RateHistory)
+            .where(RateHistory.nation_id == nation_id)
+            .order_by(RateHistory.calculated_at.desc())
+            .limit(limit)
+        )
+    ).scalars().all()))
+    if len(history_rows) >= 2 and history_rows[0].rate:
+        total_change = (
+            (history_rows[-1].rate - history_rows[0].rate)
+            / history_rows[0].rate
+            * Decimal("100")
+        )
+    else:
+        total_change = Decimal("0")
+
+    deltas = _RATE_FACTOR_HISTORY.get(nation_id, [])[-limit:]
+    component_specs = (
+        ("فعالیت اعضا", Decimal("0.4"), "activity_score"),
+        ("حجم معاملات", Decimal("0.3"), "trade_score"),
+        ("رشد ملت", Decimal("0.3"), "growth_score"),
+        ("فشار بازار", Decimal("0.05"), "pressure_signal"),
+    )
+    totals: dict[str, Decimal] = {
+        label: Decimal("0") for label, _, _ in component_specs
+    }
+    for delta in deltas:
+        for label, weight, attribute in component_specs:
+            value = Decimal(str(getattr(delta.factors, attribute)))
+            totals[label] += value * weight * settings.rate_base_step * Decimal("100")
+
+    factors = [
+        ReceiptLine(
+            label=label,
+            impact_pct=value.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP),
+            direction="+" if value >= 0 else "-",
+        )
+        for label, value in totals.items()
+        if value != 0
+    ]
+    return PriceReceipt(
+        currency_code=nation.currency_code,
+        total_change_pct=Decimal(str(total_change)).quantize(
+            Decimal("0.0001"),
+            rounding=ROUND_HALF_UP,
+        ),
+        factors=factors,
+    )
