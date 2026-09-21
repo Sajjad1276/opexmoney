@@ -235,8 +235,11 @@ async def test_ai_health_check_uses_gemini_model(monkeypatch) -> None:
     assert await companion.health_check() is True
 
 
-def test_main_wires_ai_router() -> None:
+def test_main_does_not_wire_global_ai_chat_router() -> None:
     from pathlib import Path
 
     source = Path("main.py").read_text(encoding="utf-8")
-    assert "dp.include_router(ai_router)" in source
+    ai_source = Path("ai/__init__.py").read_text(encoding="utf-8")
+
+    assert "dp.include_router(ai_router)" not in source
+    assert '@ai_router.message(F.text)' not in ai_source
