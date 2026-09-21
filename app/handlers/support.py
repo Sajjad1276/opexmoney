@@ -2,15 +2,11 @@ from __future__ import annotations
 
 from aiogram import F, Router
 from aiogram.enums import ParseMode
-from aiogram.filters.state import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from app.database.session import async_session
-from app.keyboards.inline import (
-    support_panel_keyboard,
-    support_result_keyboard,
-)
+from app.keyboards.inline import support_panel_keyboard, support_result_keyboard
 from app.services.support.support_service import support_service
 from app.states.support import SupportStates
 from app.utils.ui import close_inline_panel, remember_inline_panel, send_submenu_panel
@@ -89,6 +85,11 @@ async def check_recent_issue(
                 report="",
             )
 
+    result = await support_service.finalize(
+        user_id=callback.from_user.id,
+        report="",
+        result=result,
+    )
     await state.clear()
     await callback.message.edit_text(
         result.response_text,
@@ -153,6 +154,11 @@ async def submit_support_report(
                 report=report,
             )
 
+    result = await support_service.finalize(
+        user_id=message.from_user.id,
+        report=report,
+        result=result,
+    )
     await state.clear()
     await message.answer(
         result.response_text,
