@@ -411,7 +411,6 @@ async def main() -> None:
     dp.include_router(portfolio_router)
     dp.include_router(ranking_router)
     dp.include_router(settings_router)
-    dp.include_router(founder_router)
     dp.include_router(nation_management_router)
     dp.include_router(treasury_router)
     dp.include_router(nation_router)
