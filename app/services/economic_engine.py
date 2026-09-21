@@ -154,7 +154,9 @@ async def calculate_rate_delta(
     if old_members in (None, 0):
         growth_score = Decimal("0")
     else:
-        current_members = total
+        current_members = (
+            nation.member_count if nation.is_ai else total
+        )
         growth_score = clamp(
             Decimal(current_members - old_members) / Decimal(old_members),
             Decimal("-0.5"),
@@ -234,7 +236,8 @@ async def persist_rate_update(
     nation.rate_prev = nation.exchange_rate
     nation.exchange_rate = delta.new_rate
     nation.active_members_24h = active
-    nation.member_count = total
+    if not nation.is_ai:
+        nation.member_count = total
     nation.last_rate_update = now
 
     session.add(
