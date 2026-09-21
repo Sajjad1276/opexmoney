@@ -8,6 +8,7 @@ from aiogram.types import Message
 from app.database.session import async_session
 from app.database.models import Nation, User
 from app.handlers.dashboard import show_dashboard
+from app.keyboards.inline import welcome_keyboard
 from app.core.redis import get_redis
 from app.services.nation.nation_invite_service import consume_invite_link
 from app.utils.formatting import rtl_html
@@ -98,7 +99,7 @@ async def handle_deep_link(
                 f"🌍 <b>ملت «{nation.name}» انتخاب شد.</b>\n\n"
                 "برای ادامه، «شروع بازی» را بزن."
             ),
-            reply_markup=__import__("app.keyboards.inline", fromlist=["welcome_keyboard"]).welcome_keyboard(),
+            reply_markup=welcome_keyboard(),
             parse_mode="HTML",
         )
         return True
