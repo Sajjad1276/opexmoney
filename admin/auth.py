@@ -251,3 +251,4 @@ async def get_admin_user(
             detail="Authentication error",
         ) from None
 
+
