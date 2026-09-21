@@ -437,16 +437,10 @@ async def _trade_volume_for_user(
     user_id: int,
 ) -> Decimal:
     since = datetime.utcnow() - timedelta(days=30)
-    from app.database.models import Transaction
-    rows = (
-        await session.execute(
-            select(Transaction.amount).where(
-                Transaction.user_id == user_id,
-                Transaction.created_at >= since,
-            )
-        )
-    ).scalars().all()
-    return sum((Decimal(str(value)) for value in rows), Decimal("0"))
+    return await TransactionRepository(session).get_user_volume_since(
+        user_id,
+        since,
+    )
 
 
 async def check_nation_creation_eligibility(
