@@ -37,6 +37,7 @@ from app.keyboards.inline import (
 )
 from app.keyboards.reply import main_menu_keyboard, new_player_menu_keyboard
 from app.services.nation_service import get_active_nations, get_nation_rank
+from app.services.dashboard_service import build_live_dashboard, render_live_dashboard
 from app.services.mission_service import check_permanent_missions, increment_mission
 from app.services.founder_service import cancel_draft
 from app.services.user_service import get_registration_status, get_user, is_fully_registered, sync_user_balance, username_exists
@@ -277,29 +278,27 @@ async def show_dashboard(
     bot: Bot | None = None,
     display_user=None,
 ) -> None:
-    """Return to the existing main menu without sending the old dashboard card.
-
-    The detailed player dashboard is intentionally not rendered here.
-    Balances, assets, rates, rank, and similar data belong to their
-    dedicated menu sections. Telegram's ReplyKeyboard is already persistent,
-    so returning from an inline panel does not require another text message.
-    """
+    """Render the live game state and restore the persistent main keyboard."""
     if replace_inline:
         try:
             await message.delete()
         except Exception:
             logger.debug("Could not delete previous inline panel", exc_info=True)
 
-    # Reply keyboards are attached to outgoing messages. Deleting an inline
-    # panel does not restore the main keyboard, so re-publish it together with
-    # the compact main-menu landing message.
+    async with async_session() as session:
+        async with session.begin():
+            dashboard = await build_live_dashboard(
+                session,
+                message.from_user.id,
+            )
+
+    text = render_live_dashboard(dashboard)
     imperial_date, imperial_time = imperial_datetime()
     text = (
-        "⛃ <b>بازگشت به منوی OPEXMONEY</b>\n\n"
-        "🎯 <b>تصمیم بگیر، معامله کن، رشد کن!</b>\n"
-        f"📅 {imperial_date}\n"
-        f"🕐 {imperial_time}"
+        f"{text}\n\n"
+        f"<i>{imperial_date} · {imperial_time}</i>"
     )
+
     await message.answer(
         rtl_html(text),
         reply_markup=main_menu_keyboard(),
@@ -403,6 +402,10 @@ async def start(message: Message, state: FSMContext) -> None:
     if preferred_nation_id is not None:
         await state.update_data(preferred_nation_id=preferred_nation_id)
 
+    if user is not None:
+        await show_dashboard(message, user)
+        return
+
     imperial_date, imperial_time = imperial_datetime()
 
     text = f"""🌐 <b>به OPEX MONEY خوش اومدی</b>
@@ -414,11 +417,9 @@ async def start(message: Message, state: FSMContext) -> None:
 📅 {imperial_date}
 🕐 {imperial_time}"""
 
-    # /start is a clean entry point for every player.
-    # Detailed balances and assets remain inside their dedicated sections.
     await message.answer(
         rtl_html(text),
-        reply_markup=main_menu_keyboard() if user is not None else _welcome_keyboard(),
+        reply_markup=_welcome_keyboard(),
         parse_mode=ParseMode.HTML,
     )
 
