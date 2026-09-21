@@ -10,10 +10,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import Nation, NationJoinRequest, NationMember, NationMemberRole
 from app.services.nation.membership_service import (
-
     MembershipResult,
     _join_nation_internal,
 )
+from config import settings
 
 
 INVITE_TTL_SECONDS = 86400
