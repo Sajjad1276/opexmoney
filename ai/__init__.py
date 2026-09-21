@@ -308,33 +308,10 @@ async def remember_bot_reply(user_id: int, message: str) -> None:
     await remember_bot_message(user_id, message)
 
 
-ai_router = Router(name="ai")
-
-
-@ai_router.message(F.text)
-async def ai_companion_message(message: Message) -> None:
-    """Answer unmatched private chat text with the AI companion."""
-    if message.chat.type != "private":
-        return
-
-    text = (message.text or "").strip()
-    if not text or text.startswith("/"):
-        return
-
-    async with async_session() as db:
-        reply = await get_ai_reply(message.from_user.id, text, db)
-
-    sent = await message.answer(reply)
-    await remember_bot_reply(
-        message.from_user.id,
-        sent.html_text if getattr(sent, "html_text", None) else reply,
-    )
-
 
 __all__ = [
     "AICompanion",
     "companion",
-    "ai_router",
     "get_ai_reply",
     "remember_bot_reply",
 ]
