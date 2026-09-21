@@ -140,7 +140,6 @@ async def get_currency_state(
     national_activity = await get_active_members(
         session,
         nation_id,
-        hours=max(1, int(window_minutes)),
     )
 
     liquidity_score = min(
