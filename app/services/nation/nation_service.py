@@ -33,19 +33,16 @@ async def _repair_membership(
     *,
     role: NationMemberRole,
 ) -> str | None:
-    if not nation.is_ai:
-        telegram_membership = await session.scalar(
-            select(NationTelegramMember)
-            .where(
-                NationTelegramMember.nation_id == nation.nation_id,
-                NationTelegramMember.telegram_user_id == user.user_id,
-                NationTelegramMember.is_active.is_(True),
-            )
-            .limit(1)
-        )
-        if telegram_membership is None:
-            return None
+    """Restore the canonical internal nation membership.
 
+    NationTelegramMember is a Telegram-state projection. It is not the
+    authority for the internal game invariant:
+    User.home_nation_id <-> active NationMember.
+
+    A missing Telegram projection must not make an otherwise recoverable
+    account look corrupted. Telegram membership is synchronized separately
+    by the membership service.
+    """
     member = await session.scalar(
         select(NationMember)
         .where(
