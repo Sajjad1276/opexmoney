@@ -11,6 +11,7 @@ import app.handlers.start as start_module
 from app.database.models import CurrencyHolding, Nation, Transaction, User, UserActivity
 from app.database.session import async_session
 from app.states.onboarding import OnboardingStates
+from app.services.user_service import is_fully_registered
 
 
 USER_ID = 932001
@@ -92,6 +93,34 @@ async def cleanup():
             await session.execute(delete(User).where(User.user_id == USER_ID))
             if nation_ids:
                 await session.execute(delete(Nation).where(Nation.nation_id.in_(nation_ids)))
+
+
+@pytest.mark.asyncio
+async def test_player_is_registered_without_nation_or_currency_holding():
+    async with async_session() as session:
+        async with session.begin():
+            session.add(
+                User(
+                    user_id=USER_ID,
+                    username="NationlessTester",
+                    home_nation_id=None,
+                    balance=Decimal("0"),
+                    xr_balance=Decimal("500"),
+                    role="player",
+                )
+            )
+
+    async with async_session() as session:
+        assert await is_fully_registered(session, USER_ID) is True
+        user = await session.get(User, USER_ID)
+        holding = await session.scalar(
+            select(CurrencyHolding).where(CurrencyHolding.user_id == USER_ID)
+        )
+
+    assert user is not None
+    assert user.home_nation_id is None
+    assert user.xr_balance == Decimal("500")
+    assert holding is None
 
 
 @pytest.mark.asyncio
