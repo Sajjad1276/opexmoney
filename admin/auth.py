@@ -3,82 +3,227 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import logging
 import os
-from urllib.parse import parse_qsl
+import time
+from urllib.parse import unquote
 
-from fastapi import Header, HTTPException
+from fastapi import Depends, HTTPException, Request
+from pydantic import BaseModel, computed_field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from redis.asyncio import Redis
+
+from admin.dependencies import get_redis
 
 
-UNAUTHORIZED = "Unauthorized"
-MISSING_AUTH = "Missing auth"
+logger = logging.getLogger("opex.admin.auth")
 
 
-def _admin_user_ids() -> set[int]:
-    raw = os.getenv("ADMIN_USER_IDS", "")
-    result: set[int] = set()
-    for value in raw.split(","):
-        value = value.strip()
-        if not value:
+class AdminUser(BaseModel):
+    user_id: int
+    username: str
+
+
+class TooManyRequests(Exception):
+    pass
+
+
+class Settings(BaseSettings):
+    BOT_TOKEN: str
+    ADMIN_USER_IDS: str = ""
+    DATABASE_URL: str
+    REDIS_URL: str
+    AI_ENABLED: bool = False
+    AI_MODEL: str = ""
+    GEMINI_API_KEY: str = ""
+
+    @computed_field
+    @property
+    def admin_ids(self) -> list[int]:
+        if not self.ADMIN_USER_IDS:
+            return []
+        return [
+            int(x.strip())
+            for x in self.ADMIN_USER_IDS.split(",")
+            if x.strip()
+        ]
+
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+
+settings = Settings()
+
+
+def validate_init_data(init_data_raw: str, bot_token: str) -> dict:
+    decoded = unquote(init_data_raw)
+    parts = decoded.split("&")
+
+    pairs: list[tuple[str, str]] = []
+    received_hash: str | None = None
+    auth_date_raw: str | None = None
+
+    for part in parts:
+        if "=" not in part:
+            raise ValueError("Invalid initData")
+        key, value = part.split("=", 1)
+        if key == "hash":
+            received_hash = value
             continue
-        try:
-            result.add(int(value))
-        except ValueError:
-            continue
-    return result
+        pairs.append((key, value))
+        if key == "auth_date":
+            auth_date_raw = value
 
+    if not received_hash:
+        raise ValueError("Invalid hash")
 
-def _unauthorized() -> HTTPException:
-    return HTTPException(status_code=401, detail=UNAUTHORIZED)
-
-
-def validate_telegram_init_data(init_data: str) -> int:
-    bot_token = os.getenv("BOT_TOKEN", "").strip()
-    if not bot_token:
-        raise _unauthorized()
+    if auth_date_raw is None:
+        raise ValueError("Invalid initData")
 
     try:
-        pairs = parse_qsl(init_data, keep_blank_values=True, strict_parsing=True)
-        data = dict(pairs)
-        received_hash = data.pop("hash", None)
-        if not received_hash:
-            raise _unauthorized()
+        auth_date = int(auth_date_raw)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Invalid initData") from exc
 
-        data_check_string = "\n".join(
-            f"{key}={value}" for key, value in sorted(data.items())
-        )
-        secret_key = hmac.new(
-            key=b"WebAppData",
-            msg=bot_token.encode("utf-8"),
-            digestmod=hashlib.sha256,
-        ).digest()
-        expected_hash = hmac.new(
-            key=secret_key,
-            msg=data_check_string.encode("utf-8"),
-            digestmod=hashlib.sha256,
-        ).hexdigest()
+    if time.time() - auth_date > 86400:
+        raise ValueError("initData expired")
 
-        if not hmac.compare_digest(expected_hash, received_hash):
-            raise _unauthorized()
+    sorted_pairs = sorted(pairs, key=lambda item: item[0])
+    data_check_string = "\n".join(
+        f"{key}={value}" for key, value in sorted_pairs
+    )
 
-        raw_user = data.get("user")
-        if not raw_user:
-            raise _unauthorized()
-        user = json.loads(raw_user)
-        user_id = int(user["id"])
-    except HTTPException:
-        raise
-    except Exception as exc:
-        raise _unauthorized() from exc
+    secret_key = hmac.new(
+        b"WebAppData",
+        bot_token.encode(),
+        hashlib.sha256,
+    ).digest()
 
-    if user_id not in _admin_user_ids():
-        raise _unauthorized()
+    expected = hmac.new(
+        secret_key,
+        data_check_string.encode(),
+        hashlib.sha256,
+    ).hexdigest()
+
+    if not hmac.compare_digest(expected, received_hash):
+        raise ValueError("Invalid hash")
+
+    user_raw = None
+    for key, value in pairs:
+        if key == "user":
+            user_raw = value
+            break
+
+    if not user_raw:
+        raise ValueError("Invalid user data")
+
+    try:
+        user_data = json.loads(user_raw)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Invalid user data") from exc
+
+    if not isinstance(user_data, dict):
+        raise ValueError("Invalid user data")
+
+    return user_data
+
+
+def check_is_admin(user_data: dict) -> int:
+    try:
+        user_id = int(user_data["id"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise PermissionError("Forbidden") from exc
+
+    if user_id not in settings.admin_ids:
+        raise PermissionError(f"User {user_id} is not an admin")
 
     return user_id
 
 
+async def check_rate_limit(user_id: int, redis: Redis) -> None:
+    key = f"admin:ratelimit:{user_id}"
+
+    try:
+        count = await redis.incr(key)
+        if count == 1:
+            await redis.expire(key, 60)
+        if count > 120:
+            raise TooManyRequests()
+    except TooManyRequests:
+        raise
+    except Exception:
+        logger.warning(
+            "Admin rate limiting is unavailable; allowing request.",
+            exc_info=True,
+        )
+
+
+def _is_dev_mode() -> bool:
+    return os.getenv("DEV_MODE", "").strip().lower() == "true"
+
+
 async def get_admin_user(
-    init_data: str | None = Header(default=None, alias="X-Telegram-Init-Data"),
-) -> int:
-    if not init_data:
-        raise HTTPException(status_code=401, detail=MISSING_AUTH)
-    return validate_telegram_init_data(init_data)
+    request: Request,
+    redis: Redis = Depends(get_redis),
+) -> AdminUser:
+    try:
+        dev_admin_id_raw = request.headers.get("X-Dev-Admin-Id")
+
+        if _is_dev_mode() and dev_admin_id_raw is not None:
+            try:
+                dev_admin_id = int(dev_admin_id_raw)
+            except (TypeError, ValueError):
+                dev_admin_id = None
+
+            if (
+                dev_admin_id is not None
+                and dev_admin_id in settings.admin_ids
+            ):
+                await check_rate_limit(dev_admin_id, redis)
+                return AdminUser(user_id=dev_admin_id, username="")
+
+        init_data = request.headers.get("X-Telegram-Init-Data")
+        if not init_data:
+            raise HTTPException(
+                status_code=401,
+                detail="Missing authentication",
+            )
+
+        try:
+            user_data = validate_init_data(init_data, settings.BOT_TOKEN)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=401,
+                detail=str(exc),
+            ) from exc
+
+        try:
+            user_id = check_is_admin(user_data)
+        except PermissionError as exc:
+            raise HTTPException(
+                status_code=403,
+                detail="Forbidden",
+            ) from exc
+
+        try:
+            await check_rate_limit(user_id, redis)
+        except TooManyRequests as exc:
+            raise HTTPException(
+                status_code=429,
+                detail="Rate limit exceeded",
+            ) from exc
+
+        return AdminUser(
+            user_id=user_id,
+            username=str(user_data.get("username", "")),
+        )
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Unexpected admin authentication error.")
+        raise HTTPException(
+            status_code=500,
+            detail="Authentication error",
+        ) from None
+
+
+# ── END OF auth.py ──
