@@ -71,7 +71,7 @@ async def get_or_create_draft(
                 founder_user_id=founder_user_id,
                 launch_token=token_urlsafe(24),
                 status="WAITING_GROUP",
-                flag_emoji=(flag_emoji or "🏴").strip() or "🏴",
+                flag_emoji="🏴",
                 expires_at=_utcnow() + DRAFT_TTL,
             )
             session.add(draft)
@@ -558,7 +558,7 @@ async def create_nation(
     nation = Nation(
         group_id=group_chat_id,
         name=name,
-        flag_emoji="🏴",
+        flag_emoji=(flag_emoji or "🏴").strip() or "🏴",
         currency_code=currency_code,
         founder_user_id=founder_id,
         exchange_rate=Decimal("1.0000"),
