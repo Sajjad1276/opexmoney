@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     ai_timeout_seconds: float = 12.0
     ai_cache_ttl_seconds: int = 120
     ai_last_message_ttl_seconds: int = 1800
+    support_ai_enabled: bool = True
+    support_max_report_chars: int = 1200
+    support_telemetry_ttl_seconds: int = 3600
 
     governance_proposal_top_percent: Decimal = Decimal("10")
     governance_voting_hours: int = 24

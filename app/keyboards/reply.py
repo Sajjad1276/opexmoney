@@ -11,6 +11,9 @@ def new_player_menu_keyboard() -> ReplyKeyboardMarkup:
             [
                 KeyboardButton(text="🌍 ملت من"),
             ],
+            [
+                KeyboardButton(text="🛟 پشتیبانی هوشمند"),
+            ],
         ],
         resize_keyboard=True,
         is_persistent=True,
@@ -31,6 +34,9 @@ def main_menu_keyboard() -> ReplyKeyboardMarkup:
             [
                 KeyboardButton(text="🏆 رتبه‌بندی"),
                 KeyboardButton(text="🎓 آکادمی"),
+            ],
+            [
+                KeyboardButton(text="🛟 پشتیبانی هوشمند"),
             ],
             [
                 KeyboardButton(text="☰ بیشتر"),
