@@ -104,10 +104,11 @@ def _permanent_text(status: MissionStatus) -> str:
 
 def build_missions_text(data: dict[str, list[MissionStatus]]) -> str:
     lines = [
-        "⚡ <b>مأموریت‌ها</b>",
+        "⚡ <b>اتاق مأموریت OPEX</b>",
         "\n",
+        "امروز چه چیزی اقتصاد بازیت را جلو می‌برد؟",
         "",
-        "🌅 <b>مأموریت‌های امروز</b>",
+        "🌅 <b>ماموریت‌های امروز</b>",
     ]
 
     daily = data["daily"]
@@ -115,12 +116,12 @@ def build_missions_text(data: dict[str, list[MissionStatus]]) -> str:
         for status in daily:
             lines.append(_progress_text(status))
     else:
-        lines.append("مأموریت فعالی برای امروز وجود ندارد.")
+        lines.append("امروز مأموریت تازه‌ای برایت ثبت نشده؛ بازار همچنان باز است.")
 
     lines.extend(
         [
             "",
-            "📅 <b>مأموریت‌های هفتگی</b>",
+            "📅 <b>هدف‌های این هفته</b>",
         ]
     )
 
@@ -129,12 +130,12 @@ def build_missions_text(data: dict[str, list[MissionStatus]]) -> str:
         for status in weekly:
             lines.append(_progress_text(status))
     else:
-        lines.append("مأموریت فعالی برای این هفته وجود ندارد.")
+        lines.append("این هفته مأموریت فعالی نداری؛ برای هدف بعدی آماده بمان.")
 
     lines.extend(
         [
             "",
-            "🏅 <b>دستاوردها</b>",
+            "🏅 <b>دستاوردهای ثبت‌شده</b>",
         ]
     )
 
@@ -143,7 +144,7 @@ def build_missions_text(data: dict[str, list[MissionStatus]]) -> str:
         for status in permanent:
             lines.append(_permanent_text(status))
     else:
-        lines.append("دستاورد فعالی وجود ندارد.")
+        lines.append("هنوز دستاوردی ثبت نشده؛ اولین رکوردت می‌تواند همین‌جا شروع شود.")
 
     return "\n".join(f"{RLM}{line}" for line in lines)
 
