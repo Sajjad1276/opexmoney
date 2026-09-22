@@ -92,7 +92,7 @@ async def _send_governance_home(call: CallbackQuery | None, message: Message | N
 
     text = (
         "📜 <b>قانون اساسی OPEX</b>\n"
-        "<blockquote>⁠</blockquote>\n"
+        "\n"
         "اینجا قوانین اقتصادی ملت‌ها دیده، پیشنهاد و تصویب میشن.\n\n"
         "هر طرح وارد رأی‌گیری میشه و فقط بعد از عبور از حداقل مشارکت و رأی موافق فعال میشه."
     )
@@ -126,7 +126,7 @@ async def governance_active(call: CallbackQuery):
             overrides = await get_active_overrides(session)
             user = await session.get(User, call.from_user.id)
 
-    lines = ["📜 <b>قوانین فعال</b>", "<blockquote>⁠</blockquote>"]
+    lines = ["📜 <b>قوانین فعال</b>", "\n"]
     if not overrides:
         lines.append("فعلاً قانون ویژه‌ای فعال نیست.\nمقدار پایه رجیستری اجرا میشه.")
     for override in overrides[:12]:
@@ -170,7 +170,7 @@ async def governance_new(call: CallbackQuery, state: FSMContext):
     await state.clear()
     await call.message.edit_text(
         "📝 <b>ثبت طرح جدید</b>\n"
-        "<blockquote>⁠</blockquote>\n"
+        "\n"
         "یک قانون از فهرست مجاز انتخاب کن.\n"
         "هیچ قانون خارج از این فهرست قابل ثبت نیست.",
         reply_markup=governance_rule_keyboard(
@@ -270,7 +270,7 @@ async def governance_receive_value(message: Message, state: FSMContext):
 
     preview_message = await message.answer(
         "📋 <b>پیش‌نمایش طرح</b>\n"
-        "<blockquote>⁠</blockquote>\n"
+        "\n"
         f"قانون: <b>{html.escape(rule.title_fa)}</b>\n"
         f"مقدار فعلی: <b>{html.escape(_format_value(rule, current))}</b>\n"
         f"مقدار پیشنهادی: <b>{html.escape(_format_value(rule, parsed))}</b>\n\n"
@@ -312,7 +312,7 @@ async def governance_confirm(call: CallbackQuery, state: FSMContext):
     await state.clear()
     await call.message.edit_text(
         "✅ <b>طرح ثبت شد.</b>\n"
-        "<blockquote>⁠</blockquote>\n"
+        "\n"
         f"شماره طرح: <b>#{proposal.id}</b>\n"
         "⏱ رأی‌گیری طبق چرخه اقتصادی باز میشه.\n"
         "برای دیدن وضعیت طرح‌ها برو به «رأی‌گیری‌های جاری».",
@@ -343,12 +343,12 @@ async def governance_voting(call: CallbackQuery):
             ).scalars().all()
 
     if not proposals:
-        text = "🗳 <b>رأی‌گیری‌های جاری</b>\n<blockquote>⁠</blockquote>\nفعلاً رأی‌گیری بازی در جریانی نیست."
+        text = "🗳 <b>رأی‌گیری‌های جاری</b>\n\nفعلاً رأی‌گیری بازی در جریانی نیست."
         markup = governance_main_keyboard(False)
     else:
         text = (
             "🗳 <b>رأی‌گیری‌های جاری</b>\n"
-            "<blockquote>⁠</blockquote>\n"
+            "\n"
             "روی هر طرح بزن تا جزئیات و دکمه‌های رأی رو ببینی."
         )
         markup = governance_proposal_list_keyboard(proposals)
@@ -387,7 +387,7 @@ async def governance_proposal(call: CallbackQuery):
 
     text = (
         f"📜 <b>طرح #{proposal.id}</b>\n"
-        "<blockquote>⁠</blockquote>\n"
+        "\n"
         f"قانون: <b>{html.escape(rule.title_fa)}</b>\n"
         f"مقدار پیشنهادی: <b>{html.escape(_format_value(rule, proposal.proposed_value))}</b>\n"
         f"وضعیت: <b>{html.escape({"draft": "پیش‌نویس", "voting": "در حال رأی‌گیری", "passed": "تصویب‌شده", "rejected": "ردشده", "expired": "منقضی‌شده", "active": "فعال", "revoked": "لغوشده"}.get(proposal.status, "نامشخص"))}</b>\n"
@@ -432,7 +432,7 @@ async def governance_history(call: CallbackQuery):
         async with session.begin():
             rows = await get_governance_history(session, offset=offset, limit=9)
 
-    lines = ["📚 <b>تاریخ قوانین</b>", "<blockquote>⁠</blockquote>"]
+    lines = ["📚 <b>تاریخ قوانین</b>", "\n"]
     if not rows:
         lines.append("هنوز سابقه‌ای ثبت نشده.")
     action_labels = {
@@ -482,7 +482,7 @@ async def governance_revoke_list(call: CallbackQuery):
 
     await call.message.edit_text(
         "👑 <b>لغو فوری قانون</b>\n"
-        "<blockquote>⁠</blockquote>\n"
+        "\n"
         "لغو فوری، قانون مربوطه رو از همین لحظه غیرفعال می‌کنه.",
         reply_markup=governance_revoke_keyboard(overrides[:10]),
         parse_mode="HTML",
