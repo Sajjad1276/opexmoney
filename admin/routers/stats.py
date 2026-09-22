@@ -19,6 +19,7 @@ from app.database.models import (
     Nation,
     NationWar,
     Proposal,
+    RateHistory,
     Transaction,
     User,
     UserActivity,
@@ -197,9 +198,6 @@ async def economy_health(
         wealth_concentration=round(wealth_concentration * 100, 1),
         market_stability=round(max(0.0, min(100.0, 100.0 - avg_volatility * 100)), 1),
     )
-
-
-from app.database.models import RateHistory
 
 
 # ── END OF stats.py ──
