@@ -69,10 +69,10 @@ def build_academy_main_msg(user_xp) -> str:
     level = user_xp.level if user_xp.level in LEVEL_EMOJI else "beginner"
     lines = [
         "🎓 <b>OPEX Academy</b>",
-        "<blockquote>⁠</blockquote>",
+        "\n",
         f"⭐ سطح تو: {LEVEL_EMOJI[level]} {html.escape(level)}",
         f"🏆 XP: {to_fa(user_xp.total_xp)} امتیاز",
-        "<blockquote>⁠</blockquote>",
+        "\n",
         "📚 <b>ماژول‌های آموزشی:</b>",
         "از دکمه‌های زیر یک مسیر آموزشی را باز کن.",
     ]
@@ -107,7 +107,7 @@ def build_module_msg(module_id: int, lessons: list[dict]) -> str:
     meta = MODULE_META[module_id]
     lines = [
         f"📚 <b>ماژول {to_fa(module_id)}: {html.escape(meta['title'])}</b>",
-        "<blockquote>⁠</blockquote>",
+        "\n",
     ]
     if not lessons:
         lines.append("هنوز در این ماژول درسی ثبت نشده است.")
@@ -153,9 +153,9 @@ def build_lesson_msg(lesson) -> str:
     lines = [
         f"📖 <b>درس {to_fa(lesson.module_id)}.{to_fa(lesson.order)}: "
         f"{html.escape(lesson.title_fa)}</b>",
-        "<blockquote>⁠</blockquote>",
+        "\n",
         lesson.content_fa,
-        "<blockquote>⁠</blockquote>",
+        "\n",
         f"⭐ جایزه: +{to_fa(lesson.xp_reward)} XP "
         f"💰 +{to_fa(fmt_amount(lesson.xr_reward))} دلار",
     ]
@@ -227,7 +227,7 @@ async def _show_question(
     text = "\n".join(
         [
             f"{RLM}❓ <b>سوال {to_fa(q_idx + 1)} از {to_fa(total)}</b>",
-            f"{RLM}<blockquote>⁠</blockquote>",
+            f"{RLM}\n",
             f"{RLM}{html.escape(question['q'])}",
         ]
     )
@@ -705,7 +705,7 @@ async def finish_quiz(
 
         lines = [
             f"{RLM}🏆 <b>کوئیز تموم شد!</b>",
-            f"{RLM}<blockquote>⁠</blockquote>",
+            f"{RLM}\n",
             f"{RLM}✅ نتیجه: {to_fa(correct)}/{to_fa(total)} ({to_fa(score)}٪)",
             f"{RLM}⭐ +{to_fa(result['xp_gained'])} XP",
         ]
@@ -786,7 +786,7 @@ async def start_ask_ai(
             "\n".join(
                 [
                     f"{RLM}💬 <b>از اوپکس بپرس</b>",
-                    f"{RLM}<blockquote>⁠</blockquote>",
+                    f"{RLM}\n",
                     f"{RLM}سوالت رو بنویس.",
                     f"{RLM}فقط درباره OPEX MONEY جواب میدم!",
                 ]
