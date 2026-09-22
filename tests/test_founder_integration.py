@@ -323,8 +323,8 @@ async def cleanup_test_rows():
     yield
     async with async_session() as session:
         async with session.begin():
-            await session.execute(delete(CurrencyHolding).where(CurrencyHolding.user_id >= 910001, CurrencyHolding.user_id <= 910007))
-            await session.execute(delete(UserActivity).where(UserActivity.user_id >= 910001, UserActivity.user_id <= 910007))
-            await session.execute(delete(NationFoundingDraft).where(NationFoundingDraft.founder_user_id >= 910001, NationFoundingDraft.founder_user_id <= 910007))
-            await session.execute(delete(User).where(User.user_id >= 910001, User.user_id <= 910007))
-            await session.execute(delete(Nation).where(Nation.group_id >= -100910011, Nation.group_id <= -100910001))
+            await session.execute(delete(CurrencyHolding).where(CurrencyHolding.user_id >= 910001, CurrencyHolding.user_id <= 910009))
+            await session.execute(delete(UserActivity).where(UserActivity.user_id >= 910001, UserActivity.user_id <= 910009))
+            await session.execute(delete(NationFoundingDraft).where(NationFoundingDraft.founder_user_id >= 910001, NationFoundingDraft.founder_user_id <= 910009))
+            await session.execute(delete(User).where(User.user_id >= 910001, User.user_id <= 910009))
+            await session.execute(delete(Nation).where(Nation.group_id >= -100910013, Nation.group_id <= -100910001))
