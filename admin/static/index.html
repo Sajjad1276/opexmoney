@@ -121,10 +121,15 @@ async function initSectionOverview(){
    '</div></div>';
   if(window.Chart){
    charts.d?.destroy();
-   const labels=['شنبه','یکشنبه','دوشنبه','سه‌شنبه','چهارشنبه','پنجشنبه','جمعه'];
-   const base=Math.max(1,Number(tx)||1);
-   const data=[.62,.78,.71,.93,.84,1.05,.97].map(v=>Math.round(base*v));
-   charts.d=new Chart($('dash-activity-chart'),{type:'line',data:{labels,datasets:[{label:'تراکنش',data,borderColor:color,backgroundColor:'rgba(239,159,39,.08)',fill:true,tension:.42,pointRadius:3,pointHoverRadius:5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:10}}},y:{grid:{color:'rgba(255,255,255,.05)'},ticks:{callback:v=>formatNumber(v),font:{size:10}}}}}});
+   const labels=['اعتماد بازار','نقدینگی','ثبات بازار','تورم معکوس','تمرکز ثروت معکوس'];
+   const data=[
+    Number(health.market_confidence||0),
+    Number(health.total_liquidity||0),
+    Number(health.market_stability||0),
+    Math.max(0,100-Math.min(100,Math.abs(Number(health.inflation_rate||0)))),
+    Math.max(0,100-Math.min(100,Number(health.wealth_concentration||0)))
+   ];
+   charts.d=new Chart($('dash-activity-chart'),{type:'line',data:{labels,datasets:[{label:'شاخص سلامت',data,borderColor:color,backgroundColor:'rgba(239,159,39,.08)',fill:true,tension:.42,pointRadius:3,pointHoverRadius:5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:10}}},y:{min:0,max:100,grid:{color:'rgba(255,255,255,.05)'},ticks:{callback:v=>formatNumber(v),font:{size:10}}}}}});
   }
   $('dash-refresh').onclick=()=>initSectionOverview();
   $('dash-nations').onclick=()=>go('nations');
