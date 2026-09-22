@@ -105,7 +105,7 @@ def _permanent_text(status: MissionStatus) -> str:
 def build_missions_text(data: dict[str, list[MissionStatus]]) -> str:
     lines = [
         "⚡ <b>مأموریت‌ها</b>",
-        "<blockquote>⁠</blockquote>",
+        "\n",
         "",
         "🌅 <b>مأموریت‌های امروز</b>",
     ]
