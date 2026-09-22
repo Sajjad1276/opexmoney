@@ -349,7 +349,7 @@ async def nation_detail(
             dominant_cause=row.dominant_cause,
             pressure_signal=float(row.pressure_signal) if row.pressure_signal is not None else None,
         )
-        for row in reversed(history_rows)
+        for row in history_rows
     ]
 
     members = [
