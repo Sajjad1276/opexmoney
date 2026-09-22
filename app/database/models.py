@@ -509,6 +509,9 @@ class PriceAlert(Base):
     )
     is_triggered: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     triggered = synonym("is_triggered")
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default=text("true"), nullable=False
+    )
     created_at: Mapped[datetime] = mapped_column(
         UTCDateTime(), default=utcnow, server_default=func.now(), nullable=False
     )
