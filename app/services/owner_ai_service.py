@@ -28,13 +28,19 @@ from config import settings
 logger = logging.getLogger("opex.owner_ai")
 
 ROOT_REPO = "Sajjad1276/opexmoney"
-MAX_CONTEXT_FILES = 18
-MAX_FILE_CHARS = 24000
-MAX_TOTAL_CONTEXT = 100000
-MAX_PLAN_ROUNDS = 6
-MAX_FIX_ATTEMPTS = 3
-CI_POLL_SECONDS = 8
-DEFAULT_TIMEOUT = 420
+MAX_CONTEXT_FILES = 64
+MAX_FILE_CHARS = 36000
+MAX_TOTAL_CONTEXT = 280000
+MAX_PLAN_ROUNDS = 10
+MAX_FIX_ATTEMPTS = 5
+CI_POLL_SECONDS = 5
+DEFAULT_TIMEOUT = 900
+
+TEXT_EXTENSIONS = {
+    ".py", ".md", ".txt", ".json", ".yaml", ".yml", ".toml", ".ini",
+    ".cfg", ".html", ".css", ".js", ".ts", ".tsx", ".jsx", ".sql",
+    ".sh", ".bat", ".ps1", ".xml", ".csv", ".jinja", ".j2",
+}
 
 ProgressCallback = Callable[[str], Awaitable[None]]
 
