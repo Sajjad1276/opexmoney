@@ -154,7 +154,7 @@ def test_admin_static_has_control_api_wiring() -> None:
         "/api/control/profiles",
         "/api/control/onboarding/summary",
         "/api/economy/behavior-snapshots",
-        "/api/control/price-alerts",
+        "/api/market/price-alerts",
         "/api/control/scheduler",
         "/api/control/support/overview",
         "/api/treasury/overview",
