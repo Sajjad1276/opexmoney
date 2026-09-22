@@ -825,9 +825,13 @@ async def run_owner_ai(
                 "SUPPORT_GITHUB_TOKEN یا GITHUB_TOKEN برای دسترسی پروژه تنظیم نشده است.",
             )
 
-        await say("در حال خواندن وضعیت واقعی repository و معماری پروژه...")
+        await say("در حال خواندن فهرست کامل repository و فایل‌های مرتبط...")
         tree = await _repo_tree("main")
         inspected: dict[str, str] = {}
+        seed_paths = await _seed_context_paths(request, tree)
+        if seed_paths:
+            await say("در حال خواندن سورس واقعی مرتبط، بدون حدس...")
+            inspected.update(await _read_many(seed_paths, "main"))
         tool_result = ""
         changed: set[str] = set()
         branch: str | None = None
@@ -845,13 +849,24 @@ async def run_owner_ai(
                     ci=ci_status,
                 )
 
-            plan = await _planner(
-                request=request,
-                history=history,
-                tree=tree,
-                inspected=inspected,
-                tool_result=tool_result,
-            )
+            try:
+                plan = await _planner(
+                    request=request,
+                    history=history,
+                    tree=tree,
+                    inspected=inspected,
+                    tool_result=tool_result,
+                )
+            except Exception as exc:
+                logger.exception("Owner AI planner failed; switching to recovery mode")
+                try:
+                    recovery = await _plain_recovery_answer(request, inspected)
+                    return OwnerAIResult(
+                        "answered",
+                        "Recovery mode فعال شد.\n\n" + recovery,
+                    )
+                except Exception:
+                    raise exc
             action = str(plan.get("action") or "answer").lower()
             message = str(plan.get("message") or "در حال ادامه بررسی.")
 
@@ -890,7 +905,7 @@ async def run_owner_ai(
                 if not query:
                     tool_result = "search بدون query."
                     continue
-                paths = await _search_code(query)
+                paths = await _search_code(query, branch or "main")
                 tool_result = "نتایج جستجو:\n" + "\n".join(paths)
                 history.append({"role": "tool", "content": tool_result})
                 continue
