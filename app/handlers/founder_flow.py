@@ -12,7 +12,7 @@ from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from aiogram.filters import CommandStart
 from aiogram.filters.state import StateFilter
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, ChatMemberUpdated, Message
+from aiogram.types import CallbackQuery, ChatMemberUpdated, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 from app.database.models import Nation, User
 from app.database.session import async_session
@@ -889,14 +889,22 @@ async def receive_founder_username(
             else:
                 user.username = value
 
-    await state.set_state(FounderStates.WAITING_GROUP_ADMIN)
-    await state.update_data(founder_pending_group=None, founder_launch_token=draft.launch_token)
     try:
         async with async_session() as session:
             draft = await get_or_create_draft(session, message.from_user.id)
     except ValueError as exc:
-        await message.answer(str(exc), reply_markup=founder_cancel_keyboard(), parse_mode="HTML")
+        await message.answer(
+            str(exc),
+            reply_markup=founder_cancel_keyboard(),
+            parse_mode="HTML",
+        )
         return
+
+    await state.set_state(FounderStates.WAITING_GROUP_ADMIN)
+    await state.update_data(
+        founder_pending_group=None,
+        founder_launch_token=draft.launch_token,
+    )
     await _show_group_step(message, state, bot, draft)
 
 
