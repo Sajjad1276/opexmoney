@@ -12,8 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from admin.auth import AdminUser, get_admin_user
 from admin.dependencies import get_db_session, get_redis
-from app import database
-from app.ai import companion
+from ai import companion
 from app.database.models import (
     ActivityType,
     AIUsageLog,
@@ -397,7 +396,7 @@ async def missions_v2(
                 "type": m.mission_type,
                 "target_value": m.target_count,
                 "target_type": m.target_type,
-                "reward_xp": int(m.reward_xr or 0),
+                "reward_xp": int(m.reward_xp or 0),
                 "reward_xr": float(m.reward_xr or 0),
                 "reward_currency": float(m.reward_currency or 0),
                 "duration_days": m.duration_days,
@@ -427,7 +426,7 @@ async def mission_detail(
         "type": m.mission_type,
         "target_value": m.target_count,
         "target_type": m.target_type,
-        "reward_xp": int(m.reward_xr or 0),
+        "reward_xp": int(m.reward_xp or 0),
         "reward_xr": float(m.reward_xr or 0),
         "reward_currency": float(m.reward_currency or 0),
         "duration_days": m.duration_days,
@@ -481,8 +480,9 @@ async def update_mission_v2(
         m.target_count = body.target_value
         m.target_type = body.target_type
         m.duration_days = body.duration_days
-        m.reward_xr = Decimal(str(body.reward_xp))
-        m.reward_currency = Decimal(str(body.reward_xr))
+        m.reward_xp = body.reward_xp
+        m.reward_xr = Decimal(str(body.reward_xr))
+        m.reward_currency = Decimal("0")
         await _audit(db, admin_user, "admin_mission_update", f"mission.{mission_id}", old_value=old, new_value=body.title)
     return {"success": True}
 
@@ -733,7 +733,7 @@ async def ai_stats(
         "gemini_requests_today": requests + extra,
         "gemini_tokens_today": None,
         "active_ai_players": active_ai,
-        "gemini_model": getattr(database.settings, "ai_model", None) if hasattr(database, "settings") else None,
+        "gemini_model": __import__("config").settings.ai_model,
         "gemini_status": "online" if health else "offline",
     }
 
