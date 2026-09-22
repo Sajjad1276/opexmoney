@@ -130,6 +130,32 @@ async def cleanup_market_health_rows():
 
 
 @pytest.mark.asyncio
+async def test_market_opens_for_registered_user_without_nation():
+    async with async_session() as session:
+        async with session.begin():
+            session.add(
+                User(
+                    user_id=TEST_USER_ID,
+                    username="healthtester",
+                    balance=Decimal("0"),
+                    xr_balance=Decimal("500"),
+                    role="player",
+                    home_nation_id=None,
+                )
+            )
+
+    data = await get_market_page_data(TEST_USER_ID)
+
+    assert data.user is not None
+    assert data.user.home_nation_id is None
+
+    message = FakeMessage(TEST_USER_ID)
+    await market_button(message)
+    assert message.answers
+    assert all("حساب پیدا نشد" not in answer for answer in message.answers)
+
+
+@pytest.mark.asyncio
 async def test_market_repairs_missing_home_nation_from_active_membership():
     async with async_session() as session:
         async with session.begin():
