@@ -19,6 +19,7 @@ from app.database.models import (
 )
 from app.services.market_intelligence import get_market_overview, get_risk_label
 from app.services.nation_service import get_user_active_nation_context
+from app.services.world_events import get_active_world_event
 from app.utils.formatting import fmt_amount, fmt_pct, fmt_rate, to_fa
 
 
@@ -148,10 +149,17 @@ async def build_live_dashboard(
         nation.nation_id if nation is not None else None,
         limit=8,
     )
+    world_event = await get_active_world_event(
+        session,
+        nation_id=nation.nation_id if nation is not None else None,
+    )
 
     if nation is None:
         winner_code, winner_change = overview["top_mover"]["winner"]
-        if winner_code:
+        if world_event is not None:
+            event_title = html.escape(world_event.title)
+            event_detail = html.escape(world_event.description)
+        elif winner_code:
             event_title = "مهم‌ترین حرکت بازار"
             event_detail = (
                 f"{winner_code} در ۲۴ ساعت گذشته "
@@ -233,6 +241,9 @@ async def build_live_dashboard(
             f"ملت {html.escape(opponent.name) if opponent is not None else 'رقیب'} "
             f"تا {active_war.ends_at.strftime('%H:%M')} در وضعیت جنگی است."
         )
+    elif world_event is not None:
+        event_title = html.escape(world_event.title)
+        event_detail = html.escape(world_event.description)
     elif abs(change) >= Decimal("3"):
         direction = "صعود" if change > 0 else "فشار فروش"
         event_title = "حرکت مهم ارز ملت"
