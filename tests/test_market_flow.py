@@ -10,12 +10,15 @@ from sqlalchemy import delete, select
 from app.database.models import (
     CurrencyHolding,
     Nation,
+    NationMember,
+    NationMemberRole,
     TradePreview,
     Transaction,
     User,
     UserActivity,
 )
 from app.database.session import async_session
+from app.services.market.market_service import get_market_page_data
 from app.handlers.market import (
     buy_currency,
     buy_amount_message,
@@ -110,6 +113,9 @@ async def cleanup_market_health_rows():
                 delete(UserActivity).where(UserActivity.user_id == TEST_USER_ID)
             )
             await session.execute(
+                delete(NationMember).where(NationMember.user_id == TEST_USER_ID)
+            )
+            await session.execute(
                 delete(CurrencyHolding).where(CurrencyHolding.user_id == TEST_USER_ID)
             )
             await session.execute(
@@ -120,6 +126,50 @@ async def cleanup_market_health_rows():
                     Nation.group_id.in_({TEST_GROUP_HOME, TEST_GROUP_TARGET})
                 )
             )
+
+
+@pytest.mark.asyncio
+async def test_market_repairs_missing_home_nation_from_active_membership():
+    async with async_session() as session:
+        async with session.begin():
+            user = User(
+                user_id=TEST_USER_ID,
+                username="healthtester",
+                balance=Decimal("0"),
+                xr_balance=Decimal("1000"),
+                role="player",
+                home_nation_id=None,
+            )
+            nation = Nation(
+                name="Health Home",
+                currency_code="HOM",
+                group_id=TEST_GROUP_HOME,
+                founder_user_id=None,
+                invite_code=secrets.token_urlsafe(8),
+                exchange_rate=Decimal("1"),
+                rate_prev=Decimal("1"),
+                rate_24h_open=Decimal("1"),
+                trade_volume_24h=Decimal("0"),
+                active_members_24h=1,
+                member_count=1,
+                is_active=True,
+            )
+            session.add_all([user, nation])
+            await session.flush()
+            session.add(
+                NationMember(
+                    nation_id=nation.nation_id,
+                    user_id=TEST_USER_ID,
+                    role=NationMemberRole.CITIZEN,
+                    is_active=True,
+                )
+            )
+
+    data = await get_market_page_data(TEST_USER_ID)
+
+    assert data.user is not None
+    assert data.user.home_nation_id is not None
+    assert data.user.home_nation_id == nation.nation_id
 
 
 @pytest.mark.asyncio
