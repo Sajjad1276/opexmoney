@@ -645,6 +645,47 @@ def _candidate_models() -> list[str]:
     return list(dict.fromkeys(item for item in values if item))
 
 
+def _parse_planner_json(raw: str) -> dict[str, Any]:
+    text = (raw or '').strip()
+    if text.startswith('```'):
+        text = text.strip('`')
+        if text.lstrip().startswith('json'):
+            text = text.lstrip()[4:].lstrip()
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError:
+        start = text.find('{')
+        end = text.rfind('}')
+        if start < 0 or end <= start:
+            raise
+        payload = json.loads(text[start:end + 1])
+    if not isinstance(payload, dict):
+        raise ValueError('Owner AI planner response is not an object.')
+    return payload
+
+
+async def _plain_recovery_answer(request: str, inspected: dict[str, str]) -> str:
+    client = companion._get_client()
+    if client is None:
+        raise RuntimeError('Gemini برای recovery mode در دسترس نیست.')
+    source = '\n\n'.join(f'FILE {path}\n{content}' for path, content in inspected.items())[:MAX_TOTAL_CONTEXT]
+    prompt = 'You are OPEX MONEY Owner AI recovery mode.\n' + request + '\n\nSOURCE:\n' + source
+    last_error: Exception | None = None
+    for model in _candidate_models():
+        try:
+            response = await client.aio.models.generate_content(
+                model=model,
+                contents=prompt,
+                config=types.GenerateContentConfig(temperature=0, max_output_tokens=5000),
+            )
+            answer = (response.text or '').strip()
+            if answer:
+                return answer
+        except Exception as exc:
+            last_error = exc
+    raise RuntimeError(f'recovery failed: {type(last_error).__name__ if last_error else "unknown"}')
+
+
 async def _planner(
     *,
     request: str,
@@ -719,6 +760,7 @@ LATEST TOOL RESULT:
 {tool_result[:12000]}
 """
 
+    last_error: Exception | None = None
     for model in _candidate_models():
         try:
             response = await client.aio.models.generate_content(
@@ -727,15 +769,25 @@ LATEST TOOL RESULT:
                 config=types.GenerateContentConfig(
                     temperature=0,
                     max_output_tokens=24000,
-                    response_mime_type="application/json",
+                    response_mime_type='application/json',
                 ),
             )
-            parsed = json.loads((response.text or "").strip())
-            if isinstance(parsed, dict):
-                return parsed
+            return _parse_planner_json(response.text or '')
         except Exception as exc:
-            logger.warning("Owner AI planner failed model=%s error=%s", model, type(exc).__name__)
-    raise RuntimeError("Owner AI planner نتوانست برنامه معتبر تولید کند.")
+            last_error = exc
+            logger.warning('Owner AI planner failed model=%s error=%s message=%s', model, type(exc).__name__, str(exc)[:600])
+            try:
+                response = await client.aio.models.generate_content(
+                    model=model,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(temperature=0, max_output_tokens=24000),
+                )
+                return _parse_planner_json(response.text or '')
+            except Exception as retry_exc:
+                last_error = retry_exc
+                logger.warning('Owner AI planner retry failed model=%s error=%s message=%s', model, type(retry_exc).__name__, str(retry_exc)[:600])
+
+    raise RuntimeError(f"Owner AI planner نتوانست برنامه معتبر تولید کند: {type(last_error).__name__ if last_error else "Unknown"}")
 
 
 async def run_owner_ai(
