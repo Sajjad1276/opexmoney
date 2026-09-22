@@ -14,7 +14,7 @@ fastapi==0.115.5
 uvicorn[standard]==0.32.1
 httpx==0.28.1
 orjson==3.10.11
-pydantic==2.10.3
+pydantic==2.12.5
 pydantic-settings==2.6.1
 uvloop==0.21.0
 httptools==0.6.4
