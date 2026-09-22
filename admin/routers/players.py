@@ -20,6 +20,7 @@ from app.database.models import (
     NationMembership,
     Transaction,
     User,
+    UserActivity,
     UserMissionProgress,
     UserXP,
 )
@@ -103,9 +104,6 @@ async def _player_list_rows(
         .limit(limit)
     )
     return await _run_all(stmt)
-
-
-from app.database.models import UserActivity
 
 
 @router.get("", response_model=PaginatedResponse[PlayerListItem])
@@ -248,14 +246,31 @@ async def player_detail(
         AIUsageLog.user_id == user_id,
         AIUsageLog.date == date.today(),
     ).limit(1)
+    total_transactions_stmt = select(func.count(Transaction.id)).where(
+        Transaction.user_id == user_id,
+    )
+    last_activity_stmt = select(func.max(UserActivity.created_at)).where(
+        UserActivity.user_id == user_id,
+    )
 
-    user_row, xp_row, membership_row, tx_rows, mission_count, usage_row = await asyncio.gather(
+    (
+        user_row,
+        xp_row,
+        membership_row,
+        tx_rows,
+        mission_count,
+        usage_row,
+        total_transactions,
+        last_activity_at,
+    ) = await asyncio.gather(
         _run_first(user_stmt),
         _run_first(xp_stmt),
         _run_first(membership_stmt),
         _run_all(tx_stmt),
         _run_scalar(mission_stmt),
         _run_first(usage_stmt),
+        _run_scalar(total_transactions_stmt),
+        _run_scalar(last_activity_stmt),
     )
 
     if user_row is None:
@@ -287,8 +302,8 @@ async def player_detail(
         home_nation_flag=user_row.home_nation_flag,
         created_at=_iso(user_row.created_at),
         is_ai=bool(user_row.is_ai),
-        total_transactions=len(transactions),
-        last_activity_at=None,
+        total_transactions=int(total_transactions or 0),
+        last_activity_at=last_activity_at.isoformat() if last_activity_at else None,
         xp_total=int(getattr(xp_row, "total_xp", 0) or 0),
         xp_level=getattr(xp_row, "level", "beginner") or "beginner",
         active_nation_role=_enum_value(
