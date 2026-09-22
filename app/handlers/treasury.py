@@ -189,7 +189,9 @@ def build_treasury_msg(
     currency_code = html.escape(treasury["currency_code"])
 
     lines = [
-        f"🏦 <b>خزانه {nation_name}</b>",
+        f"🏦 <b>قلب مالی {nation_name}</b>",
+        "\n",
+        "اینجا منابع ملت جمع می‌شوند و تصمیم‌های بزرگ از این ذخیره عبور می‌کنند.",
         "\n",
         (
             f"💎 ذخیره دلار: "
@@ -204,11 +206,11 @@ def build_treasury_msg(
             f"<code>{_amount_text(treasury['total_deposited'])}</code>"
         ),
         "\n",
-        "📋 <b>آخرین تراکنش‌ها:</b>",
+        "📋 <b>ردپای مالی اخیر</b>",
     ]
 
     if not logs:
-        lines.append(" ▸ هنوز تراکنشی ثبت نشده")
+        lines.append("هنوز حرکتی در خزانه ثبت نشده است.")
     else:
         for log in logs[:5]:
             username = log["actor_username"]
@@ -367,12 +369,12 @@ async def start_deposit(
 
         if callback.message is not None:
             await callback.message.edit_text(
-                "💎 <b>واریز به خزانه</b>\n"
+                "💎 <b>افزایش ذخیره خزانه</b>\n"
                 "\n"
                 f"موجودی دلار شما: "
                 f"<code>{_amount_text(xr_balance)}</code>\n"
                 f"حداقل واریز: <code>{_amount_text(MIN_DEPOSIT)}</code> دلار\n\n"
-                "مقدار واریز را بنویسید:",
+                "مقداری که می‌خواهی وارد خزانه شود را بنویس:",
                 reply_markup=cancel_keyboard(nation_id, return_target),
                 parse_mode="HTML",
             )
@@ -543,7 +545,7 @@ async def start_withdraw(
                 "\n"
                 f"موجودی خزانه: "
                 f"<code>{_amount_text(treasury['balance_xr'])}</code> دلار\n\n"
-                "مقدار برداشت را بنویسید:",
+                "مقدار موردنیاز برای برداشت را بنویس:",
                 reply_markup=cancel_keyboard(nation_id, return_target),
                 parse_mode="HTML",
             )
@@ -596,11 +598,11 @@ async def receive_withdraw_amount(
 
         await close_inline_panel(state, message.bot)
         confirm_message = await message.answer(
-            "⚠️ <b>تأیید برداشت</b>\n"
+            "⚠️ <b>آخرین بررسی برداشت</b>\n"
             "\n"
             f"مقدار: <code>{_amount_text(amount)}</code> دلار\n"
             "این مبلغ به موجودی دلار شما اضافه می‌شود.\n\n"
-            "مطمئنید؟",
+            "این مبلغ از ذخیره ملت کم می‌شود. تأیید می‌کنی؟",
             reply_markup=confirm_withdraw_keyboard(
                 int(nation_id),
                 amount_str,
