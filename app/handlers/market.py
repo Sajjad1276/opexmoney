@@ -56,7 +56,7 @@ def _cancel_markup() -> InlineKeyboardMarkup:
 async def render_market(message: Message, edit_call: CallbackQuery | None = None, *, request_user_id: int | None = None):
     uid = edit_call.from_user.id if edit_call else request_user_id or message.from_user.id
     data = await get_market_page_data(uid)
-    if data.user is None or data.user.home_nation_id is None:
+    if data.user is None:
         text = "🔴 حساب پیدا نشد. /start بزن."
         if edit_call:
             await edit_call.answer(text, show_alert=True)
