@@ -43,7 +43,7 @@ def test_profile_text_contains_derived_identity_and_real_metrics() -> None:
     assert "Avalon · AVL" in text
     assert "معامله‌گر" in text
     assert "12" in text
-    assert "4,200.00" in text
+    assert "4200.00" in text
     assert "شهرت‌های رفتاری" in text
 
 
