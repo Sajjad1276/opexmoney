@@ -23,6 +23,7 @@ from sqlalchemy.exc import IntegrityError
 from app.database.models import CurrencyHolding, Nation, Transaction, User, UserActivity
 from app.database.session import async_session
 from app.handlers.nation_management import _join_user
+from app.handlers.onboarding import _begin_registration
 from app.filters.profanity import profanity_filter
 from app.utils.name_filter import TRADER_NAME_RE, is_blocked_trader_name, is_valid_trader_name
 from app.keyboards.inline import (
@@ -258,23 +259,39 @@ async def _show_help(
     replace_inline: bool = False,
 ) -> None:
     text = (
-        "❓ <b>راهنمای OPEX MONEY</b>\n"
-        "تو یه معامله‌گر اقتصادی هستی.\n"
-        "به ملت‌ها بپیوند، ارز بخر و بفروش.\n"
-        "نرخ ارز با فعالیت بازار تغییر می‌کنه.\n"
-        "برای شروع، اسم معامله‌گرت رو انتخاب کن."
+        "❓ <b>راهنمای OPEX MONEY</b>\n\n"
+        "<b>شروع بازی</b>\n"
+        "۱) یک نام معامله‌گر ۳ تا ۲۰ کاراکتری انتخاب کن.\n"
+        "۲) یک ملت فعال را انتخاب کن یا، در صورت داشتن شرایط، ملت خودت را تأسیس کن.\n"
+        "۳) بعد از ورود به ملت، ۵۰۰ واحد از ارز همان ملت را داری و اولین معامله‌ات آماده است.\n"
+        "۴) در اولین معامله، بخشی از ارز ملتت را به دلار تبدیل می‌کنی تا وارد بازار گسترده‌تر شوی.\n\n"
+        "<b>بازار</b>\n"
+        "در بازار می‌توانی با دلار ارز ملت‌ها را بخری یا بفروشی، فهرست ارزهای فعال را ببینی، نمودار قیمت بگیری، هشدار قیمت ثبت کنی و تاریخچه معاملاتت را بررسی کنی.\n"
+        "نرخ‌ها هر ۱۵ دقیقه به‌روزرسانی می‌شوند و فعالیت اقتصادی، معاملات و فشار بازار روی آن‌ها اثر می‌گذارد.\n\n"
+        "<b>ملت</b>\n"
+        "بخش «ملت من» برای مشاهده و مدیریت ملت، بررسی آمار، خزانه و بخش‌های حکمرانی است.\n"
+        "خزانه امکان واریز، برداشت و گزارش‌گیری دارد. در قانون اساسی می‌توان قوانین فعال، طرح‌های جدید، رأی‌گیری‌ها و تاریخ قوانین را دید.\n"
+        "دسترسی‌های مدیریتی، بخش اعضا و لاگ فعالیت و امکانات مدیریتی ملت را باز می‌کند.\n\n"
+        "<b>جنگ</b>\n"
+        "جنگ بین ملت‌ها ۴۸ ساعت ادامه دارد. در پایان، ملت با نرخ ارز بالاتر برنده می‌شود و ۱۰٪ خزانه ملت بازنده به‌عنوان خسارت به برنده می‌رسد.\n\n"
+        "<b>پیشرفت</b>\n"
+        "مأموریت‌های روزانه و هفتگی برایت هدف و جایزه می‌سازند.\n"
+        "در آکادمی، ماژول‌ها و درس‌ها را جلو می‌بری، کوئیز حل می‌کنی، XP و پاداش دلار می‌گیری و می‌توانی از اوپکس سؤال بپرسی.\n"
+        "رتبه‌بندی هم سه نمای اصلی دارد: ملت‌ها، ثروتمندان و معامله‌گران.\n\n"
+        "<b>قانون مهم</b>\n"
+        "تصمیم‌ها روی اقتصاد بازی اثر می‌گذارند. بازار، ملت، معاملات، خزانه و رقابت بین ملت‌ها به هم متصل‌اند."
     )
 
     if replace_inline:
         await message.edit_text(
-            text,
+            rtl_html(text),
             reply_markup=welcome_keyboard(),
             parse_mode="HTML",
         )
         return
 
     await message.answer(
-        text,
+        rtl_html(text),
         reply_markup=welcome_keyboard(),
         parse_mode="HTML",
     )
