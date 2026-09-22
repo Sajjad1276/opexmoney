@@ -232,7 +232,12 @@ async def market_price_alerts_v2(
                 "currency": row.currency_code,
                 "condition": _enum(row.direction),
                 "threshold": float(row.target_price or 0),
-                "current_value": float(row.exchange_rate or 0),
+                "current_value": float(
+                    row.exchange_rate if not row.is_triggered else (
+                        row.triggered_value if row.triggered_value is not None else row.exchange_rate
+                    )
+                    or 0
+                ),
                 "is_triggered": bool(row.is_triggered),
                 "triggered_at": _iso(row.triggered_at),
                 "is_active": bool(row.is_active),
