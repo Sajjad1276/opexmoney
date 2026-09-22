@@ -57,6 +57,7 @@ _ACTION_RATE_LIMITS: dict[str, int] = {
 class _StrictBody(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
+        strict=True,
         str_strip_whitespace=True,
         validate_assignment=True,
         allow_inf_nan=False,
@@ -625,6 +626,7 @@ async def reset_rates(
                         Nation.nation_id == body.nation_id,
                         Nation.is_active.is_(True),
                         Nation.deleted_at.is_(None),
+                        Nation.is_ai.is_(False),
                     )
                     .values(
                         rate_prev=Nation.exchange_rate,
