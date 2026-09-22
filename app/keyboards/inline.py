@@ -200,8 +200,15 @@ def nation_panel_keyboard(
     buttons = [
         [InlineKeyboardButton(text="🌍 ملت‌های من", callback_data="my_nations")],
         [InlineKeyboardButton(text="🔍 کاوش ملت‌ها", callback_data="explore_nations")],
-        [InlineKeyboardButton(text="🏛 تأسیس ملت", callback_data="found_nation", style=ButtonStyle.SUCCESS)],
     ]
+
+    # A player with an active nation must not be offered nation founding again.
+    # `nation_id` comes from the active-nation context, so this stays consistent
+    # with the membership source of truth used by the nation handlers.
+    if nation_id is None:
+        buttons.append(
+            [InlineKeyboardButton(text="🏛 تأسیس ملت", callback_data="found_nation", style=ButtonStyle.SUCCESS)]
+        )
 
     if nation_id is not None:
         buttons.append(
