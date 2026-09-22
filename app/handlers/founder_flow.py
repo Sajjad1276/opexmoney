@@ -170,13 +170,13 @@ def _founder_intro_text(user_mention: str) -> str:
         "هر ملت یه گروه تلگرامیه.\n"
         "هر گروه یه اقتصاد مستقل داره.\n"
         "اعضای گروهت شهروندان ملتت میشن.\n\n"
-        "<blockquote>⁠</blockquote>\n"
+        "\n"
         "<b>قبل از شروع بدون:</b>\n\n"
         "👑 تو به عنوان بنیان‌گذار ثبت میشی\n"
         "💰 موجودی اولیه: <b>۱,۰۰۰ واحد</b> ارز ملت\n"
         "🎖 نشان «بنیان‌گذار» برای همیشه روی پروفایلت\n"
         "📊 کنترل کامل تنظیمات اقتصادی ملت\n\n"
-        "<blockquote>⁠</blockquote>\n"
+        "\n"
         "<i>گروه تلگرامی داری؟</i>"
     )
 
@@ -184,7 +184,7 @@ def _founder_intro_text(user_mention: str) -> str:
 def _no_group_text(user_mention: str) -> str:
     return (
         f"{user_mention}، دو راه داری:\n\n"
-        "<blockquote>⁠</blockquote>\n"
+        "\n"
         "<b>راه اول — همین الان گروه بساز:</b>\n"
         "تلگرام رو باز کن، یه گروه جدید بساز،\n"
         "بعد برگرد اینجا.\n\n"
@@ -207,11 +207,11 @@ def _username_step_text(user_mention: str) -> str:
 def _group_identified_text(draft, member_count: int) -> str:
     return (
         "✅ <b>گروه شناسایی شد!</b>\n"
-        "<blockquote>⁠</blockquote>\n"
+        "\n"
         f"📍 گروه: <b>{html.escape(draft.group_title or 'گروه')}</b>\n"
         f"👥 اعضا: <b>{member_count}</b> نفر\n"
         f"🆔 شناسه: <code>{draft.group_id}</code>\n\n"
-        "<blockquote>⁠</blockquote>\n"
+        "\n"
         "حالا باید واحد پول ملتت رو نام‌گذاری کنی.\n\n"
         "<b>یه کد کوتاه ۳ تا ۴ حرفی انگلیسی:</b>\n"
         "<i>مثال: AZD — IRN — PRS — GLX — VLT — GOLD</i>\n\n"
@@ -222,7 +222,7 @@ def _group_identified_text(draft, member_count: int) -> str:
 def _currency_step_text(draft) -> str:
     return (
         "💰 <b>کد ارز ملت</b>\n"
-        "<blockquote>⁠</blockquote>\n"
+        "\n"
         f"📍 گروه: <b>{html.escape(draft.group_title or 'گروه')}</b>\n\n"
         "یه کد کوتاه ۳ تا ۴ حرفی انگلیسی انتخاب کن.\n"
         "<i>مثال: AZD — IRN — PRS — GLX — VLT — GOLD</i>\n\n"
@@ -233,11 +233,11 @@ def _currency_step_text(draft) -> str:
 def _f5_text(draft, founder_mention: str) -> str:
     return (
         "💰 <b>تأیید کد ارز</b>\n"
-        "<blockquote>⁠</blockquote>\n"
+        "\n"
         f"{founder_mention}:\n\n"
         f"کد انتخابی: <code>{html.escape(draft.currency_code or '---')}</code>\n"
         f"ملت: <b>{html.escape(draft.group_title or '---')}</b>\n\n"
-        "<blockquote>⁠</blockquote>\n"
+        "\n"
         "<b>بعد از تأیید:</b>\n"
         f"- ارز <code>{html.escape(draft.currency_code or '---')}</code> در بازارهای OPEX ثبت میشه\n"
         "- نرخ اولیه: <b>۱.۰۰۰۰ دلار</b>\n"
@@ -442,7 +442,7 @@ async def start_founder(
     )
     await call.message.edit_text(
         "🏛 <b>ساخت ملت جدید</b>\n"
-        "<blockquote>⁠</blockquote>\n"
+        "\n"
         + _founder_intro_text(mention),
         reply_markup=keyboard,
         parse_mode="HTML",
@@ -471,7 +471,7 @@ async def founder_no_group(call: CallbackQuery) -> None:
     if call.message:
         await call.message.edit_text(
             "💡 <b>بدون گروه هم میشه شروع کرد!</b>\n"
-            "<blockquote>⁠</blockquote>\n"
+            "\n"
             + _no_group_text(mention),
             reply_markup=keyboard,
             parse_mode="HTML",
@@ -501,7 +501,7 @@ async def founder_has_group(call: CallbackQuery, state: FSMContext, bot: Bot) ->
     if call.message:
         await call.message.edit_text(
             "👑 <b>ثبت‌نام بنیان‌گذار</b>\n"
-            "<blockquote>⁠</blockquote>\n"
+            "\n"
             + _username_step_text(
                 f'<a href="tg://user?id={call.from_user.id}">{html.escape(call.from_user.first_name or "بنیان‌گذار")}</a>'
             ),
@@ -1161,9 +1161,9 @@ async def confirm_founder(
     if call.message is not None:
         f6_text = (
             f"👑 <b>ملت «{html.escape(nation.name)}» ساخته شد!</b>\n"
-            "<blockquote>⁠</blockquote>\n"
+            "\n"
             f"👤 بنیان‌گذار: <b>{html.escape(call.from_user.first_name or 'بنیان‌گذار')}</b>\n\n"
-            "<blockquote>⁠</blockquote>\n"
+            "\n"
             f"🏛 ملت: <b>{html.escape(nation.name)}</b>\n"
             f"💰 ارز: <code>{html.escape(nation.currency_code)}</code>\n"
             "📈 نرخ اولیه: <b>۱.۰۰۰۰ دلار</b>\n"
@@ -1206,12 +1206,12 @@ async def confirm_founder(
             group_id,
             (
                 f"🏛 <b>ملت «{html.escape(nation.name)}» در OPEX ثبت شد!</b>\n"
-                "<blockquote>⁠</blockquote>\n"
+                "\n"
                 "از این لحظه این گروه یه ملت مستقل در بازارهای جهانی OPEX است.\n\n"
                 f"💰 واحد پول: <code>{html.escape(nation.currency_code)}</code>\n"
                 "📈 نرخ امروز: <b>۱.۰۰۰۰ دلار</b>\n"
                 f"👑 بنیان‌گذار: <a href='tg://user?id={call.from_user.id}'>{html.escape(call.from_user.first_name or 'بنیان‌گذار')}</a>\n"
-                "<blockquote>⁠</blockquote>\n"
+                "\n"
                 "<b>چطور بازی کنم؟</b>\n"
                 "۱. روی دکمه زیر بزن\n"
                 "۲. ربات رو استارت بزن\n"
