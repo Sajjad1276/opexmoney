@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import (
+    CurrencyHolding,
     Nation,
     NationLog,
     NationWar,
@@ -120,7 +121,20 @@ async def get_player_profile(
     xp = await session.scalar(
         select(UserXP.total_xp).where(UserXP.user_id == user_id)
     )
-    wealth = Decimal(str(user.xr_balance or 0))
+    holdings_value = await session.scalar(
+        select(
+            func.coalesce(
+                func.sum(CurrencyHolding.amount * Nation.exchange_rate),
+                0,
+            )
+        )
+        .join(Nation, Nation.nation_id == CurrencyHolding.nation_id)
+        .where(
+            CurrencyHolding.user_id == user_id,
+            Nation.is_active.is_(True),
+        )
+    )
+    wealth = Decimal(str(user.xr_balance or 0)) + Decimal(str(holdings_value or 0))
 
     reputation_trade = min(
         100,
