@@ -707,7 +707,7 @@ async def ai_stats(
 ):
     today = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0).replace(tzinfo=None)
     requests, extra = await _ai_usage_today(db)
-    ai_players = int(await db.scalar(select(func.count(User.user_id)).where(User.is_ai.is_(True), User.deleted_at.is_(None))) or 0)
+    ai_players = int(await db.scalar(select(func.count(User.user_id)).where(User.is_ai.is_(True))) or 0)
     ai_nations = int(await db.scalar(select(func.count(Nation.nation_id)).where(Nation.is_ai.is_(True), Nation.is_active.is_(True))) or 0)
     trades_today = int(
         await db.scalar(
@@ -772,7 +772,7 @@ async def ai_players(
         select(User, Nation.name.label("nation_name"), trade_max.c.last_trade_at)
         .outerjoin(Nation, Nation.nation_id == User.home_nation_id)
         .outerjoin(trade_max, trade_max.c.user_id == User.user_id)
-        .where(User.is_ai.is_(True), User.deleted_at.is_(None))
+        .where(User.is_ai.is_(True))
         .order_by(User.user_id)
     )
     total = int(await db.scalar(select(func.count()).select_from(stmt.order_by(None).subquery())) or 0)
@@ -1016,7 +1016,7 @@ async def _profile_row(db: AsyncSession, user_id: int):
 @router.get("/api/profiles/search")
 async def profile_search(q: str = "", db: AsyncSession = Depends(get_db_session), admin_user: AdminUser = Depends(get_admin_user)):
     q = q.strip()
-    stmt = select(User).where(User.deleted_at.is_(None)).order_by(User.user_id)
+    stmt = select(User).order_by(User.user_id)
     if q:
         conditions = [User.username.ilike(f"%{q}%")]
         if q.isdigit():
