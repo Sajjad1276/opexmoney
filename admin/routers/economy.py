@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -84,6 +85,7 @@ async def market_states(
         )
         .outerjoin(Nation, Nation.currency_code == CurrencyMarketState.currency_code)
         .order_by(CurrencyMarketState.calculated_rate.desc())
+        .limit(500)
     )
 
     rows = await _run_all(stmt)
@@ -136,7 +138,7 @@ async def rate_history(
         .limit(10000)
     )
 
-    nation_row, rows = await __import__("asyncio").gather(
+    nation_row, rows = await asyncio.gather(
         _run_first(nation_stmt),
         _run_all(rows_stmt),
     )
