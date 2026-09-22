@@ -205,14 +205,14 @@ USERNAME_CAPTION = """💹 <b>اسم معامله‌گرت رو انتخاب ک�
 def nation_list_text(user, trader_name: str, nations: list[Nation]) -> str:
     lines = [
         f"✅ <b>«{html.escape(trader_name)}»</b> ثبت شد.",
-        "<blockquote>⁠</blockquote>",
+        "\n",
         f"{user_mention(user)}، حالا باید به یه ملت بپیوندی.",
         "",
         "ارز اون ملت، پول اصلی حسابت میشه.",
         "هر معامله‌ات مستقیم روی نرخ اون ارز اثر میذاره.",
         "",
         "<b>🌍 ملت‌های فعال:</b>",
-        "<blockquote>⁠</blockquote>",
+        "\n",
     ]
     for index, nation in enumerate(nations, start=1):
         change = get_rate_change(nation)
@@ -224,10 +224,10 @@ def nation_list_text(user, trader_name: str, nations: list[Nation]) -> str:
             ]
         )
         if index != len(nations):
-            lines.append("<blockquote>⁠</blockquote>")
+            lines.append("\n")
     lines.extend(
         [
-            "<blockquote>⁠</blockquote>",
+            "\n",
             "نرخ‌ها هر 15 دقیقه آپدیت میشن.",
         ]
     )
@@ -426,7 +426,7 @@ async def new_player_next_step(message: Message, state: FSMContext) -> None:
     receive_omx = Decimal("50") * nation.exchange_rate
     text = (
         f"{html.escape(nation.flag_emoji or '🏴')} <b>قدم بعدی تو</b>\n"
-        "<blockquote>⁠</blockquote>"
+        "\n"
         "🎯 این اولین تصمیم اقتصادی توست.\n\n"
         f"📤 می‌فروشی: <b>۵۰ {html.escape(nation.currency_code)}</b>\n"
         f"📥 می‌گیری: <b>{fmt_amount(receive_omx)} دلار</b>\n\n"
@@ -465,7 +465,7 @@ async def first_trade_tutorial(call: CallbackQuery, state: FSMContext) -> None:
         return
     receive_omx = Decimal("50") * nation.exchange_rate
     change = get_rate_change(nation)
-    text = ("⚡ <b>اولین معامله</b>\n<blockquote>⁠</blockquote>\n" f"📤 می‌فروشی:   <b>50 <code>{html.escape(nation.currency_code)}</code></b>\n" f"📥 دریافت می‌کنی: <b>{fmt_amount(receive_omx)} <code>دلار</code></b>\n\n<blockquote>⁠</blockquote>\n" f"💹 نرخ: <code>1 {html.escape(nation.currency_code)} = {fmt_rate(nation.exchange_rate)} دلار</code>\n" f"{get_rate_emoji(change)} تغییر 24h: <b>{fmt_pct(change)}</b>\n<blockquote>⁠</blockquote>")
+    text = ("⚡ <b>اولین معامله</b>\n\n" f"📤 می‌فروشی:   <b>50 <code>{html.escape(nation.currency_code)}</code></b>\n" f"📥 دریافت می‌کنی: <b>{fmt_amount(receive_omx)} <code>دلار</code></b>\n\n\n" f"💹 نرخ: <code>1 {html.escape(nation.currency_code)} = {fmt_rate(nation.exchange_rate)} دلار</code>\n" f"{get_rate_emoji(change)} تغییر 24h: <b>{fmt_pct(change)}</b>\n")
     await _safe_edit_text(call, text, trade_confirmation_keyboard())
     await call.answer()
 
@@ -526,7 +526,7 @@ async def confirm_first_trade(call: CallbackQuery, state: FSMContext) -> None:
 
     text = (
         "✅ <b>اولین معامله انجام شد!</b>\n"
-        "<blockquote>⁠</blockquote>\n"
+        "\n"
         f"📤 فروختی: <s>۵۰ {html.escape(nation.currency_code)}</s>\n"
         f"📥 دریافتی: <b>{fmt_amount(receive_omx)} دلار</b>\n\n"
         f"💰 حالا داری: <b>{fmt_amount(holding.amount)} {html.escape(nation.currency_code)}</b> + <b>{fmt_amount(user.xr_balance)} دلار</b>\n\n"
