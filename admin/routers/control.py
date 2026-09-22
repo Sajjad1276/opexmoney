@@ -26,6 +26,7 @@ from app.database.models import (
     Nation,
     NationFoundingDraft,
     NationRank,
+    NationMembership,
     NationTreasury,
     PriceAlert,
     TreasuryLog,
@@ -35,7 +36,7 @@ from app.database.models import (
     UserMissionProgress,
     UserXP,
 )
-from app.database.session import async_session
+from app.schedulers.admin_control import SCHEDULER_JOB_META
 from app.diagnostics.support_telemetry import get_recent_telemetry
 
 router = APIRouter(prefix="/api/control", tags=["admin-control"])
@@ -622,12 +623,12 @@ async def profiles(
     result = []
     for r in rows:
         membership_nation = await db.scalar(
-            select(Nation.id if False else Nation.nation_id)
-            .join_from(Nation, __import__("app.database.models", fromlist=["NationMembership"]).NationMembership, isouter=True)
+            select(NationMembership.nation_id)
             .where(
-                __import__("app.database.models", fromlist=["NationMembership"]).NationMembership.user_id == r.user_id,
-                __import__("app.database.models", fromlist=["NationMembership"]).NationMembership.is_active.is_(True),
+                NationMembership.user_id == r.user_id,
+                NationMembership.is_active.is_(True),
             )
+            .order_by(NationMembership.joined_at.desc())
             .limit(1)
         )
         result.append(
@@ -872,21 +873,8 @@ async def scheduler_status(
     redis=Depends(get_redis),
     admin_user: AdminUser = Depends(get_admin_user),
 ):
-    configured = [
-        ("rate_engine_15m", "هر ۱۵ دقیقه", "بازمحاسبه نرخ ملت‌ها"),
-        ("nation_membership_reconciliation_15m", "هر ۱۵ دقیقه", "همگام‌سازی اعضای ملت"),
-        ("nation_rank_hourly", "ساعتی", "به‌روزرسانی رتبه ملت‌ها"),
-        ("governance_cycle", "دقیقه ۵ هر ساعت", "چرخه حکمرانی"),
-        ("daily_market_reset", "هر روز ۰۰:۰۰", "ریست متریک روزانه بازار"),
-        ("nation_war_resolution_15m", "هر ۱۵ دقیقه", "تسویه جنگ‌های منقضی"),
-        ("nation_join_request_expiration", "هر ۱۵ دقیقه", "انقضای درخواست عضویت"),
-        ("nation_weekly_ai_report", "دوشنبه ۰۹:۰۰", "گزارش هفتگی AI"),
-        ("price_alert_checker_5m", "هر ۵ دقیقه", "بررسی هشدار قیمت"),
-        ("ai_world_5m", "هر ۵ دقیقه", "چرخه دنیای AI"),
-        ("portfolio_live_updates", "زمان‌بندی داخلی", "به‌روزرسانی زنده پرتفولیو"),
-    ]
     result = []
-    for job_id, schedule, label in configured:
+    for job_id, (schedule, label) in SCHEDULER_JOB_META.items():
         item = {"job_id": job_id, "schedule": schedule, "label": label, "status": "unknown"}
         if redis is not None:
             raw = await redis.hgetall(f"opex:scheduler:job:{job_id}")
@@ -909,20 +897,7 @@ async def scheduler_command(
     redis=Depends(get_redis),
     admin_user: AdminUser = Depends(get_admin_user),
 ):
-    allowed = {
-        "rate_engine_15m",
-        "nation_membership_reconciliation_15m",
-        "nation_rank_hourly",
-        "governance_cycle",
-        "daily_market_reset",
-        "nation_war_resolution_15m",
-        "nation_join_request_expiration",
-        "nation_weekly_ai_report",
-        "price_alert_checker_5m",
-        "ai_world_5m",
-        "portfolio_live_updates",
-    }
-    if job_id not in allowed:
+    if job_id not in SCHEDULER_JOB_META:
         raise HTTPException(status_code=404, detail="Unknown scheduler job")
     if redis is None:
         raise HTTPException(status_code=503, detail="Redis unavailable")
