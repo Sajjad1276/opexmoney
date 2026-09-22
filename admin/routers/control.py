@@ -682,6 +682,7 @@ async def finalize_founder_draft(
     )
     if founder_id is None:
         raise HTTPException(status_code=404, detail="Founder draft not found")
+    await db.rollback()
     try:
         nation, group_id = await finalize_draft(
             db,
@@ -953,6 +954,42 @@ async def treasury_list(
     ]
 
 
+@router.get("/treasury/{nation_id}/logs")
+async def treasury_logs(
+    nation_id: int,
+    limit: int = Query(default=50, ge=1, le=200),
+    db: AsyncSession = Depends(get_db_session),
+    admin_user: AdminUser = Depends(get_admin_user),
+):
+    rows = (
+        await db.execute(
+            select(
+                TreasuryLog.id,
+                TreasuryLog.action,
+                TreasuryLog.amount_xr,
+                TreasuryLog.note,
+                TreasuryLog.created_at,
+                User.username,
+            )
+            .outerjoin(User, User.user_id == TreasuryLog.actor_id)
+            .where(TreasuryLog.nation_id == nation_id)
+            .order_by(TreasuryLog.created_at.desc(), TreasuryLog.id.desc())
+            .limit(limit)
+        )
+    ).all()
+    return [
+        {
+            "id": int(r.id),
+            "action": r.action,
+            "amount_xr": float(r.amount_xr or 0),
+            "note": r.note,
+            "created_at": _iso(r.created_at),
+            "actor_username": r.username,
+        }
+        for r in rows
+    ]
+
+
 @router.post("/treasury/{nation_id}/adjust")
 async def treasury_adjust(
     nation_id: int,
@@ -975,9 +1012,6 @@ async def treasury_adjust(
         if after < 0:
             raise HTTPException(status_code=422, detail="Treasury balance cannot become negative")
         treasury.balance_xr = after
-        if amount > 0:
-            treasury.total_deposited = Decimal(str(treasury.total_deposited or 0)) + amount
-            treasury.last_deposit_at = datetime.now(UTC)
         nation.treasury = after
         db.add(
             TreasuryLog(
