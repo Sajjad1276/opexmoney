@@ -61,7 +61,7 @@ async def get_active_world_event(
         WorldEvent.ends_at > current,
     )
     if nation_id is None:
-        statement = statement.where(WorldEvent.scope == WorldEventScope.GLOBAL)
+        statement = statement.order_by(WorldEvent.started_at.desc())
     else:
         statement = statement.where(
             (WorldEvent.affected_nation_id == nation_id)
