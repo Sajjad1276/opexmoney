@@ -219,14 +219,20 @@ async def _github_text(path: str) -> str:
 
 async def _read_file(path: str, ref: str = "main") -> str:
     clean = _safe_repo_path(path)
+    suffix = PurePosixPath(clean).suffix.casefold()
+    if suffix and suffix not in TEXT_EXTENSIONS:
+        raise ValueError(f"فایل باینری یا غیرمتنی قابل تحلیل متنی نیست: {clean}")
+
     result = await _github(
         f"/repos/{_repo()}/contents/{_encode_path(clean)}?ref={urllib.parse.quote(ref, safe='')}"
     )
     content = result.get("content")
     if not isinstance(content, str):
         raise RuntimeError(f"محتوای {clean} قابل خواندن نیست.")
-    decoded = base64.b64decode(content.encode("ascii")).decode("utf-8")
-    return decoded[:MAX_FILE_CHARS]
+    decoded = base64.b64decode(content.encode("ascii")).decode("utf-8", errors="replace")
+    if len(decoded) > MAX_FILE_CHARS:
+        return decoded[:MAX_FILE_CHARS] + "\n# [OWNER_AI_SOURCE_TRUNCATED]"
+    return decoded
 
 
 async def _repo_tree(ref: str = "main") -> list[str]:
