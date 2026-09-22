@@ -55,6 +55,7 @@ def test_admin_control_endpoints_cover_missing_systems() -> None:
     required = [
         '@router.get("/academy/summary")',
         '@router.get("/academy/lessons")',
+        '@router.post("/academy/lessons")',
         '@router.patch("/academy/lessons/{lesson_id}")',
         '@router.get("/academy/progress")',
         '@router.get("/missions")',
@@ -63,6 +64,7 @@ def test_admin_control_endpoints_cover_missing_systems() -> None:
         '@router.get("/founder/summary")',
         '@router.get("/founder/drafts")',
         '@router.post("/founder/drafts/{draft_id}/cancel")',
+        '@router.post("/founder/drafts/{draft_id}/finalize")',
         '@router.get("/ai/summary")',
         '@router.get("/ai/users")',
         '@router.patch("/ai/users/{user_id}")',
@@ -161,6 +163,7 @@ def test_admin_static_has_control_api_wiring() -> None:
 
     assert "api.patch" in html
     assert "api.post" in html
+    assert 'allow_methods=["GET", "POST", "PATCH", "OPTIONS"]' in _read(ADMIN_MAIN)
 
 
 def test_scheduler_admin_bridge_is_registered() -> None:
