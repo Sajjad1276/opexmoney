@@ -54,3 +54,9 @@ def test_scheduler_monitor_does_not_require_legacy_next_run_time_property() -> N
     source = open("app/schedulers/admin_control.py", encoding="utf-8").read()
     assert 'getattr(job, "next_run_time", None)' in source
     assert 'getattr(job, "next_fire_time", None)' in source
+
+
+def test_owner_ai_command_is_hidden_from_public_command_menu() -> None:
+    source = open("main.py", encoding="utf-8").read()
+    assert 'command="ai"' not in source
+    assert 'command="start"' in source
