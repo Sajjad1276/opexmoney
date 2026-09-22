@@ -83,6 +83,94 @@ body.dashboard-mode .dash-v2 .btn:hover{background:#f5f5f3}
 @media(max-width:1050px){body.dashboard-mode .dash-v2 .dash-kpis{grid-template-columns:repeat(2,1fr)}body.dashboard-mode .dash-v2 .dash-main,body.dashboard-mode .dash-v2 .dash-bottom{grid-template-columns:1fr}}
 @media(max-width:780px){body.dashboard-mode .sidebar{width:68px;padding:10px 8px}body.dashboard-mode .logo b,body.dashboard-mode .logo small,body.dashboard-mode .nav .label,body.dashboard-mode .nav .badge,body.dashboard-mode .status .txt{display:none}body.dashboard-mode .logo{justify-content:center}body.dashboard-mode .nav button{justify-content:center}body.dashboard-mode .content{padding:0 12px 20px}body.dashboard-mode .topbar{padding:0 12px}}
 @media(max-width:650px){body.dashboard-mode .dash-v2 .dash-kpis{grid-template-columns:1fr}body.dashboard-mode .dash-v2 .dash-welcome{align-items:flex-start;flex-direction:column}body.dashboard-mode .dash-v2 .dash-welcome h2{font-size:23px}}
+/* exact dashboard composition */
+body.dashboard-mode{background:#f2f2f0;color:#181818}
+body.dashboard-mode .app{direction:ltr;background:#f2f2f0}
+body.dashboard-mode .sidebar{order:0;width:218px;min-width:218px;background:#fafaf9;border:0;border-right:1px solid #deded9;padding:20px 15px}
+body.dashboard-mode .logo{justify-content:flex-start;border:0;margin:0 0 20px;padding:4px 10px 18px}
+body.dashboard-mode .logo b{color:#171717;font-size:20px;letter-spacing:-.7px}
+body.dashboard-mode .logo small{color:#999994}
+body.dashboard-mode .nav{gap:2px}
+body.dashboard-mode .nav-sep{border:0;color:#9a9a95;margin:20px 9px 7px;padding:0;font-size:9px}
+body.dashboard-mode .nav button{height:37px;border:0;border-radius:10px;background:transparent;color:#70706c;padding:8px 10px;text-align:left;gap:10px}
+body.dashboard-mode .nav button:hover{background:#eeeeec;color:#222}
+body.dashboard-mode .nav button.active{background:#171717;color:#fff;border:0}
+body.dashboard-mode .nav button.active .nav-icon{color:#fff}
+body.dashboard-mode .nav-icon{color:#7c7c77}
+body.dashboard-mode .badge{background:transparent;color:#999}
+body.dashboard-mode .status{border-top:1px solid #deded9;color:#777;padding:13px 9px 3px}
+body.dashboard-mode .dot{background:#222}
+body.dashboard-mode .main{direction:rtl;background:#f2f2f0}
+body.dashboard-mode .topbar{height:78px;border:0;background:#f2f2f0;padding:0 30px}
+body.dashboard-mode .topbar h1{display:none}
+body.dashboard-mode .topbar p{display:none}
+body.dashboard-mode .topbar:before{content:'داشبورد';font-size:18px;font-weight:750;color:#171717}
+body.dashboard-mode .topbar .actions{gap:7px}
+body.dashboard-mode .topbar .actions .btn{background:#fff;color:#222;border:1px solid #deded9;border-radius:50px;padding:8px 14px}
+body.dashboard-mode .topbar .actions .btn.gold{background:#171717;color:#fff;border-color:#171717}
+body.dashboard-mode .content{padding:0 30px 30px;overflow-y:auto}
+body.dashboard-mode .card{background:#fff;border:1px solid #dfded9;border-radius:20px;box-shadow:0 7px 25px rgba(20,20,18,.035)}
+body.dashboard-mode .dash-v2{max-width:1420px;margin:0 auto;display:grid;gap:14px;padding-bottom:25px}
+body.dashboard-mode .dash-v2 .dash-welcome{display:flex;justify-content:space-between;align-items:flex-end;padding:2px 4px 7px}
+body.dashboard-mode .dash-v2 .dash-welcome h2{margin:0;color:#171717;font-size:29px;line-height:1.15;letter-spacing:-1px}
+body.dashboard-mode .dash-v2 .dash-welcome p{margin:7px 0 0;color:#9a9a95;font-size:11px}
+body.dashboard-mode .dash-v2 .dash-actions{display:none}
+body.dashboard-mode .dash-v2 .dash-bento-top{display:grid;grid-template-columns:1.18fr .94fr .94fr;gap:14px;direction:ltr}
+body.dashboard-mode .dash-v2 .bento-card{min-height:255px;padding:19px;direction:rtl;overflow:hidden}
+body.dashboard-mode .dash-v2 .bento-card.dark{background:#171717;border-color:#171717;color:#fff}
+body.dashboard-mode .dash-v2 .bento-card.dark h3,body.dashboard-mode .dash-v2 .bento-card.dark b{color:#fff}
+body.dashboard-mode .dash-v2 .bento-card.dark small{color:#aaa}
+body.dashboard-mode .dash-v2 .bento-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+body.dashboard-mode .dash-v2 .bento-head h3{margin:0;font-size:15px;color:#171717}
+body.dashboard-mode .dash-v2 .bento-head small{display:block;color:#969691;font-size:10px;margin-top:5px}
+body.dashboard-mode .dash-v2 .hero-number{font-size:43px;line-height:1;font-weight:850;letter-spacing:-2px;margin-top:28px}
+body.dashboard-mode .dash-v2 .hero-number span{font-size:10px;font-weight:500;letter-spacing:0;color:#999;margin-right:6px}
+body.dashboard-mode .dash-v2 .hero-line{height:3px;background:#444;margin:15px 0 12px;border-radius:99px}
+body.dashboard-mode .dash-v2 .hero-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+body.dashboard-mode .dash-v2 .hero-stat{background:#292929;border-radius:11px;padding:10px}
+body.dashboard-mode .dash-v2 .hero-stat strong{display:block;font-size:18px}
+body.dashboard-mode .dash-v2 .hero-stat small{display:block;margin-top:4px;color:#a5a5a5}
+body.dashboard-mode .dash-v2 .metric-big{font-size:30px;font-weight:800;margin-top:19px}
+body.dashboard-mode .dash-v2 .metric-big small{font-size:10px;font-weight:500;color:#999;margin-right:5px}
+body.dashboard-mode .dash-v2 .mini-bars{height:118px;display:flex;align-items:flex-end;gap:8px;margin-top:15px}
+body.dashboard-mode .dash-v2 .mini-bars i{display:block;flex:1;min-width:8px;background:#202020;border-radius:5px 5px 2px 2px}
+body.dashboard-mode .dash-v2 .dark .mini-bars i{background:#fff}
+body.dashboard-mode .dash-v2 .bar-labels{display:flex;justify-content:space-between;color:#aaa;font-size:8px;margin-top:6px}
+body.dashboard-mode .dash-v2 .ring-wrap{display:grid;place-items:center;height:157px;position:relative}
+body.dashboard-mode .dash-v2 .ring-wrap svg{width:145px;height:145px;transform:rotate(-90deg)}
+body.dashboard-mode .dash-v2 .ring-center{position:absolute;text-align:center}
+body.dashboard-mode .dash-v2 .ring-center strong{display:block;font-size:27px}
+body.dashboard-mode .dash-v2 .ring-center small{color:#999;font-size:9px}
+body.dashboard-mode .dash-v2 .dash-row{display:grid;gap:14px;direction:ltr}
+body.dashboard-mode .dash-v2 .dash-row.mid{grid-template-columns:.88fr 1.48fr;direction:ltr}
+body.dashboard-mode .dash-v2 .dash-row.bottom{grid-template-columns:1.25fr .9fr .9fr}
+body.dashboard-mode .dash-v2 .row-card{padding:17px;min-height:235px;direction:rtl}
+body.dashboard-mode .dash-v2 .goal-list{display:grid;gap:8px;margin-top:15px}
+body.dashboard-mode .dash-v2 .goal{display:flex;align-items:center;gap:9px;color:#777;font-size:11px}
+body.dashboard-mode .dash-v2 .goal:before{content:'';width:15px;height:15px;border:1px solid #d2d1cc;border-radius:4px;flex:none}
+body.dashboard-mode .dash-v2 .goal.done{color:#444;text-decoration:line-through}
+body.dashboard-mode .dash-v2 .goal.done:before{content:'✓';display:grid;place-items:center;background:#171717;color:#fff;border-color:#171717;font-size:9px}
+body.dashboard-mode .dash-v2 .task-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:15px}
+body.dashboard-mode .dash-v2 .task{min-height:145px;border:1px solid #e2e1dc;border-radius:15px;padding:13px;display:flex;flex-direction:column;justify-content:space-between}
+body.dashboard-mode .dash-v2 .task b{font-size:12px;color:#242424}
+body.dashboard-mode .dash-v2 .task small{font-size:9px;color:#999}
+body.dashboard-mode .dash-v2 .task .task-icon{font-size:17px;color:#555}
+body.dashboard-mode .dash-v2 .project-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:15px}
+body.dashboard-mode .dash-v2 .project{height:110px;background:#171717;border-radius:15px;padding:14px;color:#fff;display:flex;flex-direction:column;justify-content:space-between}
+body.dashboard-mode .dash-v2 .project b{font-size:12px}
+body.dashboard-mode .dash-v2 .project small{font-size:9px;color:#aaa}
+body.dashboard-mode .dash-v2 .project .project-state{font-size:9px}
+body.dashboard-mode .dash-v2 .quick-side{display:grid;gap:8px;margin-top:14px}
+body.dashboard-mode .dash-v2 .quick-side .q{display:flex;justify-content:space-between;align-items:center;padding:10px 11px;background:#fafaf8;border:1px solid #e4e3de;border-radius:11px}
+body.dashboard-mode .dash-v2 .quick-side .q b{font-size:11px}
+body.dashboard-mode .dash-v2 .quick-side .q small{font-size:9px;color:#999}
+body.dashboard-mode .dash-v2 .pill{border-color:#deddd8;background:#f7f7f5;color:#666}
+body.dashboard-mode .dash-v2 .pill.green{color:#28764a;background:#eaf6ee;border-color:#d0ead9}
+body.dashboard-mode .dash-v2 .pill.gold{color:#966a18;background:#fff4dc;border-color:#efdfbb}
+body.dashboard-mode .dash-v2 .pill.red{color:#a53c3c;background:#fff0f0;border-color:#f1d4d4}
+@media(max-width:1050px){body.dashboard-mode .sidebar{width:82px;min-width:82px;padding:16px 9px}body.dashboard-mode .logo b,body.dashboard-mode .logo small,body.dashboard-mode .nav .label,body.dashboard-mode .nav .badge,body.dashboard-mode .status .txt{display:none}body.dashboard-mode .logo{justify-content:center;padding:6px 4px 16px}body.dashboard-mode .nav button{justify-content:center;padding:10px}body.dashboard-mode .content{padding:0 16px 20px}body.dashboard-mode .topbar{padding:0 16px}body.dashboard-mode .dash-v2 .dash-bento-top{grid-template-columns:1.15fr .85fr}.dash-v2 .dash-bento-top .bento-card:last-child{grid-column:1/-1;min-height:220px}body.dashboard-mode .dash-v2 .dash-row.mid{grid-template-columns:1fr 1.4fr}body.dashboard-mode .dash-v2 .dash-row.bottom{grid-template-columns:1fr 1fr}}
+@media(max-width:700px){body.dashboard-mode .sidebar{width:58px;min-width:58px;padding:10px 6px}body.dashboard-mode .content{padding:0 10px 16px}body.dashboard-mode .topbar{height:65px;padding:0 10px}body.dashboard-mode .dash-v2{gap:10px}body.dashboard-mode .dash-v2 .dash-welcome h2{font-size:23px}body.dashboard-mode .dash-v2 .dash-bento-top{grid-template-columns:1fr 1fr;gap:10px}body.dashboard-mode .dash-v2 .dash-bento-top .bento-card:first-child{grid-column:1/-1;min-height:210px}body.dashboard-mode .dash-v2 .dash-bento-top .bento-card:last-child{grid-column:auto;min-height:205px}body.dashboard-mode .dash-v2 .dash-row.mid{grid-template-columns:1fr 1fr;gap:10px}body.dashboard-mode .dash-v2 .dash-row.bottom{grid-template-columns:1fr;gap:10px}body.dashboard-mode .dash-v2 .row-card{min-height:205px}body.dashboard-mode .dash-v2 .task-grid{grid-template-columns:1fr 1fr}body.dashboard-mode .dash-v2 .project-grid{grid-template-columns:1fr 1fr}body.dashboard-mode .dash-v2 .project:last-child{grid-column:1/-1}}
+@media(max-width:430px){body.dashboard-mode .sidebar{width:0;min-width:0;padding:0;overflow:hidden;border:0}body.dashboard-mode .topbar:before{font-size:16px}body.dashboard-mode .dash-v2 .dash-bento-top{grid-template-columns:1fr 1fr}body.dashboard-mode .dash-v2 .hero-stats{grid-template-columns:repeat(3,1fr)}body.dashboard-mode .dash-v2 .hero-number{font-size:37px}body.dashboard-mode .dash-v2 .dash-row.mid{grid-template-columns:1fr 1fr}body.dashboard-mode .dash-v2 .task-grid{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 <body>
@@ -137,7 +225,7 @@ async function load(){
 }
 
 async function initSectionOverview(){
- const el=$('overview');el.innerHTML=skeleton('height:760px');
+ const el=$('overview');el.innerHTML=skeleton('height:700px');
  try{
   const [rawStats,rawHealth,rawEvents,rawNations]=await Promise.all([
    api.get('/api/stats/overview'),
@@ -156,42 +244,47 @@ async function initSectionOverview(){
   let score=Number(health.score);
   if(!Number.isFinite(score))score=(Number(health.market_confidence||0)+Number(health.total_liquidity||0)+Number(health.market_stability||0)+Math.max(0,100-Math.abs(Number(health.inflation_rate||0)))+Math.max(0,100-Number(health.wealth_concentration||0)))/5;
   score=Math.max(0,Math.min(100,score||0));
-  const color=score<40?'#c94b4b':score<=70?'#bd861e':'#3b8d58';
   const trend=health.trend||'stable';
-  const trendText=trend==='up'?'روند صعودی':trend==='down'?'روند نزولی':'روند پایدار';
-  const feed=events.slice().sort((x,y)=>new Date(y.started_at||y.timestamp||0)-new Date(x.started_at||x.timestamp||0)).slice(0,5);
+  const color=score<40?'#c94b4b':score<=70?'#bd861e':'#3b8d58';
   const nationRows=nations.slice(0,5);
-  const hour=new Date().getHours();
-  const greeting=hour<12?'صبح بخیر':hour<18?'روز بخیر':'شب بخیر';
+  const feed=events.slice().sort((x,y)=>new Date(y.started_at||y.timestamp||0)-new Date(x.started_at||x.timestamp||0)).slice(0,3);
+  const bars=[
+   Number(health.market_confidence||0),
+   Number(health.total_liquidity||0),
+   Number(health.market_stability||0),
+   Math.max(0,100-Math.abs(Number(health.inflation_rate||0))),
+   Math.max(0,100-Number(health.wealth_concentration||0))
+  ];
   const circumference=251.2,dash=circumference*(score/100);
-  const kpi=(label,value,meta,primary)=>'<div class="card dash-kpi '+(primary?'primary':'')+'"><span class="label">'+label+'</span><strong class="value">'+formatNumber(value)+'</strong><span class="meta">'+meta+'</span></div>';
+  const kpi=(label,value,meta)=>'<div class="hero-stat"><strong>'+formatNumber(value)+'</strong><small>'+label+' · '+meta+'</small></div>';
+  const goalDone=Number(activePlayers)>0;
   el.innerHTML='<div class="dash-v2">'+
-   '<div class="dash-welcome"><div><h2>'+greeting+'، فرمانده</h2><p>مرکز فرماندهی OPEX MONEY · تصویر زنده جهان بازی</p></div><div class="dash-actions"><button class="btn" id="dash-refresh">بروزرسانی</button><button class="btn gold" id="dash-announce">اعلامیه جدید</button></div></div>'+
-   '<div class="dash-kpis">'+
-    kpi('کل بازیکنان',players,'بازیکنان ثبت‌شده',true)+
-    kpi('بازیکنان فعال',activePlayers,'فعال در بازه اخیر')+
-    kpi('ملت‌های فعال',nationsCount,'در جهان بازی')+
-    kpi('تراکنش امروز',tx,'فعالیت اقتصادی')+
+   '<div class="dash-welcome"><div><h2>سلام، فرمانده</h2><p>داشبورد مرکزی OPEX MONEY · وضعیت زنده جهان بازی</p></div></div>'+
+   '<div class="dash-bento-top">'+
+    '<div class="card bento-card dark"><div class="bento-head"><div><h3>اطلاعات کلی</h3><small>وضعیت جهان بازی در یک نگاه</small></div><span class="pill gold">زنده</span></div><div class="hero-number">'+formatNumber(players)+'<span>بازیکن</span></div><div class="hero-line"></div><div class="hero-stats">'+kpi('ملت‌ها',nationsCount,'فعال')+kpi('جنگ‌ها',wars,'جاری')+kpi('تراکنش',tx,'امروز')+'</div></div>'+
+    '<div class="card bento-card"><div class="bento-head"><div><h3>پیشرفت اقتصاد</h3><small>شاخص‌های اصلی</small></div><span class="pill '+(trend==='down'?'red':trend==='up'?'green':'gold')+'">'+(trend==='up'?'▲':trend==='down'?'▼':'•')+'</span></div><div class="metric-big">'+formatNumber(activePlayers)+' <small>فعال</small></div><div class="mini-bars">'+bars.map(v=>'<i style="height:'+Math.max(12,Math.min(100,v))+'%"></i>').join('')+'</div><div class="bar-labels"><span>بازار</span><span>نقدینگی</span><span>ثبات</span><span>تورم</span><span>ثروت</span></div></div>'+
+    '<div class="card bento-card"><div class="bento-head"><div><h3>پیشرفت ماه</h3><small>سلامت کلی اقتصاد</small></div><span class="pill '+(score<40?'red':score<=70?'gold':'green')+'">'+formatNumber(score)+'/۱۰۰</span></div><div class="ring-wrap"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="none" stroke="#e9e8e3" stroke-width="9"></circle><circle cx="50" cy="50" r="40" fill="none" stroke="'+color+'" stroke-width="9" stroke-linecap="round" stroke-dasharray="'+(251.2*score/100)+' 251.2" pathLength="251.2"></circle></svg><div class="ring-center"><strong>'+formatNumber(score)+'٪</strong><small>سلامت اقتصاد</small></div></div></div>'+
    '</div>'+
-   '<div class="dash-main">'+
-    '<div class="card dash-card"><div class="dash-head"><div><h3>فعالیت اقتصادی</h3><small>شاخص‌های اصلی اقتصاد در لحظه</small></div><span class="pill '+(trend==='down'?'red':trend==='up'?'green':'gold')+'">'+(trend==='up'?'▲':trend==='down'?'▼':'•')+' '+trendText+'</span></div><div class="dash-chart"><canvas id="dash-activity-chart"></canvas></div></div>'+
-    '<div class="card dash-card"><div class="dash-head"><div><h3>سلامت اقتصاد</h3><small>امتیاز ترکیبی بازار</small></div><span class="pill '+(score<40?'red':score<=70?'gold':'green')+'">'+formatNumber(score)+'/۱۰۰</span></div><div class="dash-health"><svg viewBox="0 0 100 60" aria-label="سلامت اقتصاد"><path d="M10 50 A40 40 0 0 1 90 50" fill="none" stroke="#e5e4df" stroke-width="8" pathLength="251.2"></path><path d="M10 50 A40 40 0 0 1 90 50" fill="none" stroke="'+color+'" stroke-width="8" pathLength="251.2" stroke-dasharray="'+dash+' 251.2" stroke-linecap="round"></path></svg><div class="dash-health-center"><strong style="color:'+color+'">'+formatNumber(score)+'</strong><span>از ۱۰۰</span></div></div><div class="dash-health-meta"><span><i class="g"></i>پایدار</span><span><i class="a"></i>نیازمند توجه</span><span><i class="r"></i>بحرانی</span></div></div>'+
+   '<div class="dash-row mid">'+
+    '<div class="card row-card"><div class="bento-head"><div><h3>اهداف ماه</h3><small>شاخص‌های مهم فرماندهی</small></div><span class="pill">وضعیت</span></div><div class="goal-list"><div class="goal '+(goalDone?'done':'')+'">بازیکنان فعال وارد چرخه بازی شوند</div><div class="goal '+(nationsCount>0?'done':'')+'">حداقل یک ملت فعال در جهان</div><div class="goal '+(tx>0?'done':'')+'">ثبت اولین تراکنش امروز</div><div class="goal '+(wars>0?'done':'')+'">رصد نبردهای جاری</div></div></div>'+
+    '<div class="card row-card"><div class="bento-head"><div><h3>فعالیت در جریان</h3><small>مواردی که همین حالا باید دیده شوند</small></div><button class="btn" id="dash-events">آرشیو</button></div><div class="task-grid">'+
+      '<div class="task"><span class="task-icon">◎</span><b>'+formatNumber(activePlayers)+' بازیکن فعال</b><small>وضعیت بازیکنان</small></div>'+
+      '<div class="task"><span class="task-icon">◇</span><b>'+formatNumber(wars)+' جنگ جاری</b><small>نبردهای جهان</small></div>'+
+      '<div class="task"><span class="task-icon">↗</span><b>'+formatNumber(tx)+' تراکنش امروز</b><small>حرکت اقتصادی</small></div>'+
+      '<div class="task"><span class="task-icon">◉</span><b>'+formatNumber(nationsCount)+' ملت فعال</b><small>وضعیت ملت‌ها</small></div>'+
+    '</div></div>'+
    '</div>'+
-   '<div class="dash-bottom">'+
-    '<div class="card dash-card"><div class="dash-head"><div><h3>ملت‌های برتر</h3><small>بر اساس تعداد اعضا</small></div><button class="btn" id="dash-nations">مشاهده</button></div><div class="dash-list">'+(nationRows.length?nationRows.map((n,i)=>'<div class="dash-list-item"><span class="avatar">'+esc(n.flag_emoji||String(i+1))+'</span><div class="body"><b>'+esc(n.name||'-')+'</b><small>'+formatNumber(n.member_count)+' عضو · '+esc(n.currency_code||'-')+'</small></div><span class="pill '+(n.is_active?'green':'gold')+'">'+(n.is_active?'فعال':'غیرفعال')+'</span></div>').join(''):'<div class="empty">ملتی ثبت نشده است</div>')+'</div></div>'+
-    '<div class="card dash-card"><div class="dash-head"><div><h3>رویدادهای اخیر</h3><small>آخرین تغییرات جهان بازی</small></div><button class="btn" id="dash-events">همه</button></div><div class="dash-feed">'+(feed.length?feed.map(x=>'<div class="feed-row"><b>'+esc(x.title||'-')+'</b><small>'+esc(x.description||'')+' · '+timeAgo(x.started_at||x.timestamp)+'</small></div>').join(''):'<div class="empty">رویدادی ثبت نشده است</div>')+'</div></div>'+
-    '<div class="card dash-card"><div class="dash-head"><div><h3>وضعیت عملیات</h3><small>نمای سریع فرماندهی</small></div></div><div class="dash-list"><div class="dash-list-item"><span class="avatar">ج</span><div class="body"><b>جنگ‌های جاری</b><small>نبردهای فعال</small></div><strong>'+formatNumber(wars)+'</strong></div><div class="dash-list-item"><span class="avatar">م</span><div class="body"><b>ملت‌های فعال</b><small>در جهان بازی</small></div><strong>'+formatNumber(nationsCount)+'</strong></div><div class="dash-list-item"><span class="avatar">ت</span><div class="body"><b>تراکنش امروز</b><small>فعالیت اقتصادی</small></div><strong>'+formatNumber(tx)+'</strong></div><div class="dash-list-item"><span class="avatar">ا</span><div class="body"><b>بازیکنان فعال</b><small>وضعیت فعالیت</small></div><strong>'+formatNumber(activePlayers)+'</strong></div></div></div>'+
+   '<div class="dash-row bottom">'+
+    '<div class="card row-card"><div class="bento-head"><div><h3>ملت‌های برتر</h3><small>بر اساس تعداد اعضا</small></div><button class="btn" id="dash-nations">همه</button></div><div class="project-grid">'+(nationRows.length?nationRows.slice(0,3).map(n=>'<div class="project"><b>'+esc(n.flag_emoji||'')+' '+esc(n.name||'-')+'</b><small>'+formatNumber(n.member_count)+' عضو · '+esc(n.currency_code||'-')+'</small><span class="project-state">'+(n.is_active?'فعال':'غیرفعال')+'</span></div>').join(''):'<div class="empty">ملتی ثبت نشده است</div>')+'</div></div>'+
+    '<div class="card row-card"><div class="bento-head"><div><h3>رویدادهای اخیر</h3><small>آخرین اتفاقات جهان</small></div></div><div class="quick-side">'+(feed.length?feed.map(x=>'<div class="q"><div><b>'+esc(x.title||'رویداد')+'</b><small>'+esc(x.description||'')+'</small></div><span>›</span></div>').join(''):'<div class="empty">رویدادی ثبت نشده است</div>')+'</div></div>'+
+    '<div class="card row-card"><div class="bento-head"><div><h3>عملیات سریع</h3><small>دسترسی مستقیم</small></div></div><div class="quick-side"><div class="q" id="dash-q-market"><b>بازار</b><span>›</span></div><div class="q" id="dash-q-players"><b>بازیکنان</b><span>›</span></div><div class="q" id="dash-q-war"><b>جنگ‌ها</b><span>›</span></div><div class="q" id="dash-q-actions"><b>اقدامات</b><span>›</span></div></div></div>'+
    '</div></div>';
-  if(window.Chart){
-   charts.d?.destroy();
-   const labels=['اعتماد بازار','نقدینگی','ثبات بازار','تورم','توزیع ثروت'];
-   const data=[Number(health.market_confidence||0),Number(health.total_liquidity||0),Number(health.market_stability||0),Math.max(0,100-Math.abs(Number(health.inflation_rate||0))),Math.max(0,100-Number(health.wealth_concentration||0))];
-   charts.d=new Chart($('dash-activity-chart'),{type:'line',data:{labels,datasets:[{label:'شاخص',data,borderColor:'#222',backgroundColor:'rgba(20,20,20,.055)',fill:true,tension:.42,pointRadius:3,pointBackgroundColor:'#222',pointBorderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{color:'#8d8d88',font:{size:10}}},y:{min:0,max:100,grid:{color:'#ecebe7'},ticks:{color:'#8d8d88',font:{size:10}}}}}});
-  }
-  $('dash-refresh').onclick=()=>initSectionOverview();
   $('dash-nations').onclick=()=>go('nations');
   $('dash-events').onclick=()=>go('economy');
-  $('dash-announce').onclick=()=>go('actions');
+  $('dash-q-market').onclick=()=>go('market');
+  $('dash-q-players').onclick=()=>go('players');
+  $('dash-q-war').onclick=()=>go('wars');
+  $('dash-q-actions').onclick=()=>go('actions');
   window._intervals.push(setInterval(()=>{if(S.section==='overview')initSectionOverview()},30000));
  }catch(e){el.innerHTML='<div class="error">'+esc(e.message)+'</div>'}
 }
