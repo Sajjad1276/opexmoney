@@ -39,14 +39,31 @@ def build_profile_text(profile: PlayerProfile) -> str:
         ("سازندگی", profile.reputation_builder),
     ]
 
+    scores = [
+        ("معامله‌گر", profile.reputation_trade),
+        ("حاکم", profile.reputation_governance),
+        ("نوآور", profile.reputation_knowledge),
+        ("جنگ‌سالار", profile.reputation_military),
+        ("سازنده", profile.reputation_builder),
+    ]
+    scores.sort(key=lambda item: item[1], reverse=True)
+
     lines = [
         f"👤 <b>{html.escape(profile.username)}</b>",
         f"ملت: <b>{nation}</b>",
         "",
         f"سبک غالب: <b>{profile.archetype}</b>",
         "",
-        "<b>شهرت‌های رفتاری</b>",
+        "<b>گرایش‌های تو</b>",
     ]
+    for index, (label, value) in enumerate(scores[:3], start=1):
+        lines.append(f"{index}. {label} · {to_fa(value)}/100")
+    lines.extend(
+        [
+            "",
+            "<b>شهرت‌های رفتاری</b>",
+        ]
+    )
     for label, value in rows:
         lines.append(f"{label:<8} {_bar(value)}  {to_fa(value)}/100")
 
