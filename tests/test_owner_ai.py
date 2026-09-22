@@ -19,3 +19,22 @@ def test_owner_paths_block_secrets() -> None:
 def test_owner_paths_allow_project_source() -> None:
     assert _safe_repo_path("app/handlers/market.py") == "app/handlers/market.py"
     assert _safe_repo_path("tests/test_market_flow.py") == "tests/test_market_flow.py"
+
+
+def test_owner_paths_allow_full_project_files_except_secrets() -> None:
+    assert _safe_repo_path("alembic/versions/0022_admin_price_alert_active.py") == "alembic/versions/0022_admin_price_alert_active.py"
+    assert _safe_repo_path(".github/workflows/ci.yml") == ".github/workflows/ci.yml"
+    assert _safe_repo_path("Dockerfile") == "Dockerfile"
+
+
+def test_owner_command_cleanup_is_registered() -> None:
+    main_source = open("main.py", encoding="utf-8").read()
+    assert "CommandPanelCleanupMiddleware" in main_source
+    assert "dp.message.middleware(CommandPanelCleanupMiddleware())" in main_source
+
+
+def test_owner_ai_supports_repository_search_fallback() -> None:
+    source = open("app/services/owner_ai_service.py", encoding="utf-8").read()
+    assert "Owner AI code search failed; fallback scan" in source
+    assert "async def _scan_repository_for_query" in source
+    assert "async def _plain_recovery_answer" in source
