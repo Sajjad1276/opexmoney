@@ -292,14 +292,14 @@ async def build_live_dashboard(
 def render_live_dashboard(dashboard: LiveDashboard) -> str:
     if not dashboard.has_nation:
         return (
-            "<b>داشبورد زنده OPEX MONEY</b>\n"
+            "<b>نبض OPEX</b>\n"
             "ــــــــــــــــــــ\n\n"
             f"<b>موجودی:</b> {fmt_amount(dashboard.dollar_balance)} دلار\n\n"
             "<b>ملت:</b> هنوز عضو هیچ ملتی نیستی\n"
             "<i>بازار و معامله بدون ملت آزاد است.</i>\n\n"
-            f"<b>اتفاق مهم</b>\n{dashboard.event_detail}\n\n"
-            f"<b>پیشنهاد اقتصادی</b>\n{dashboard.suggestion}\n\n"
-            f"<b>بازار:</b> {dashboard.pressure_status}"
+            f"<b>حرکت مهم بازار</b>\n{dashboard.event_detail}\n\n"
+            f"<b>حرکت بعدی</b>\n{dashboard.suggestion}\n\n"
+            f"<b>حال بازار:</b> {dashboard.pressure_status}"
         )
 
     flag = dashboard.nation_flag or "🏴"
@@ -314,10 +314,10 @@ def render_live_dashboard(dashboard: LiveDashboard) -> str:
         f"<b>رتبه ملت:</b> #{to_fa(dashboard.national_rank or 0)}\n\n"
         f"<b>{html.escape(dashboard.event_title)}</b>\n"
         f"{dashboard.event_detail}\n\n"
-        f"<b>پیشنهاد اقتصادی</b>\n"
+        f"🎯 <b>پیشنهاد حرکت</b>\n"
         f"{dashboard.suggestion}\n\n"
-        f"<b>وضعیت ملت</b>\n"
+        f"<b>نبض ملت</b>\n"
         f"رشد: {dashboard.growth_status}\n"
-        f"فشار: {dashboard.pressure_status}\n"
-        f"خطر: {dashboard.risk_status}"
+        f"فشار بازار: {dashboard.pressure_status}\n"
+        f"ریسک: {dashboard.risk_status}"
     )
