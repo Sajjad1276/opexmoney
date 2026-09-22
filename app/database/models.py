@@ -419,6 +419,7 @@ class User(Base):
         Numeric(14, 2), default=Decimal("0.00"), nullable=False
     )
     role: Mapped[str] = mapped_column(String(20), default="player", nullable=False)
+    ban_reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
     is_ai: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     ai_strategy: Mapped[str] = mapped_column(String(20), default="balanced", nullable=False)
     ai_tier: Mapped[AITier] = mapped_column(
@@ -1012,6 +1013,8 @@ class Mission(Base):
     description_fa: Mapped[str] = mapped_column(String(255), nullable=False)
     mission_type: Mapped[str] = mapped_column(String(10), nullable=False)
     target_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    target_type: Mapped[str] = mapped_column(String(20), default="custom", server_default="custom", nullable=False)
+    duration_days: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
     reward_xr: Mapped[Decimal] = mapped_column(
         Numeric(18, 4), default=Decimal("0"), nullable=False
     )
