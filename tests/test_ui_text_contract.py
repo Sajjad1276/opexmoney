@@ -28,6 +28,27 @@ def test_user_facing_text_contains_no_blockquote():
     assert not offenders, f"blockquote markup remains in user-facing files: {offenders}"
 
 
+def test_nation_panel_hides_foundation_for_players_with_an_active_nation():
+    from app.keyboards.inline import nation_panel_keyboard
+
+    nationless = nation_panel_keyboard(False, None)
+    nation_member = nation_panel_keyboard(False, 42)
+
+    nationless_callbacks = {
+        button.callback_data
+        for row in nationless.inline_keyboard
+        for button in row
+    }
+    member_callbacks = {
+        button.callback_data
+        for row in nation_member.inline_keyboard
+        for button in row
+    }
+
+    assert "found_nation" in nationless_callbacks
+    assert "found_nation" not in member_callbacks
+
+
 def test_treasury_back_supports_all_return_targets_without_missing_nation_import():
     source = (
         ROOT / "app" / "handlers" / "treasury.py"
