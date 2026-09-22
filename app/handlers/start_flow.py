@@ -444,11 +444,11 @@ async def new_player_next_step(message: Message, state: FSMContext) -> None:
     text = (
         f"{html.escape(nation.flag_emoji or '🏴')} <b>قدم بعدی تو</b>\n"
         "\n"
-        "🎯 این اولین تصمیم اقتصادی توست.\n\n"
+        "🎯 <b>اولین تصمیم اقتصادی تو</b> همین‌جاست.\n\n"
         f"📤 می‌فروشی: <b>۵۰ {html.escape(nation.currency_code)}</b>\n"
         f"📥 می‌گیری: <b>{fmt_amount(receive_omx)} دلار</b>\n\n"
-        "🧠 چرا؟ ارز ملتت را به دلار تبدیل می‌کنی تا بعداً بتوانی ارزهای دیگر را معامله کنی.\n"
-        "این فقط آموزش نیست؛ یک معامله واقعی در اقتصاد بازی است."
+        "🧠 این معامله دروازه ورودت به بازار آزاد است: بخشی از ارز ملتت را به دلار تبدیل می‌کنی.\n"
+        "این یک معامله واقعی است؛ نتیجه‌اش مستقیم وارد اقتصاد حسابت می‌شود."
     )
     panel = await send_submenu_panel(
         message,
@@ -542,12 +542,12 @@ async def confirm_first_trade(call: CallbackQuery, state: FSMContext) -> None:
             await sync_user_balance(session, user.user_id)
 
     text = (
-        "✅ <b>اولین معامله انجام شد!</b>\n"
+        "✅ <b>اولین معامله ثبت شد.</b>\n"
         "\n"
         f"📤 فروختی: <s>۵۰ {html.escape(nation.currency_code)}</s>\n"
         f"📥 دریافتی: <b>{fmt_amount(receive_omx)} دلار</b>\n\n"
         f"💰 حالا داری: <b>{fmt_amount(holding.amount)} {html.escape(nation.currency_code)}</b> + <b>{fmt_amount(user.xr_balance)} دلار</b>\n\n"
-        "🎯 <b>قدم بعدی:</b>\n"
+        "🎯 <b>حالا انتخاب با توست:</b>\n"
         "یک ارز دیگه از بازار بخر و ببین با تغییر نرخ، دارایی‌ات چطور بالا و پایین می‌شه."
     )
     await state.clear()
