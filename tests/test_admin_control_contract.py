@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import ast
 from pathlib import Path
 
 
@@ -190,3 +191,12 @@ def test_scheduler_admin_bridge_is_registered() -> None:
     assert '"pause"' in bridge
     assert '"resume"' in bridge
     assert '"run_now"' in bridge
+
+
+def test_admin_control_and_scheduler_sources_parse_and_import_paths() -> None:
+    control = _read(CONTROL)
+    scheduler = _read(ROOT / "app" / "schedulers" / "admin_control.py")
+    assert "from ai import companion" in control
+    assert "from app.ai import companion" not in control
+    ast.parse(control)
+    ast.parse(scheduler)
