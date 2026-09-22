@@ -61,6 +61,7 @@ from app.services.governance_service import governance_cycle
 from app.services.membership_service import reconcile_human_nation_member_counts
 from app.services.war_service import resolve_expired_wars
 from app.services.ai_world import ensure_ai_world, run_ai_world_cycle
+from app.services.world_events import generate_market_world_event
 from app.schedulers.alert_checker import register_price_alert_job
 from app.schedulers.admin_control import install_scheduler_monitor, scheduler_control_loop
 from app.schedulers.ai_world import register_ai_world_job
@@ -173,6 +174,22 @@ async def run_rate_job() -> None:
         logger.exception("Behavior snapshot failed")
 
 
+async def run_world_event_job() -> None:
+    try:
+        async with async_session() as session:
+            async with session.begin():
+                event = await generate_market_world_event(session)
+        if event is not None:
+            logger.info(
+                "World event created | type=%s nation=%s title=%s",
+                event.event_type,
+                event.affected_nation_id,
+                event.title,
+            )
+    except Exception:
+        logger.exception("World event generation failed")
+
+
 async def run_membership_reconciliation(bot: Bot) -> None:
     try:
         updated = await reconcile_human_nation_member_counts(bot)
@@ -275,6 +292,14 @@ def build_scheduler(bot: Bot) -> AsyncIOScheduler:
         run_rate_job,
         CronTrigger(minute="*/15"),
         id="rate_engine_15m",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+    scheduler.add_job(
+        run_world_event_job,
+        CronTrigger(minute="2,17,32,47"),
+        id="world_event_engine_15m",
         replace_existing=True,
         max_instances=1,
         coalesce=True,
