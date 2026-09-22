@@ -32,6 +32,7 @@ from app.handlers.founder import founder_router
 from app.handlers.governance import governance_router
 from app.handlers.academy import router as academy_router
 from app.handlers.admin_panel import router as admin_panel_router
+from app.handlers.owner_ai import router as owner_ai_router
 from app.handlers.chart import router as chart_router
 from app.handlers.market import router as market_router
 from app.handlers.membership import membership_router
