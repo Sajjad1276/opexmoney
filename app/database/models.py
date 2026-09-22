@@ -1014,6 +1014,7 @@ class Mission(Base):
     mission_type: Mapped[str] = mapped_column(String(10), nullable=False)
     target_count: Mapped[int] = mapped_column(Integer, nullable=False)
     target_type: Mapped[str] = mapped_column(String(20), default="custom", server_default="custom", nullable=False)
+    reward_xp: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
     duration_days: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
     reward_xr: Mapped[Decimal] = mapped_column(
         Numeric(18, 4), default=Decimal("0"), nullable=False
