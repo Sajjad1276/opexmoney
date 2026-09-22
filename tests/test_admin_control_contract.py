@@ -111,8 +111,30 @@ def test_admin_static_contains_all_control_sections_and_initializers() -> None:
     nav_sections = set(re.findall(r'<button data-s="([^"]+)"', html))
     assert nav_sections == EXPECTED_SECTIONS
 
-    for section in EXPECTED_SECTIONS:
-        assert f"initSection{section[0].upper() + section[1:]}()" in html
+    init_names = {
+        "overview": "initSectionOverview",
+        "economy": "initSectionEconomy",
+        "market": "initSectionMarket",
+        "players": "initSectionPlayers",
+        "nations": "initSectionNations",
+        "wars": "initSectionWars",
+        "governance": "initSectionGovernance",
+        "transactions": "initSectionTransactions",
+        "actions": "initSectionActions",
+        "logs": "initSectionLogs",
+        "academy": "initSectionAcademy",
+        "missions": "initSectionMissions",
+        "founder": "initSectionFounder",
+        "aiworld": "initSectionAIWorld",
+        "ranking": "initSectionRanking",
+        "profiles": "initSectionProfiles",
+        "onboarding": "initSectionOnboarding",
+        "scheduler": "initSectionScheduler",
+        "support": "initSectionSupport",
+        "treasury": "initSectionTreasury",
+    }
+    for section, function_name in init_names.items():
+        assert f"{function_name}()" in html, section
 
 
 def test_admin_static_has_control_api_wiring() -> None:
