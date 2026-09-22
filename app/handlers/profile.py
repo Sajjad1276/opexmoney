@@ -62,8 +62,7 @@ def build_profile_text(profile: PlayerProfile) -> str:
             "<i>سبک بازی از رفتار واقعی تو استخراج می‌شود.</i>",
         ]
     )
-    return "
-".join(lines)
+    return "\n".join(lines)
 
 
 def profile_keyboard() -> InlineKeyboardMarkup:
