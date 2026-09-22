@@ -27,6 +27,8 @@ REVISION_CHAIN = [
     "0018_market_query_indexes",
     "0019_foundation_v2",
     "0020_rate_history_factors",
+    "0021_admin_panel_fields",
+    "0022_admin_price_alert_active",
 ]
 
 BASE_TABLES = {
@@ -296,6 +298,22 @@ async def detect_revision(conn: asyncpg.Connection) -> str | None:
     }
     if await all_columns_exist(conn, rate_history_factor_columns):
         highest = "0020_rate_history_factors"
+
+    admin_panel_columns = {
+        ("missions", "target_type"),
+        ("missions", "duration_days"),
+        ("missions", "reward_xp"),
+        ("users", "ban_reason"),
+    }
+    if await all_columns_exist(conn, admin_panel_columns):
+        highest = "0021_admin_panel_fields"
+
+    admin_price_alert_columns = {
+        ("price_alerts", "is_active"),
+        ("price_alerts", "triggered_value"),
+    }
+    if await all_columns_exist(conn, admin_price_alert_columns):
+        highest = "0022_admin_price_alert_active"
 
     return highest
 
