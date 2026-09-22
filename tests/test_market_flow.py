@@ -171,6 +171,11 @@ async def test_market_repairs_missing_home_nation_from_active_membership():
     assert data.user.home_nation_id is not None
     assert data.user.home_nation_id == nation.nation_id
 
+    message = FakeMessage(TEST_USER_ID)
+    await market_button(message)
+    assert message.answers
+    assert all("حساب پیدا نشد" not in answer for answer in message.answers)
+
 
 @pytest.mark.asyncio
 async def test_complete_buy_then_sell_button_journey():
