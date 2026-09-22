@@ -31,6 +31,7 @@ from app.diagnostics.self_test import run_startup_smoke_test
 from app.handlers.founder import founder_router
 from app.handlers.governance import governance_router
 from app.handlers.academy import router as academy_router
+from app.handlers.admin_panel import router as admin_panel_router
 from app.handlers.chart import router as chart_router
 from app.handlers.market import router as market_router
 from app.handlers.membership import membership_router
@@ -417,6 +418,8 @@ async def main() -> None:
     dp.include_router(governance_router)
     dp.include_router(sections_router)
     dp.include_router(support_router)
+    # Add admin Mini App router beside the other top-level private-chat routers.
+    dp.include_router(admin_panel_router)
     dp.include_router(academy_router)
 
     ai_ok = await companion.health_check()
