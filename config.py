@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     database_url: str
     redis_url: str | None = None
     owner_id: int | None = None
+    owner_ai_enabled: bool = True
+    railway_api_token: str | None = None
 
     ai_enabled: bool = True
     gemini_api_key: str | None = Field(
