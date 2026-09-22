@@ -43,6 +43,7 @@ def test_market_price_alert_contract():
     assert '@router.get("/api/economy/behavior-snapshots")' in ROUTER
     assert '@router.get("/api/market/price-alerts")' in ROUTER
     assert '@router.patch("/api/market/price-alerts/{alert_id}/toggle")' in ROUTER
+    assert "PriceAlert.triggered_value" in ROUTER
 
 
 def test_price_alert_state_is_persisted_and_checked():
