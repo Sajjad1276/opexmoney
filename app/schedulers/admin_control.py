@@ -11,6 +11,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 SCHEDULER_JOB_META: dict[str, tuple[str, str]] = {
     "rate_engine_15m": ("هر ۱۵ دقیقه", "بازمحاسبه نرخ ملت‌ها"),
+    "world_event_engine_15m": ("هر ۱۵ دقیقه", "تولید رویدادهای داده‌محور جهان"),
     "nation_membership_reconciliation_15m": ("هر ۱۵ دقیقه", "همگام‌سازی اعضای ملت"),
     "nation_rank_hourly": ("ساعتی", "به‌روزرسانی رتبه ملت‌ها"),
     "governance_cycle": ("دقیقه ۵ هر ساعت", "چرخه حکمرانی"),
