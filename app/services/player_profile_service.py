@@ -39,14 +39,6 @@ class PlayerProfile:
     reputation_builder: int
 
 
-def _score(value: Decimal | int | float, *, scale: Decimal, cap: int = 100) -> int:
-    raw = Decimal(str(value or 0))
-    if raw <= 0:
-        return 0
-    result = int((raw / scale * Decimal("100")).sqrt() * Decimal("10"))
-    return max(0, min(cap, result))
-
-
 async def get_player_profile(
     session: AsyncSession,
     user_id: int,
@@ -57,7 +49,7 @@ async def get_player_profile(
 
     since = datetime.now(UTC) - timedelta(days=30)
 
-    trade_count, trade_volume = await session.execute(
+    trade_result = await session.execute(
         select(
             func.count(Transaction.id),
             func.coalesce(func.sum(Transaction.spend_xr), 0),
@@ -66,7 +58,7 @@ async def get_player_profile(
             Transaction.created_at >= since,
         )
     )
-    trade_row = trade_count.first()
+    trade_row = trade_result.one()
     trades = int(trade_row[0] or 0)
     volume = Decimal(str(trade_row[1] or 0))
 
@@ -144,7 +136,7 @@ async def get_player_profile(
     )
     reputation_governance = min(
         100,
-        int((Decimal(governance_actions + nation_logs) ** Decimal("0.5")) * Decimal("20")),
+        int(Decimal(governance_actions + nation_logs).sqrt() * Decimal("20")),
     )
     reputation_knowledge = min(
         100,
