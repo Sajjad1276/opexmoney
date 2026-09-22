@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import date
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import case, func, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from admin.auth import AdminUser, get_admin_user
@@ -15,7 +15,6 @@ from admin.dependencies import get_db_session, get_redis, page_count
 from admin.schemas.responses import PaginatedResponse, PlayerDetail, PlayerListItem, TransactionItem
 from app.database.models import (
     AIUsageLog,
-    CurrencyHolding,
     Nation,
     NationMembership,
     Transaction,
@@ -244,7 +243,7 @@ async def player_detail(
         AIUsageLog.war_analysis_used,
     ).where(
         AIUsageLog.user_id == user_id,
-        AIUsageLog.date == date.today(),
+        AIUsageLog.date == datetime.now(timezone.utc).date(),
     ).limit(1)
     total_transactions_stmt = select(func.count(Transaction.id)).where(
         Transaction.user_id == user_id,
