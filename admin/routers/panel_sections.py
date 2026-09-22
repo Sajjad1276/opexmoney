@@ -212,6 +212,7 @@ async def market_price_alerts_v2(
             PriceAlert.is_active,
             PriceAlert.created_at,
             PriceAlert.triggered_at,
+            PriceAlert.triggered_value,
             Nation.nation_id,
             Nation.name.label("nation_name"),
             Nation.flag_emoji,
