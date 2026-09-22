@@ -434,11 +434,11 @@ def _rtl(lines: list[str]) -> str:
 
 def build_nation_msg(data: dict) -> str:
     lines = [
-        "🏆 <b>رتبه‌بندی ملت‌ها</b>",
+        "🏆 <b>نقشه قدرت ملت‌ها</b>",
         "━━━━━━━━━━━━━━━━━━",
     ]
     if not data["top10"]:
-        lines.append("⚠️ هنوز داده‌ای برای نمایش وجود ندارد.")
+        lines.append("هنوز رکوردی برای نمایش ثبت نشده است.")
     else:
         for row in data["top10"]:
             lines.append(
@@ -446,7 +446,7 @@ def build_nation_msg(data: dict) -> str:
                 f"{row['nation_name']} · {row['currency_code']}"
             )
             lines.append(
-                f"        💹 {to_fa(fmt_amount(row['exchange_rate']))} ΩXR · "
+                f"        💹 {to_fa(fmt_amount(row['exchange_rate']))} دلار · "
                 f"{row['rate_emoji']} {_fmt_rate_change(row['rate_change_pct'])}٪ · "
                 f"👥 {to_fa(row['member_count'])} نفر"
             )
@@ -470,17 +470,17 @@ def build_nation_msg(data: dict) -> str:
 
 def build_wealth_msg(data: dict) -> str:
     lines = [
-        "💰 <b>ثروتمندترین‌ها</b>",
+        "💰 <b>جدول ثروت</b>",
         "━━━━━━━━━━━━━━━━━━",
     ]
     if not data["top10"]:
-        lines.append("⚠️ هنوز داده‌ای برای نمایش وجود ندارد.")
+        lines.append("هنوز رکوردی برای نمایش ثبت نشده است.")
         return _rtl(lines)
 
     for row in data["top10"]:
         lines.append(f"{rank_prefix(row['rank'])} {row['username']}")
         lines.append(
-            f"        💎 {to_fa(fmt_amount(row['total_xr']))} ΩXR"
+            f"        💎 {to_fa(fmt_amount(row['total_xr']))} دلار"
         )
 
     lines.append("━━━━━━━━━━━━━━━━━━")
@@ -496,11 +496,11 @@ def build_wealth_msg(data: dict) -> str:
 
 def build_trader_msg(data: dict) -> str:
     lines = [
-        "📈 <b>فعال‌ترین معامله‌گران (۲۴ ساعت)</b>",
+        "📈 <b>نبض معامله‌گران · ۲۴ ساعت</b>",
         "━━━━━━━━━━━━━━━━━━",
     ]
     if not data["top10"]:
-        lines.append("⚠️ هنوز داده‌ای برای نمایش وجود ندارد.")
+        lines.append("هنوز رکوردی برای نمایش ثبت نشده است.")
         return _rtl(lines)
 
     for row in data["top10"]:
