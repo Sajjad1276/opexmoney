@@ -41,14 +41,11 @@ def test_founder_text_state_handlers_are_private_only():
         "SELECT_FLAG",
         "CONFIRM",
     ):
-        match = re.search(
-            rf"@founder_router\\.message\\(\\n([\\s\\S]*?)\\)\\nasync def",
-            source,
-        )
-        assert match is not None
-
-    assert source.count('F.chat.type == "private"') >= 6
-    assert 'FounderStates.WAITING_GROUP_ADMIN,\n    F.chat.type == "private",\n    F.text' in source
+        assert (
+            f"FounderStates.{state_name},\n"
+            '    F.chat.type == "private",\n'
+            "    F.text"
+        ) in source
 
 def test_founder_button_callbacks_have_handlers():
     source = (ROOT / "app/handlers/founder_flow.py").read_text(encoding="utf-8")
