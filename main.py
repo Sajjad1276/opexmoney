@@ -62,6 +62,7 @@ from app.services.membership_service import reconcile_human_nation_member_counts
 from app.services.war_service import resolve_expired_wars
 from app.services.ai_world import ensure_ai_world, run_ai_world_cycle
 from app.schedulers.alert_checker import register_price_alert_job
+from app.schedulers.admin_control import install_scheduler_monitor, scheduler_control_loop
 from app.schedulers.ai_world import register_ai_world_job
 from app.services.portfolio_live import register_portfolio_live_update_job
 from config import settings
@@ -433,6 +434,7 @@ async def main() -> None:
     register_price_alert_job(scheduler, bot)
     register_ai_world_job(scheduler)
     register_portfolio_live_update_job(scheduler, bot)
+    install_scheduler_monitor(scheduler, ranking_redis)
     await run_ai_warmup()
     smoke_ok = await run_startup_smoke_test(dp, scheduler)
     if not smoke_ok:
@@ -441,6 +443,9 @@ async def main() -> None:
         )
 
     scheduler.start()
+    scheduler_control_task = asyncio.create_task(
+        scheduler_control_loop(scheduler, ranking_redis)
+    )
     logger.info("OPEX MONEY is online")
     try:
         await dp.start_polling(
@@ -448,6 +453,11 @@ async def main() -> None:
             allowed_updates=dp.resolve_used_update_types(),
         )
     finally:
+        scheduler_control_task.cancel()
+        try:
+            await scheduler_control_task
+        except asyncio.CancelledError:
+            pass
         scheduler.shutdown(wait=False)
         if ranking_redis is not None:
             await ranking_redis.aclose()
