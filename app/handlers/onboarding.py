@@ -793,7 +793,7 @@ async def confirm_nation(call: CallbackQuery, state: FSMContext, bot: Bot) -> No
         return
 
     text = f"""{html.escape(nation.flag_emoji or "🏴")} <b>به {html.escape(nation.name)} خوش اومدی</b>
-<blockquote>⁠</blockquote>
+\n
 {user_mention(call.from_user)}، تو الان شهروند این ملت هستی.
 
 💰 سرمایه شروع: <b>۵۰۰ <code>{html.escape(nation.currency_code)}</code></b>
@@ -816,7 +816,7 @@ async def render_nation_profile(nation: Nation) -> str:
     خروجی HTML فرمت، راست‌چین:
 
     🏴 <b>نام ملت</b>
-    <blockquote>⁠</blockquote>
+    \n
     💰 <b>واحد پول:</b> {symbol}
     📈 <b>نرخ ارز:</b> {rate} دلار  <u>(آپدیت 15 دقیقه پیش)</u>
     👥 <b>اعضا:</b> {member_count} نفر
@@ -879,7 +879,7 @@ async def render_nation_profile(nation: Nation) -> str:
 
     text = """
 {0}
-<blockquote>⁠</blockquote>
+\n
 💰 <b>واحد پول:</b> {1}
 📈 <b>نرخ ارز:</b> {2} دلار  <u>(آپدیت {3} دقیقه پیش)</u>
 👥 <b>اعضا:</b> {4} نفر
