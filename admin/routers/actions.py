@@ -985,10 +985,8 @@ async def audit_log(
             .limit(limit)
         )
 
-        total, rows = await asyncio.gather(
-            db.scalar(count_stmt),
-            db.execute(rows_stmt),
-        )
+        total = await db.scalar(count_stmt)
+        rows = await db.execute(rows_stmt)
 
         total_int = int(total or 0)
         items = [
