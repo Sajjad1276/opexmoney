@@ -77,7 +77,7 @@ async def nation_stats_callback(call: CallbackQuery) -> None:
 
     text = (
         f"{html.escape(nation.flag_emoji or '🏴')} <b>آمار ملت «{html.escape(nation.name)}»</b>\n"
-        "<blockquote>⁠</blockquote>\n"
+        "\n"
         f"👥 اعضا: <b>{nation.member_count}</b> نفر\n"
         f"💱 ارز: <code>{html.escape(nation.currency_code)}</code>\n"
         f"📈 نرخ: <b>{fmt_rate(nation.exchange_rate)} دلار</b>\n"
@@ -103,7 +103,7 @@ async def nation_rate_callback(call: CallbackQuery) -> None:
     change = get_rate_change(nation)
     text = (
         f"{html.escape(nation.flag_emoji or '🏴')} <b>نرخ لحظه‌ای «{html.escape(nation.name)}»</b>\n"
-        "<blockquote>⁠</blockquote>\n"
+        "\n"
         f"💱 <code>1 {html.escape(nation.currency_code)}</code> = <b>{fmt_rate(nation.exchange_rate)} دلار</b>\n"
         f"{get_rate_emoji(change)} تغییر ۲۴ ساعت: <b>{fmt_pct(change)}</b>\n"
         f"↔️ نرخ قبلی: <b>{fmt_rate(nation.rate_prev)} دلار</b>\n"
@@ -186,7 +186,7 @@ async def my_nations(call: CallbackQuery) -> None:
         manager = user is not None and _can_manage(user)
         text = (
             f"{nation.flag_emoji or '🏴'} <b>{nation.name}</b>\n"
-            "<blockquote>⁠</blockquote>\n"
+            "\n"
             f"💱 ارز: <b>{nation.currency_code}</b>\n"
             f"📈 نرخ: <b>{fmt_rate(nation.exchange_rate)}</b> دلار\n"
             f"👥 اعضا: <b>{nation.member_count}</b>\n"
