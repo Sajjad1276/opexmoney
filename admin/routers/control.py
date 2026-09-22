@@ -37,12 +37,25 @@ from app.database.models import (
 )
 from app.schedulers.admin_control import SCHEDULER_JOB_META
 from app.diagnostics.support_telemetry import get_recent_telemetry
+from app.services.nation.founder_service import finalize_draft
 
 router = APIRouter(prefix="/api/control", tags=["admin-control"])
 
 
 class StrictBody(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True, str_strip_whitespace=True)
+
+
+class LessonCreate(StrictBody):
+    module_id: int = Field(ge=1, le=1000)
+    order: int = Field(ge=1, le=10000)
+    level: str = Field(min_length=1, max_length=10)
+    title_fa: str = Field(min_length=1, max_length=100)
+    content_fa: str = Field(min_length=1, max_length=4000)
+    quiz_json: str = "[]"
+    xp_reward: int = Field(default=10, ge=0, le=100000)
+    xr_reward: float = Field(default=0, ge=0, le=100000)
+    is_active: bool = True
 
 
 class LessonUpdate(StrictBody):
@@ -195,6 +208,47 @@ async def academy_lessons(
         }
         for row in rows
     ]
+
+
+@router.post("/academy/lessons", status_code=201)
+async def create_academy_lesson(
+    body: LessonCreate,
+    db: AsyncSession = Depends(get_db_session),
+    admin_user: AdminUser = Depends(get_admin_user),
+):
+    quiz_json = _validate_quiz_json(body.quiz_json)
+    async with db.begin():
+        duplicate = await db.scalar(
+            select(Lesson.id).where(
+                Lesson.module_id == body.module_id,
+                Lesson.order == body.order,
+            ).limit(1)
+        )
+        if duplicate is not None:
+            raise HTTPException(status_code=409, detail="Lesson order already exists in this module")
+        lesson = Lesson(
+            module_id=body.module_id,
+            order=body.order,
+            level=body.level,
+            title_fa=body.title_fa,
+            content_fa=body.content_fa,
+            quiz_json=quiz_json,
+            xp_reward=body.xp_reward,
+            xr_reward=Decimal(str(body.xr_reward)),
+            is_active=body.is_active,
+        )
+        db.add(lesson)
+        await db.flush()
+        await _audit(
+            db,
+            admin_user,
+            action="admin_academy_lesson_create",
+            rule_key=f"academy.lesson.{lesson.id}",
+            new_value=body.title_fa,
+            reason="Admin lesson create",
+        )
+        lesson_id = lesson.id
+    return {"success": True, "lesson_id": lesson_id}
 
 
 @router.patch("/academy/lessons/{lesson_id}")
@@ -613,6 +667,43 @@ async def founder_drafts(
         }
         for r in rows
     ]
+
+
+@router.post("/founder/drafts/{draft_id}/finalize")
+async def finalize_founder_draft(
+    draft_id: int,
+    db: AsyncSession = Depends(get_db_session),
+    admin_user: AdminUser = Depends(get_admin_user),
+):
+    founder_id = await db.scalar(
+        select(NationFoundingDraft.founder_user_id)
+        .where(NationFoundingDraft.id == draft_id)
+        .limit(1)
+    )
+    if founder_id is None:
+        raise HTTPException(status_code=404, detail="Founder draft not found")
+    try:
+        nation, group_id = await finalize_draft(
+            db,
+            founder_user_id=int(founder_id),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    async with db.begin():
+        await _audit(
+            db,
+            admin_user,
+            action="admin_founder_draft_finalize",
+            rule_key=f"founder.draft.{draft_id}",
+            new_value=f"COMPLETED:nation={nation.nation_id}",
+            reason=f"Admin finalized founder draft for group {group_id}",
+        )
+    return {
+        "success": True,
+        "message": "Founder draft finalized",
+        "nation_id": int(nation.nation_id),
+        "group_id": int(group_id),
+    }
 
 
 @router.post("/founder/drafts/{draft_id}/cancel")
