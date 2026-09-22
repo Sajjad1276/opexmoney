@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from decimal import Decimal
 from secrets import token_urlsafe
@@ -12,6 +13,17 @@ from app.utils.validators import validate_currency_code
 
 
 DRAFT_TTL = timedelta(minutes=30)
+
+
+@asynccontextmanager
+async def _transaction(session: AsyncSession):
+    """Use the caller's transaction when one already exists."""
+    if session.in_transaction():
+        yield
+        return
+    async with _transaction(session):
+        yield
+
 
 ACTIVE_DRAFT_STATUSES = (
     "WAITING_GROUP",
