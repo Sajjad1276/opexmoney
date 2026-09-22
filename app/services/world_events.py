@@ -73,6 +73,28 @@ async def get_active_world_event(
     return await session.scalar(statement.limit(1))
 
 
+async def get_recent_world_events(
+    session: AsyncSession,
+    *,
+    nation_id: int | None = None,
+    limit: int = 5,
+) -> list[WorldEvent]:
+    """Return recent events relevant to the player and the public world feed."""
+    limit = max(1, min(limit, 20))
+    statement = select(WorldEvent).order_by(WorldEvent.started_at.desc()).limit(limit)
+    if nation_id is not None:
+        statement = (
+            select(WorldEvent)
+            .where(
+                (WorldEvent.affected_nation_id == nation_id)
+                | (WorldEvent.scope == WorldEventScope.GLOBAL)
+            )
+            .order_by(WorldEvent.started_at.desc())
+            .limit(limit)
+        )
+    return list((await session.execute(statement)).scalars().all())
+
+
 async def generate_market_world_event(
     session: AsyncSession,
     *,
