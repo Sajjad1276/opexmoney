@@ -79,7 +79,8 @@ def _github_token() -> str | None:
 
 def _railway_token() -> str | None:
     return (
-        os.getenv("RAILWAY_API_TOKEN")
+        settings.railway_api_token
+        or os.getenv("RAILWAY_API_TOKEN")
         or os.getenv("RAILWAY_TOKEN")
         or os.getenv("RAILWAY_PROJECT_TOKEN")
     )
