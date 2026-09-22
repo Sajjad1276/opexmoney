@@ -403,7 +403,7 @@ async def _panel_text(
     citizens = await _member_count(session, nation.nation_id, NationMemberRole.CITIZEN)
     return (
         f"👑 <b>مدیریت {html.escape(nation.name)}</b>\n"
-        "<blockquote>⁠</blockquote>\n"
+        "\n"
         f"👥 اعضا: <b>{nation.member_count}</b>\n"
         f"🛡 وزیر: <b>{ministers}/3</b>\n"
         f"💼 تاجر: <b>{traders}/10</b>\n"
@@ -1356,7 +1356,7 @@ async def show_logs(call: CallbackQuery) -> None:
         await call.answer(str(exc), show_alert=True)
         return
 
-    text = "📋 <b>لاگ فعالیت ملت · 20 رویداد آخر</b>\n<blockquote>⁠</blockquote>\n"
+    text = "📋 <b>لاگ فعالیت ملت · 20 رویداد آخر</b>\n\n"
     text += "\n\n".join(feed) if feed else "هنوز رویدادی ثبت نشده."
     markup = InlineKeyboardMarkup(
         inline_keyboard=[[InlineKeyboardButton(text="↩️ مدیریت ملت", callback_data=f"nm:panel:{nation_id}")]]
