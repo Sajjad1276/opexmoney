@@ -259,14 +259,27 @@ function actionForm(id){
  return '<div class="empty">فرم عملیات موجود نیست</div>';
 }
 const actionEndpoint={broadcast:'/api/admin/actions/broadcast','give-bonus':'/api/admin/actions/give-bonus','ban-player':'/api/admin/actions/ban-player','unban-player':'/api/admin/actions/unban-player','reset-rates':'/api/admin/actions/reset-rates','end-war':'/api/admin/actions/end-war','create-event':'/api/admin/actions/create-event','send-mission-reward':'/api/admin/actions/send-mission-reward'};
-function openAdminAction(id){
- if(id==='end-war'&&!S.data.wars){S.data.wars=[]}
+async function openAdminAction(id){
  const title={'broadcast':'ارسال پیام همگانی','give-bonus':'اعطای جایزه','ban-player':'مسدود کردن بازیکن','unban-player':'رفع مسدودیت','reset-rates':'ریست نرخ‌ها','end-war':'پایان جنگ','create-event':'ایجاد رویداد','send-mission-reward':'ارسال جایزه مأموریت'}[id]||'اقدام';
- openModal(title,actionForm(id));S.action={id,body:null};
- if(id==='reset-rates')$('af-reset').oninput=e=>$('mpreview').disabled=e.target.value.trim()!=='ریست';
- $('mpreview').disabled=id==='reset-rates';
- document.querySelector('.modalfoot').innerHTML='<button class="btn" id="mcancel">لغو</button><button class="btn gold" id="mpreview">پیش‌نمایش</button><button class="btn gold" id="mexec" style="display:none">تایید و اجرا</button>';
- $('mcancel').onclick=closeModal;$('mpreview').onclick=previewAdminAction;$('mexec').onclick=executeAdminAction;
+ try{
+  if(['reset-rates','create-event'].includes(id) || id==='end-war'){
+   const tasks=[];
+   if(['reset-rates','create-event'].includes(id) && !S.txNationOptions){
+    tasks.push(api.get('/api/nations?page=1&limit=100&sort=member_count&order=desc&filter=all').then(r=>{S.txNationOptions=r.items||r.nations||[];S.data.nations=r;}));
+   }
+   if(id==='end-war' && !S.data.wars){
+    tasks.push(api.get('/api/wars?status=active').then(r=>{S.data.wars=Array.isArray(r)?r:(r.items||r.wars||[]);}));
+   }
+   if(tasks.length)await Promise.all(tasks);
+  }
+  openModal(title,actionForm(id));S.action={id,body:null};
+  document.querySelector('.modalfoot').innerHTML='<button class="btn" id="mcancel">لغو</button><button class="btn gold" id="mpreview">پیش‌نمایش</button><button class="btn gold" id="mexec" style="display:none">تایید و اجرا</button>';
+  $('mcancel').onclick=closeModal;$('mpreview').onclick=previewAdminAction;$('mexec').onclick=executeAdminAction;
+  if(id==='reset-rates'){
+   $('mpreview').disabled=true;
+   $('af-reset').oninput=e=>{$('mpreview').disabled=e.target.value.trim()!=='ریست'};
+  }
+ }catch(e){toast(e.message,'err')}
 }
 function actionPayload(id){
  const nums=s=>String(s||'').split(',').map(x=>Number(x.trim())).filter(Number.isFinite);
