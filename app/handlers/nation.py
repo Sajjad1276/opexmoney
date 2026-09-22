@@ -57,8 +57,8 @@ async def open_nations(message: Message) -> None:
 
     await send_submenu_panel(
         message,
-        "🌍 <b>ملت من</b>\n"
-        "اینجا می‌تونی ملت خودت رو بررسی کنی و بعداً وارد بخش‌های عمیق‌تر بشی.",
+        "🌍 <b>مرکز ملت</b>\n"
+        "اینجا نبض ملتت را می‌بینی؛ از وضعیت اقتصاد تا خزانه، حکمرانی و رقابت با دیگر ملت‌ها.",
         reply_markup=nation_panel_keyboard(is_manager, nation_id),
         parse_mode="HTML",
     )
@@ -176,9 +176,9 @@ async def my_nations(call: CallbackQuery) -> None:
 
     if not nations:
         text = (
-            "🌍 <b>ملت‌های من</b>\n"
-            "هنوز عضو هیچ ملتی نیستی.\n\n"
-            "می‌تونی یک ملت موجود را بررسی کنی یا ملت خودت را تأسیس کنی."
+            "🌍 <b>ملت من</b>\n"
+            "هنوز به هیچ ملتی وابسته نیستی.\n\n"
+            "یک ملت را برای ورود بررسی کن یا از همین‌جا بنیان ملت خودت را شروع کن."
         )
         markup = nation_panel_keyboard(False, None)
     else:
@@ -191,7 +191,7 @@ async def my_nations(call: CallbackQuery) -> None:
             f"📈 نرخ: <b>{fmt_rate(nation.exchange_rate)}</b> دلار\n"
             f"👥 اعضا: <b>{nation.member_count}</b>\n"
             f"🏦 خزانه: <b>{nation.treasury}</b> دلار\n\n"
-            "از دکمه‌های زیر وارد بخش‌های ملت شو."
+            "از این‌جا وارد بخش‌های مختلف حکومت و اقتصاد ملت شو."
         )
         markup = nation_panel_keyboard(manager, nation.nation_id)
 
@@ -222,8 +222,8 @@ async def explore_nations(call: CallbackQuery) -> None:
 
     if not nations:
         await call.message.edit_text(
-            "🌍 <b>هنوز ملتی وجود نداره.</b>\n"
-            "تو می‌تونی اولین ملت رو تأسیس کنی.",
+            "🌍 <b>نقشه هنوز خالی است.</b>\n"
+            "اگر می‌خواهی نام یک ملت با تصمیم‌های تو شناخته شود، می‌توانی نخستین ملت را تأسیس کنی.",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(text="🏛 تأسیس اولین ملت", callback_data="found_nation")]
             ]),
@@ -243,7 +243,7 @@ async def explore_nations(call: CallbackQuery) -> None:
     if call.message:
         await call.message.edit_text(
             "🔍 <b>کاوش ملت‌ها</b>\n"
-            "ملت فعال موردنظرت رو انتخاب کن.",
+            "فهرست ملت‌های فعال را ببین و یکی را برای ورود بررسی کن.",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=rows),
             parse_mode="HTML",
         )
