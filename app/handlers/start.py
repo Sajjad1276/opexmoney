@@ -28,9 +28,10 @@ async def cmd_start(message: Message, state: FSMContext) -> None:
         return
     imperial_date, imperial_time = imperial_datetime()
     text = (
-        "🌐 <b>به OPEX MONEY خوش اومدی</b>\n\n"
-        "اقتصاد زنده است؛ تصمیم‌های تو مهم‌اند.\n\n"
-        "🎯 <b>تصمیم بگیر، معامله کن، رشد کن.</b>\n\n"
+        "🌐 <b>OPEX MONEY</b>\n\n"
+        "این‌جا یک اقتصاد زنده منتظر تصمیم‌های توست.\n"
+        "ارزها حرکت می‌کنند، ملت‌ها رقابت می‌کنند و هر معامله رد خودش را روی بازار می‌گذارد.\n\n"
+        "🎯 <b>ورود کن. جای خودت را پیدا کن.</b>\n\n"
         f"📅 {imperial_date}\n"
         f"🕐 {imperial_time}"
     )
