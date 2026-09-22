@@ -340,6 +340,6 @@ async def confirm_sell(call: CallbackQuery, state=None):
 @router.callback_query(F.data == "market_history")
 async def market_history(call: CallbackQuery):
     user, rows = await get_market_history(call.from_user.id)
-    if not user or user.home_nation_id is None:
-        await call.answer("🔴 حساب یا ملت فعال پیدا نشد. /start بزن.", show_alert=True); return
-    await safe_edit(call, format_market_history(user, rows), market_keyboard_for_nation(user.home_nation_id)); await call.answer()
+    if not user:
+        await call.answer("🔴 حساب پیدا نشد. /start بزن.", show_alert=True); return
+    await safe_edit(call, format_market_history(user, rows), market_keyboard_for_nation(user.home_nation_id or 0)); await call.answer()
