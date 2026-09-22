@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import html
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 
 from aiogram import Bot
@@ -171,6 +171,8 @@ async def check_price_alerts(
             continue
 
         alert.triggered = True
+        alert.triggered_at = datetime.now(UTC)
+        alert.triggered_value = current
         triggered_count += 1
 
     await session.flush()
