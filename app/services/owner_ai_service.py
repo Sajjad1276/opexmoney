@@ -17,6 +17,7 @@ from datetime import UTC, datetime
 from pathlib import PurePosixPath
 from typing import Any
 
+from google import genai
 from google.genai import types
 from sqlalchemy import select
 
@@ -35,6 +36,7 @@ MAX_PLAN_ROUNDS = 10
 MAX_FIX_ATTEMPTS = 5
 CI_POLL_SECONDS = 5
 DEFAULT_TIMEOUT = 900
+OWNER_AI_MAX_OUTPUT_TOKENS = 16000
 
 TEXT_EXTENSIONS = {
     ".py", ".md", ".txt", ".json", ".yaml", ".yml", ".toml", ".ini",
@@ -43,6 +45,24 @@ TEXT_EXTENSIONS = {
 }
 
 ProgressCallback = Callable[[str], Awaitable[None]]
+_OWNER_AI_CLIENT: genai.Client | None = None
+
+
+def _owner_ai_client() -> genai.Client | None:
+    global _OWNER_AI_CLIENT
+    if not settings.ai_enabled:
+        return None
+    api_key = companion._api_key()
+    if not api_key:
+        return None
+    if _OWNER_AI_CLIENT is None:
+        _OWNER_AI_CLIENT = genai.Client(
+            api_key=api_key,
+            http_options=types.HttpOptions(
+                timeout=max(1000, int(settings.owner_ai_timeout_seconds * 1000)),
+            ),
+        )
+    return _OWNER_AI_CLIENT
 
 
 @dataclass(frozen=True)
@@ -638,9 +658,12 @@ async def _merge_pr(pr_number: int) -> bool:
 def _candidate_models() -> list[str]:
     values = [
         settings.ai_model,
-        "gemini-3.1-flash-lite",
-        "gemini-3.5-flash-lite",
+        "gemini-3.8-flash",
+        "gemini-3.7-flash",
+        "gemini-3.6-flash",
         "gemini-3.5-flash",
+        "gemini-3.5-flash-lite",
+        "gemini-3.1-flash-lite",
     ]
     return list(dict.fromkeys(item for item in values if item))
 
@@ -665,9 +688,9 @@ def _parse_planner_json(raw: str) -> dict[str, Any]:
 
 
 async def _plain_recovery_answer(request: str, inspected: dict[str, str]) -> str:
-    client = companion._get_client()
+    client = _owner_ai_client()
     if client is None:
-        raise RuntimeError('Gemini برای recovery mode در دسترس نیست.')
+        raise RuntimeError('Gemini برای Owner AI در دسترس نیست یا AI غیرفعال است.')
     source = '\n\n'.join(f'FILE {path}\n{content}' for path, content in inspected.items())[:MAX_TOTAL_CONTEXT]
     prompt = 'You are OPEX MONEY Owner AI recovery mode.\n' + request + '\n\nSOURCE:\n' + source
     last_error: Exception | None = None
@@ -694,9 +717,9 @@ async def _planner(
     inspected: dict[str, str],
     tool_result: str = "",
 ) -> dict[str, Any]:
-    client = companion._get_client()
+    client = _owner_ai_client()
     if client is None:
-        raise RuntimeError("Gemini برای Owner AI در دسترس نیست.")
+        raise RuntimeError("Gemini برای Owner AI در دسترس نیست یا AI غیرفعال است.")
 
     tree_text = "\n".join(tree[:5000])
     files_text = "\n\n".join(
@@ -774,7 +797,7 @@ LATEST TOOL RESULT:
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     temperature=0,
-                    max_output_tokens=24000,
+                    max_output_tokens=OWNER_AI_MAX_OUTPUT_TOKENS,
                     response_mime_type='application/json',
                 ),
             )
@@ -830,6 +853,12 @@ async def run_owner_ai(
             return OwnerAIResult(
                 "credentials_missing",
                 "SUPPORT_GITHUB_TOKEN یا GITHUB_TOKEN برای دسترسی پروژه تنظیم نشده است.",
+            )
+
+        if _owner_ai_client() is None:
+            return OwnerAIResult(
+                "credentials_missing",
+                "Gemini برای Owner AI فعال نیست یا GEMINI_API_KEY قابل دسترسی نیست.",
             )
 
         stage = "repository_index"
