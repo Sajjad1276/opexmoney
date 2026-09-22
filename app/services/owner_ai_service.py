@@ -264,6 +264,96 @@ async def _search_code(query: str) -> list[str]:
     ]
 
 
+async def _scan_repository_for_query(query: str, ref: str = "main") -> list[str]:
+    terms = [item.casefold() for item in query.split() if len(item.strip()) >= 2]
+    if not terms:
+        return []
+    tree = await _repo_tree(ref)
+    paths = [
+        path for path in tree
+        if PurePosixPath(path).suffix.casefold() in TEXT_EXTENSIONS
+    ]
+    paths.sort(key=lambda path: (0 if any(term in path.casefold() for term in terms) else 1, len(path)))
+    matches: list[str] = []
+    for start in range(0, min(len(paths), 240), 24):
+        batch = paths[start:start + 24]
+        results = await asyncio.gather(*(_read_file(path, ref) for path in batch), return_exceptions=True)
+        for path, result in zip(batch, results):
+            if isinstance(result, Exception):
+                continue
+            folded = str(result).casefold()
+            if any(term in folded for term in terms):
+                matches.append(path)
+                if len(matches) >= 20:
+                    return matches
+    return matches
+
+
+async def _search_code(query: str, ref: str = "main") -> list[str]:
+    try:
+        result = await _github(
+            f"/search/code?q={urllib.parse.quote(query + ' repo:' + _repo(), safe='')}"
+        )
+        items = [
+            str(item.get("path"))
+            for item in result.get("items", [])[:30]
+            if item.get("path")
+        ]
+        if items:
+            return items
+    except Exception as exc:
+        logger.warning("Owner AI code search failed; fallback scan: %s", type(exc).__name__)
+    return await _scan_repository_for_query(query, ref)
+
+
+async def _read_many(paths: list[str], ref: str = "main") -> dict[str, str]:
+    unique = list(dict.fromkeys(paths))[:MAX_CONTEXT_FILES]
+    results = await asyncio.gather(*(_read_file(path, ref) for path in unique), return_exceptions=True)
+    collected: dict[str, str] = {}
+    total = 0
+    for path, result in zip(unique, results):
+        if isinstance(result, Exception):
+            continue
+        content = str(result)
+        if total + len(content) > MAX_TOTAL_CONTEXT:
+            break
+        collected[path] = content
+        total += len(content)
+    return collected
+
+
+async def _seed_context_paths(request: str, tree: list[str]) -> list[str]:
+    lower = request.casefold()
+    selected: list[str] = []
+
+    def add(path: str) -> None:
+        if path in tree and path not in selected:
+            selected.append(path)
+
+    for preferred in (
+        "main.py",
+        "config.py",
+        "app/database/models.py",
+        "app/database/session.py",
+        "app/utils/formatting.py",
+        "app/utils/ui.py",
+    ):
+        add(preferred)
+
+    if any(token in lower for token in ("متن", "پیام", "بخش", "دکمه", "منو", "گزینه", "text", "message", "button", "menu")):
+        for path in tree:
+            if path.startswith(("app/handlers/", "app/keyboards/", "app/utils/")):
+                add(path)
+
+    for family in ("market", "trade", "nation", "war", "treasury", "academy", "portfolio", "governance", "support", "start", "owner_ai"):
+        if family in lower:
+            for path in tree:
+                if family in path.casefold():
+                    add(path)
+
+    return selected[:MAX_CONTEXT_FILES]
+
+
 async def _ci_status(branch: str | None = None) -> tuple[str, str]:
     suffix = f"&head={urllib.parse.quote(branch, safe='')}" if branch else ""
     result = await _github(
