@@ -6,7 +6,11 @@ from sqlalchemy import delete, select
 
 from app.database.models import CurrencyHolding, Nation, NationFoundingDraft, User, UserActivity
 from app.database.session import async_session
-from app.services.nation.founder_service import create_nation as create_nation_backend, get_or_create_draft
+from app.services.nation.founder_service import (
+    create_nation as create_nation_backend,
+    finalize_draft,
+    get_or_create_draft,
+)
 from app.services.nation_service import create_nation
 from app.services.user_service import is_user_registered
 
@@ -257,6 +261,61 @@ async def test_founder_backend_starts_draft_and_persists_selected_flag():
         saved_nation = await session.get(Nation, nation.nation_id)
         assert saved_nation is not None
         assert saved_nation.flag_emoji == "🇯🇵"
+
+
+@pytest.mark.asyncio
+async def test_finalize_founder_draft_without_player_eligibility():
+    founder_id = 910009
+    group_id = -100910013
+
+    async with async_session() as session:
+        async with session.begin():
+            session.add(
+                User(
+                    user_id=founder_id,
+                    username="testfounder9",
+                    balance=Decimal("0.00"),
+                    xr_balance=Decimal("0.00"),
+                    home_nation_id=None,
+                    role="player",
+                )
+            )
+
+    async with async_session() as session:
+        async with session.begin():
+            draft = await get_or_create_draft(session, founder_id)
+            draft.group_id = group_id
+            draft.group_title = "Final Founder Capital"
+            draft.group_type = "supergroup"
+            draft.nation_name = "Final Founder Nation"
+            draft.currency_code = "FFG"
+            draft.flag_emoji = "🏴"
+            draft.status = "REVIEW"
+            await session.flush()
+
+    async with async_session() as session:
+        nation, saved_group_id = await finalize_draft(
+            session,
+            founder_user_id=founder_id,
+        )
+
+    assert saved_group_id == group_id
+    assert nation.name == "Final Founder Nation"
+    assert nation.currency_code == "FFG"
+
+    async with async_session() as session:
+        user = await session.get(User, founder_id)
+        holding = await session.scalar(
+            select(CurrencyHolding).where(
+                CurrencyHolding.user_id == founder_id,
+                CurrencyHolding.nation_id == nation.nation_id,
+            )
+        )
+        assert user is not None
+        assert user.home_nation_id == nation.nation_id
+        assert user.role == "founder"
+        assert holding is not None
+        assert holding.amount == Decimal("1000.0000")
 
 
 @pytest.fixture(autouse=True)
