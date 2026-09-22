@@ -274,7 +274,6 @@ async def broadcast(
         return _dry_run()
 
     await check_action_rate_limit("broadcast", redis_client)
-        return _dry_run()
 
     try:
         target_conditions = [User.is_ai.is_(False)]
@@ -354,7 +353,6 @@ async def give_bonus(
         return _dry_run()
 
     await check_action_rate_limit("give-bonus", redis_client)
-        return _dry_run()
 
     try:
         if body.user_ids == "all":
@@ -448,7 +446,6 @@ async def ban_player(
         return _dry_run()
 
     await check_action_rate_limit("ban-player", redis_client)
-        return _dry_run()
 
     try:
         row = await db.execute(
@@ -522,7 +519,6 @@ async def unban_player(
         return _dry_run()
 
     await check_action_rate_limit("unban-player", redis_client)
-        return _dry_run()
 
     try:
         row = await db.execute(
@@ -595,7 +591,6 @@ async def reset_rates(
         return _dry_run()
 
     await check_action_rate_limit("reset-rates", redis_client)
-        return _dry_run()
 
     try:
         old_rate: str = "multiple"
@@ -690,7 +685,6 @@ async def end_war(
         return _dry_run()
 
     await check_action_rate_limit("end-war", redis_client)
-        return _dry_run()
 
     try:
         row = await db.execute(
@@ -777,7 +771,6 @@ async def create_event(
         return _dry_run()
 
     await check_action_rate_limit("create-event", redis_client)
-        return _dry_run()
 
     try:
         affected_nation = None
@@ -863,7 +856,6 @@ async def send_mission_reward(
         return _dry_run()
 
     await check_action_rate_limit("send-mission-reward", redis_client)
-        return _dry_run()
 
     try:
         mission = await db.scalar(
