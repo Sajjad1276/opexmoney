@@ -16,6 +16,7 @@ from ai import companion
 from app.database.models import (
     ActivityType,
     AIUsageLog,
+    BehaviorSnapshot,
     CurrencyHolding,
     DecisionSnapshot,
     GovernanceLedger,
@@ -25,6 +26,7 @@ from app.database.models import (
     NationFoundingDraft,
     NationMembership,
     NationTreasury,
+    PriceAlert,
     TreasuryLog,
     Transaction,
     User,
@@ -157,6 +159,111 @@ async def _audit(
             reason=(reason or "")[:255] or None,
         )
     )
+
+
+# ---------------- Economy / Market extensions ----------------
+
+@router.get("/api/economy/behavior-snapshots")
+async def economy_behavior_snapshots(
+    limit: int = Query(48, ge=1, le=168),
+    db: AsyncSession = Depends(get_db_session),
+    admin_user: AdminUser = Depends(get_admin_user),
+):
+    rows = (
+        await db.execute(
+            select(BehaviorSnapshot)
+            .order_by(BehaviorSnapshot.at.desc(), BehaviorSnapshot.id.desc())
+            .limit(limit)
+        )
+    ).scalars().all()
+    return {
+        "snapshots": [
+            {
+                "snapshot_id": row.id,
+                "nation_id": None,
+                "nation_name": "کل اقتصاد",
+                "timestamp": _iso(row.at),
+                "active_players": int(row.active_players_count or 0),
+                "trade_volume": float(row.total_volume or 0),
+                "buy_count": int(row.buy_tx_count or 0),
+                "sell_count": int(row.sell_tx_count or 0),
+                "avg_wealth": float(row.avg_net_worth or 0),
+                "median_wealth": float(row.median_net_worth or 0),
+                "gini_coefficient": float(row.gini_coefficient or 0),
+                "top10_wealth_share": float(row.top10_wealth_share or 0),
+            }
+            for row in rows
+        ]
+    }
+
+
+@router.get("/api/market/price-alerts")
+async def market_price_alerts_v2(
+    db: AsyncSession = Depends(get_db_session),
+    admin_user: AdminUser = Depends(get_admin_user),
+):
+    stmt = (
+        select(
+            PriceAlert.id,
+            PriceAlert.currency_code,
+            PriceAlert.target_price,
+            PriceAlert.direction,
+            PriceAlert.is_triggered,
+            PriceAlert.is_active,
+            PriceAlert.created_at,
+            PriceAlert.triggered_at,
+            Nation.nation_id,
+            Nation.name.label("nation_name"),
+            Nation.flag_emoji,
+            Nation.exchange_rate,
+        )
+        .outerjoin(Nation, (Nation.currency_code == PriceAlert.currency_code) & Nation.is_active.is_(True))
+        .order_by(PriceAlert.is_triggered.asc(), PriceAlert.created_at.desc(), PriceAlert.id.desc())
+        .limit(500)
+    )
+    rows = (await db.execute(stmt)).all()
+    return {
+        "alerts": [
+            {
+                "alert_id": int(row.id),
+                "nation_id": row.nation_id,
+                "nation_name": row.nation_name or "نامشخص",
+                "flag_emoji": row.flag_emoji or "",
+                "currency": row.currency_code,
+                "condition": _enum(row.direction),
+                "threshold": float(row.target_price or 0),
+                "current_value": float(row.exchange_rate or 0),
+                "is_triggered": bool(row.is_triggered),
+                "triggered_at": _iso(row.triggered_at),
+                "is_active": bool(row.is_active),
+                "created_at": _iso(row.created_at),
+            }
+            for row in rows
+        ]
+    }
+
+
+@router.patch("/api/market/price-alerts/{alert_id}/toggle")
+async def toggle_market_price_alert(
+    alert_id: int,
+    db: AsyncSession = Depends(get_db_session),
+    admin_user: AdminUser = Depends(get_admin_user),
+):
+    async with db.begin():
+        alert = await db.scalar(
+            select(PriceAlert).where(PriceAlert.id == alert_id).with_for_update()
+        )
+        if alert is None:
+            raise HTTPException(status_code=404, detail="Price alert not found")
+        alert.is_active = not alert.is_active
+        await _audit(
+            db,
+            admin_user,
+            "admin_market_price_alert_toggle",
+            f"market.price_alert.{alert_id}",
+            new_value=alert.is_active,
+        )
+    return {"success": True, "alert_id": alert_id, "is_active": alert.is_active}
 
 
 # ---------------- Academy ----------------
