@@ -33,3 +33,14 @@ def test_latest_repair_revision_detection_sources_are_present() -> None:
         "triggered_value",
     ):
         assert column in source
+
+
+def test_repair_handles_schema_behind_tracked_admin_revision() -> None:
+    source = open("scripts/repair_alembic_state.py", encoding="utf-8").read()
+    assert "repair_known_post_0020_schema" in source
+    assert "ADD COLUMN IF NOT EXISTS target_type" in source
+    assert "ADD COLUMN IF NOT EXISTS duration_days" in source
+    assert "ADD COLUMN IF NOT EXISTS reward_xp" in source
+    assert "ADD COLUMN IF NOT EXISTS ban_reason" in source
+    assert "ADD COLUMN IF NOT EXISTS is_active" in source
+    assert "ADD COLUMN IF NOT EXISTS triggered_value" in source
