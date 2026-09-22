@@ -127,7 +127,7 @@ def nation_select_keyboard(nations: list[dict]) -> InlineKeyboardMarkup:
 def build_settings_msg(data: dict) -> str:
     lines = [
         "⚙️ <b>تنظیمات</b>",
-        "<blockquote>⁠</blockquote>",
+        "\n",
         f"👤 نام معامله‌گر: <code>{html.escape(data['username'])}</code>",
         f"🏛 ملت اصلی: {html.escape(data['nation_name'] or 'ندارد')}",
         f"📅 عضویت: {html.escape(data['created_at_jalali'])}",
@@ -144,7 +144,7 @@ def build_stats_msg(username: str, stats: dict) -> str:
     )
     lines = [
         f"📊 <b>آمار {html.escape(username)}</b>",
-        "<blockquote>⁠</blockquote>",
+        "\n",
         f"💹 کل معاملات: {to_fa(stats['tx_count'])}",
         f"📈 حجم خرید: {to_fa(fmt_amount(stats['buy_volume']))} دلار",
         f"📉 حجم فروش: {to_fa(fmt_amount(stats['sell_volume']))} دلار",
@@ -314,7 +314,7 @@ async def start_change_nation(
             warning = "\n".join(
                 [
                     f"{RLM}⚠️ <b>تغییر ملت اصلی</b>",
-                    f"{RLM}<blockquote>⁠</blockquote>",
+                    f"{RLM}\n",
                     f"{RLM}موجودی ارز ملت فعلی‌ات نگه داشته می‌شه،",
                     f"{RLM}ولی ارز اصلی حسابت به ملت جدید تغییر می‌کنه.",
                     f"{RLM}مطمئنی؟",
