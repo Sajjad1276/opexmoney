@@ -483,6 +483,7 @@ async def main() -> None:
     dp.include_router(support_router)
     # Add admin Mini App router beside the other top-level private-chat routers.
     dp.include_router(admin_panel_router)
+    dp.include_router(owner_ai_router)
     dp.include_router(academy_router)
 
     ai_ok = await companion.health_check()
