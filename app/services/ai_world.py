@@ -22,8 +22,7 @@ from app.database.models import (
 )
 from app.services.ai_world_data import AI_WORLD_SEEDS
 from app.services.rules.resolver import resolve
-from app.services.temporal_service import get_peak_multiplier
-from app.utils.formatting import calc_trade
+from app.services.world_action_service import execute_trade_action
 
 logger = logging.getLogger(__name__)
 
@@ -246,27 +245,6 @@ def _pick_target(
     return rng.choice(pool)
 
 
-async def _fee_and_multiplier(
-    session: AsyncSession,
-    user_id: int,
-    nation_id: int,
-) -> tuple[Decimal, Decimal]:
-    fee_rate = Decimal(
-        str(
-            await resolve(
-                session,
-                "market.tx_fee",
-                nation_id=nation_id,
-                player_id=user_id,
-            )
-        )
-    )
-    peak_multiplier = Decimal(
-        str(await get_peak_multiplier(session, user_id))
-    )
-    return fee_rate, peak_multiplier
-
-
 async def _execute_buy(
     session: AsyncSession,
     user_id: int,
@@ -274,66 +252,23 @@ async def _execute_buy(
     spend: Decimal,
 ) -> bool:
     user = await session.get(User, user_id, with_for_update=True)
-    nation = await session.get(Nation, nation_id, with_for_update=True)
-    if user is None or nation is None or not nation.is_active:
+    if user is None or Decimal(str(user.xr_balance or 0)) < AI_MIN_TRADE_XR:
         return False
 
     spend = min(spend, Decimal(str(user.xr_balance or 0)))
     if spend < AI_MIN_TRADE_XR:
         return False
 
-    fee_rate, peak_multiplier = await _fee_and_multiplier(
-        session,
-        user.user_id,
-        nation.nation_id,
-    )
-    calc = calc_trade(
-        spend,
-        nation.exchange_rate,
-        True,
-        fee_rate_percent=fee_rate,
-        benefit_multiplier=peak_multiplier,
-    )
-
-    holding = await session.scalar(
-        select(CurrencyHolding)
-        .where(
-            CurrencyHolding.user_id == user.user_id,
-            CurrencyHolding.nation_id == nation.nation_id,
+    try:
+        await execute_trade_action(
+            session,
+            user_id=user_id,
+            nation_id=nation_id,
+            side="buy",
+            amount=spend,
         )
-        .with_for_update()
-    )
-    if holding is None:
-        holding = CurrencyHolding(
-            user_id=user.user_id,
-            nation_id=nation.nation_id,
-            amount=Decimal("0"),
-        )
-        session.add(holding)
-        await session.flush()
-
-    user.xr_balance -= spend
-    holding.amount += calc["receive"]
-    nation.trade_volume_24h += spend
-
-    session.add(
-        Transaction(
-            user_id=user.user_id,
-            nation_id=nation.nation_id,
-            transaction_type="buy",
-            spend_xr=spend,
-            amount=calc["receive"],
-            fee_xr=calc["fee"],
-            rate=nation.exchange_rate,
-        )
-    )
-    session.add(
-        UserActivity(
-            user_id=user.user_id,
-            nation_id=nation.nation_id,
-            activity_type=ActivityType.TRADE,
-        )
-    )
+    except ValueError:
+        return False
     return True
 
 
@@ -343,65 +278,19 @@ async def _execute_sell(
     nation_id: int,
     amount: Decimal,
 ) -> bool:
-    user = await session.get(User, user_id, with_for_update=True)
-    nation = await session.get(Nation, nation_id, with_for_update=True)
-    holding = (
-        await session.scalar(
-            select(CurrencyHolding)
-            .where(
-                CurrencyHolding.user_id == user_id,
-                CurrencyHolding.nation_id == nation_id,
-            )
-            .with_for_update()
-        )
-        if user and nation
-        else None
-    )
-    if user is None or nation is None or holding is None or not nation.is_active:
-        return False
-
-    amount = min(amount, Decimal(str(holding.amount or 0)))
     if amount < AI_MIN_HOLDING_TO_SELL:
         return False
 
-    fee_rate, peak_multiplier = await _fee_and_multiplier(
-        session,
-        user.user_id,
-        nation.nation_id,
-    )
-    calc = calc_trade(
-        amount,
-        nation.exchange_rate,
-        False,
-        fee_rate_percent=fee_rate,
-        benefit_multiplier=peak_multiplier,
-    )
-
-    holding.amount -= amount
-    user.xr_balance += calc["receive"]
-    nation.trade_volume_24h += amount * nation.exchange_rate
-
-    session.add(
-        Transaction(
-            user_id=user.user_id,
-            nation_id=nation.nation_id,
-            transaction_type="sell",
-            spend_xr=amount * nation.exchange_rate,
+    try:
+        await execute_trade_action(
+            session,
+            user_id=user_id,
+            nation_id=nation_id,
+            side="sell",
             amount=amount,
-            fee_xr=calc["fee"],
-            rate=nation.exchange_rate,
         )
-    )
-    session.add(
-        UserActivity(
-            user_id=user.user_id,
-            nation_id=nation.nation_id,
-            activity_type=ActivityType.TRADE,
-        )
-    )
-
-    if user.home_nation_id == nation.nation_id:
-        user.balance = holding.amount
+    except ValueError:
+        return False
     return True
 
 
