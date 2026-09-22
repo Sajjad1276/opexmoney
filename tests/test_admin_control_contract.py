@@ -79,6 +79,7 @@ def test_admin_control_endpoints_cover_missing_systems() -> None:
         '@router.get("/support/overview")',
         '@router.get("/support/users/{user_id}")',
         '@router.get("/treasury")',
+        '@router.get("/treasury/{nation_id}/logs")',
         '@router.post("/treasury/{nation_id}/adjust")',
     ]
     for endpoint in required:
@@ -203,3 +204,15 @@ def test_admin_control_and_scheduler_sources_parse_and_import_paths() -> None:
     assert "from app.ai import companion" not in control
     ast.parse(control)
     ast.parse(scheduler)
+
+
+def test_sensitive_control_calls_require_explicit_confirmation() -> None:
+    control = _read(CONTROL)
+    html = _read(STATIC)
+
+    founder = control[control.index('@router.post("/founder/drafts/{draft_id}/finalize")'):]
+    treasury = control[control.index('@router.post("/treasury/{nation_id}/adjust")'):]
+    assert "confirm: bool = Query(default=False)" in founder
+    assert "confirm: bool = Query(default=False)" in treasury
+    assert "/api/control/founder/drafts/'+b.dataset.founderFinalize+'/finalize?confirm=true" in html
+    assert "/api/control/treasury/'+row.nation_id+'/adjust?confirm=true" in html
