@@ -117,6 +117,10 @@ def build_bot_commands() -> list[BotCommand]:
         BotCommand(
             command="start",
             description="بازگشت به منوی اصلی",
+        ),
+        BotCommand(
+            command="ai",
+            description="دستیار مالک پروژه",
         )
     ]
 
