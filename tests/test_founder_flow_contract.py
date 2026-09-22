@@ -1,3 +1,6 @@
+from types import SimpleNamespace
+import pytest
+
 from pathlib import Path
 import re
 
@@ -50,3 +53,56 @@ def test_founder_button_callbacks_have_handlers():
         assert f"async def {handler}(" in source
     assert 'F.data.startswith("founder_flag:")' in source
     assert "async def select_founder_flag(" in source
+
+
+
+class _FounderState:
+    def __init__(self):
+        self.cleared = False
+
+    async def clear(self):
+        self.cleared = True
+
+
+class _FounderMessage:
+    def __init__(self):
+        self.edits = []
+
+    async def edit_text(self, text, **kwargs):
+        self.edits.append((text, kwargs))
+
+
+class _FounderCall:
+    def __init__(self):
+        self.from_user = SimpleNamespace(id=991001, first_name="Founder")
+        self.message = _FounderMessage()
+        self.answers = []
+
+    async def answer(self, text=None, **kwargs):
+        self.answers.append((text, kwargs))
+
+
+@pytest.mark.asyncio
+async def test_founder_entry_callback_executes():
+    from app.handlers.founder_flow import start_founder
+
+    call = _FounderCall()
+    state = _FounderState()
+
+    await start_founder(call, state, bot=SimpleNamespace())
+
+    assert state.cleared is True
+    assert call.answers
+    assert len(call.message.edits) == 1
+
+    text, kwargs = call.message.edits[0]
+    assert "ساخت ملت جدید" in text
+    markup = kwargs["reply_markup"]
+    callbacks = [
+        button.callback_data
+        for row in markup.inline_keyboard
+        for button in row
+        if button.callback_data
+    ]
+    assert "founder_has_group" in callbacks
+    assert "founder_no_group" in callbacks
