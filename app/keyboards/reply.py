@@ -30,6 +30,7 @@ def main_menu_keyboard() -> ReplyKeyboardMarkup:
             ],
             [
                 KeyboardButton(text="🏆 رتبه‌بندی"),
+                KeyboardButton(text="👤 پروفایل"),
                 KeyboardButton(text="🎓 آکادمی"),
             ],
             [
