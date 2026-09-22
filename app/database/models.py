@@ -517,6 +517,8 @@ class PriceAlert(Base):
     )
     triggered_at: Mapped[datetime | None] = mapped_column(
         UTCDateTime(), nullable=True
+    )    triggered_value: Mapped[Decimal | None] = mapped_column(
+        Numeric(18, 4), nullable=True
     )
 
     user: Mapped["User"] = relationship("User", lazy="selectin")
