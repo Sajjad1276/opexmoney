@@ -98,11 +98,15 @@ async def open_support(message: Message, state: FSMContext) -> None:
         )
 
 
-@router.callback_query(F.data == "support_check_recent", StateFilter(SupportStates.WAITING_REPORT))
+@router.callback_query(F.data == "support_check_recent")
 async def support_check_recent(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.answer("در حال بررسی آخرین وضعیت…")
     if callback.message is None:
         return
+
+    current_state = await state.get_state()
+    if current_state != SupportStates.WAITING_REPORT.state:
+        await support_service.begin(state)
 
     try:
         result = await _run_support_check(
