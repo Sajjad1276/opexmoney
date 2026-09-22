@@ -21,6 +21,7 @@ from app.database.session import async_session
 from app.services.market.market_service import get_market_page_data
 from app.handlers.market import (
     buy_currency,
+    market_button,
     buy_amount_message,
     confirm_buy,
     market_sell,
