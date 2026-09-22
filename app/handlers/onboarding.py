@@ -17,6 +17,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.database.models import CurrencyHolding, Nation, Transaction, User
 from app.database.session import async_session
+from app.filters.profanity import profanity_filter
 from app.utils.ui import (
     close_inline_panel,
     remember_inline_panel,
@@ -24,7 +25,7 @@ from app.utils.ui import (
     safe_edit_text as _safe_edit_text,
     user_mention,
 )
-from app.keyboards.inline import cancel_keyboard, first_trade_keyboard, nation_selection_keyboard, welcome_keyboard
+from app.keyboards.inline import cancel_keyboard, first_trade_keyboard, nation_selection_keyboard, suggested_name_keyboard, welcome_keyboard
 from app.services.membership_service import sync_registered_user_memberships
 from app.handlers.start import cmd_start as restart_flow
 from app.handlers.nation_management import _join_user
