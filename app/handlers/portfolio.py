@@ -97,12 +97,12 @@ def _format_rate_change(value) -> str:
 def build_portfolio_text(data: dict) -> str:
     """Keep the message body minimal; live metrics belong to information cards."""
     lines = [
-        f"💼 <b>داشبورد دارایی {html.escape(data['username'])}</b>",
+        f"💼 <b>تصویر مالی {html.escape(data['username'])}</b>",
         "",
-        "📡 <b>ثروتت ثابت نیست؛ بازار هر لحظه ارزشش را دوباره محاسبه می‌کند.</b>",
+        "ارزش دارایی تو ایستا نیست؛ بازار با هر حرکت دوباره آن را قیمت‌گذاری می‌کند.",
         "",
-        f"⚡ <b>بازار زنده</b> · بروزرسانی خودکار هر {data['live_update_seconds']} ثانیه",
-        f"🕐 آخرین محاسبه <code>{data['current_time']}</code>",
+        f"📡 <b>رصد زنده بازار</b> · بروزرسانی هر {data['live_update_seconds']} ثانیه",
+        f"🕐 آخرین محاسبه: <code>{data['current_time']}</code>",
         f"📅 {data['today_imperial']}",
     ]
     return "\n".join(f"{RLM}{line}" for line in lines)
