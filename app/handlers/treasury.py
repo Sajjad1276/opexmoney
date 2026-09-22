@@ -17,7 +17,7 @@ from aiogram.types import (
     Message,
 )
 
-from app.database.models import NationMember, NationMemberRole, User
+from app.database.models import Nation, NationMember, NationMemberRole, User
 from app.database.session import async_session
 from app.services.nation_service import get_user_active_nation_context
 from app.handlers.nation_management import nation_admin_panel
@@ -904,7 +904,7 @@ async def treasury_back(
                             session,
                             callback.from_user.id,
                             repair=True,
-                    lock=True,
+                            lock=True,
                         )
                         active_nation = context[0] if context is not None else None
                         active_role = context[1] if context is not None else None
