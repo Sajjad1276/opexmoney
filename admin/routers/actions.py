@@ -79,8 +79,12 @@ class BonusBody(_StrictBody):
     def validate_user_ids(cls, value: list[int] | Literal["all"]) -> list[int] | Literal["all"]:
         if value == "all":
             return value
+        if len(value) == 0:
+            raise ValueError("user_ids cannot be empty")
         if len(value) > 500:
             raise ValueError("user_ids cannot contain more than 500 items")
+        if len(set(value)) != len(value):
+            raise ValueError("user_ids must be unique")
         for user_id in value:
             if user_id <= 0:
                 raise ValueError("user_ids must contain only positive integers")
@@ -155,6 +159,10 @@ class MissionRewardBody(_StrictBody):
     @field_validator("user_ids")
     @classmethod
     def validate_user_ids(cls, value: list[int]) -> list[int]:
+        if len(value) == 0:
+            raise ValueError("user_ids cannot be empty")
+        if len(set(value)) != len(value):
+            raise ValueError("user_ids must be unique")
         for user_id in value:
             if user_id <= 0:
                 raise ValueError("user_ids must contain only positive integers")
