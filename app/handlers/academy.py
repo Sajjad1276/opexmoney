@@ -70,11 +70,11 @@ def build_academy_main_msg(user_xp) -> str:
     lines = [
         "🎓 <b>OPEX Academy</b>",
         "\n",
-        f"⭐ سطح تو: {LEVEL_EMOJI[level]} {html.escape(level)}",
-        f"🏆 XP: {to_fa(user_xp.total_xp)} امتیاز",
+        f"⭐ سطح: {LEVEL_EMOJI[level]} {html.escape(level)}",
+        f"🏆 XP: {to_fa(user_xp.total_xp)}",
         "\n",
-        "📚 <b>ماژول‌های آموزشی:</b>",
-        "از دکمه‌های زیر یک مسیر آموزشی را باز کن.",
+        "📚 <b>مسیر رشد تو</b>",
+        "هر درس یک ابزار تازه برای فهم بازار و بازی در اختیارت می‌گذارد.",
     ]
     return "\n".join(f"{RLM}{line}" for line in lines)
 
@@ -110,7 +110,7 @@ def build_module_msg(module_id: int, lessons: list[dict]) -> str:
         "\n",
     ]
     if not lessons:
-        lines.append("هنوز در این ماژول درسی ثبت نشده است.")
+        lines.append("این ماژول هنوز محتوایی ندارد. مسیرهای بعدی به‌زودی این‌جا باز می‌شوند.")
     else:
         for lesson in lessons:
             icon = {
@@ -156,7 +156,7 @@ def build_lesson_msg(lesson) -> str:
         "\n",
         lesson.content_fa,
         "\n",
-        f"⭐ جایزه: +{to_fa(lesson.xp_reward)} XP "
+        "🎁 <b>پاداش درس:</b> " + f"+{to_fa(lesson.xp_reward)} XP "
         f"💰 +{to_fa(fmt_amount(lesson.xr_reward))} دلار",
     ]
     return "\n".join(f"{RLM}{line}" for line in lines)
