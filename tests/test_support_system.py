@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import pytest
 
+from app.handlers import support as support_handler
+
 from app.keyboards.inline import support_panel_keyboard, support_result_keyboard
 from app.services.support.code_repair import (
     _policy_ok,
@@ -107,6 +109,21 @@ def test_support_keyboard_contract() -> None:
         "back_to_dashboard",
     } <= result_callbacks
 
+
+
+def test_support_handler_contract_covers_all_panel_callbacks() -> None:
+    source = support_handler.__file__
+    text = open(source, encoding="utf-8").read()
+
+    for callback in (
+        'F.data == "support_check_recent"',
+        'F.data == "support_new_report"',
+        'F.data == "support_back"',
+    ):
+        assert callback in text
+
+    assert '@router.message(F.text == "🛟 پشتیبانی هوشمند")' in text
+    assert "SupportStates.WAITING_REPORT" in text
 
 def test_repair_policy_has_no_economy_mutation_action() -> None:
     assert set(RepairAction) == {
