@@ -19,7 +19,7 @@ def test_economy_behavior_snapshot_contract():
         "برابری خوب",
         "نابرابری بالا",
         "آخرین بروزرسانی:",
-        "اقتصاد-behavior-refresh",
+        "economy-behavior-refresh",
     ]
     for token in required:
         assert token in INDEX
