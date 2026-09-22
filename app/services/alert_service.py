@@ -70,6 +70,7 @@ async def create_price_alert(
         target_price=target_price,
         direction=normalized_direction,
         triggered=False,
+        is_active=True,
     )
     session.add(alert)
     await session.flush()
@@ -127,6 +128,7 @@ async def check_price_alerts(
             )
             .where(
                 PriceAlert.triggered.is_(False),
+                PriceAlert.is_active.is_(True),
                 Nation.is_active.is_(True),
             )
             .order_by(PriceAlert.id.asc())
