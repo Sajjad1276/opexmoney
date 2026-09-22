@@ -34,6 +34,15 @@ def upgrade() -> None:
         ),
     )
     op.add_column(
+        "missions",
+        sa.Column(
+            "reward_xp",
+            sa.Integer(),
+            nullable=False,
+            server_default="0",
+        ),
+    )
+    op.add_column(
         "users",
         sa.Column(
             "ban_reason",
@@ -45,5 +54,6 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_column("users", "ban_reason")
+    op.drop_column("missions", "reward_xp")
     op.drop_column("missions", "duration_days")
     op.drop_column("missions", "target_type")
