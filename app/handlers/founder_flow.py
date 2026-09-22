@@ -845,6 +845,7 @@ async def founder_start_command(
 
 @founder_router.message(
     FounderStates.SET_USERNAME_FOUNDER,
+    F.chat.type == "private",
     F.text,
 )
 async def receive_founder_username(
@@ -910,6 +911,7 @@ async def receive_founder_username(
 
 @founder_router.message(
     FounderStates.SET_CURRENCY_CODE,
+    F.chat.type == "private",
     F.text,
 )
 async def receive_currency_code(
@@ -945,6 +947,7 @@ async def receive_currency_code(
 
 @founder_router.message(
     FounderStates.SET_NATION_NAME,
+    F.chat.type == "private",
     F.text,
 )
 async def receive_nation_name(
@@ -1300,6 +1303,7 @@ async def cancel_founder(
 
 @founder_router.message(
     FounderStates.WAITING_GROUP_ADMIN,
+    F.chat.type == "private",
     F.text,
 )
 async def founder_waiting_group_fallback(
@@ -1312,6 +1316,7 @@ async def founder_waiting_group_fallback(
 
 @founder_router.message(
     FounderStates.SELECT_FLAG,
+    F.chat.type == "private",
     F.text,
 )
 async def founder_flag_fallback(
@@ -1324,6 +1329,7 @@ async def founder_flag_fallback(
 
 @founder_router.message(
     FounderStates.CONFIRM,
+    F.chat.type == "private",
     F.text,
 )
 async def founder_review_fallback(
