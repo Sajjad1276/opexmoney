@@ -811,6 +811,7 @@ async def run_owner_ai(
 
     started = time.monotonic()
     history = history or []
+    stage = "initializing"
     run_key = f"{owner_id}-{uuid.uuid4().hex[:12]}"
     await _audit(
         owner_id,
@@ -831,6 +832,7 @@ async def run_owner_ai(
                 "SUPPORT_GITHUB_TOKEN یا GITHUB_TOKEN برای دسترسی پروژه تنظیم نشده است.",
             )
 
+        stage = "repository_index"
         await say("در حال خواندن فهرست کامل repository و فایل‌های مرتبط...")
         tree = await _repo_tree("main")
         inspected: dict[str, str] = {}
@@ -856,6 +858,7 @@ async def run_owner_ai(
                 )
 
             try:
+                stage = f"planning_round_{round_no}"
                 plan = await _planner(
                     request=request,
                     history=history,
@@ -911,6 +914,7 @@ async def run_owner_ai(
                 if not query:
                     tool_result = "search بدون query."
                     continue
+                stage = "repository_search"
                 paths = await _search_code(query, branch or "main")
                 tool_result = "نتایج جستجو:\n" + "\n".join(paths)
                 history.append({"role": "tool", "content": tool_result})
@@ -921,6 +925,7 @@ async def run_owner_ai(
                 if not isinstance(paths, list):
                     tool_result = "paths باید list باشد."
                     continue
+                stage = "repository_inspect"
                 read_now: list[str] = []
                 for raw_path in paths[:8]:
                     try:
@@ -953,6 +958,7 @@ async def run_owner_ai(
                             raise ValueError(f"محتوای {path} معتبر نیست.")
                         _validate_generated_file(path, content)
 
+                stage = "repository_modify"
                 if branch is None:
                     base = await _github(f"/repos/{_repo()}/git/ref/heads/main")
                     base_sha = str(base["object"]["sha"])
@@ -966,6 +972,7 @@ async def run_owner_ai(
                     pr_number = await _create_pr(branch, str(plan.get("summary") or request))
 
                 await say("تغییر اعمال شد. منتظر CI می‌مانم و فقط در صورت سبز شدن merge می‌کنم.")
+                stage = "ci_verification"
                 ci_status, ci_evidence = await _wait_for_ci(
                     branch=branch,
                     head_sha=head_sha,
@@ -1037,7 +1044,11 @@ async def run_owner_ai(
         )
         return OwnerAIResult(
             "error",
-            f"Owner AI با خطای داخلی متوقف شد: {type(exc).__name__}.",
+            (
+                f"Owner AI در مرحله «{stage}» خطا داد: "
+                f"{type(exc).__name__}: {str(exc)[:700]}\n\n"
+                "main بدون تغییر باقی ماند."
+            ),
             branch=branch,
             pull_request=pr_number,
             changed_files=tuple(sorted(changed)),
