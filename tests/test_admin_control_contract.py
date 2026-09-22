@@ -59,7 +59,7 @@ def test_admin_control_endpoints_cover_missing_systems() -> None:
         '@router.patch("/academy/lessons/{lesson_id}"',
         '@router.get("/academy/progress")',
         '@router.get("/missions")',
-        '@router.post("/missions")',
+        '@router.post("/missions"',
         '@router.patch("/missions/{mission_id}")',
         '@router.get("/founder/summary")',
         '@router.get("/founder/drafts")',
