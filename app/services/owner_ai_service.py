@@ -68,6 +68,8 @@ def owner_ids() -> set[int]:
 
 
 def is_owner(user_id: int) -> bool:
+    if not settings.owner_ai_enabled:
+        return False
     return int(user_id) in owner_ids()
 
 
