@@ -172,6 +172,52 @@ async def test_founder_constraints_reject_duplicate_group_and_currency():
 
 
 @pytest.mark.asyncio
+async def test_founder_backend_can_finalize_new_founder_without_player_balance_gate():
+    founder_id = 910008
+    group_id = -100910012
+
+    async with async_session() as session:
+        async with session.begin():
+            session.add(
+                User(
+                    user_id=founder_id,
+                    username="testfounder8",
+                    balance=Decimal("0.00"),
+                    xr_balance=Decimal("0.00"),
+                    home_nation_id=None,
+                    role="player",
+                )
+            )
+
+    async with async_session() as session:
+        async with session.begin():
+            nation = await create_nation_backend(
+                session=session,
+                founder_id=founder_id,
+                name="Fresh Founder Nation",
+                currency_code="FFN",
+                is_private=False,
+                group_chat_id=group_id,
+                flag_emoji="🏴",
+                enforce_eligibility=False,
+            )
+
+    async with async_session() as session:
+        user = await session.get(User, founder_id)
+        holding = await session.scalar(
+            select(CurrencyHolding).where(
+                CurrencyHolding.user_id == founder_id,
+                CurrencyHolding.nation_id == nation.nation_id,
+            )
+        )
+        assert user is not None
+        assert user.role == "founder"
+        assert user.home_nation_id == nation.nation_id
+        assert holding is not None
+        assert holding.amount == Decimal("1000.0000")
+
+
+@pytest.mark.asyncio
 async def test_founder_backend_starts_draft_and_persists_selected_flag():
     founder_id = 910007
     group_id = -100910011
