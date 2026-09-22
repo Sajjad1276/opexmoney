@@ -246,7 +246,7 @@ function actionForm(id){
  const nationOptions=(S.txNationOptions||S.data.nations?.items||[]).map(n=>'<option value="'+n.nation_id+'">'+esc(n.name)+'</option>').join('');
  if(!S.txNationOptions){api.get('/api/nations?page=1&limit=100&sort=member_count&order=desc&filter=all').then(r=>{S.txNationOptions=r.items||[];});}
  if(id==='broadcast')return '<div class="field"><label>پیام</label><textarea id="af-message" maxlength="4096" placeholder="پیام مدیر..."></textarea></div><div class="field"><label>مخاطب</label><select id="af-target"><option value="active_only">بازیکنان فعال</option><option value="all">همه بازیکنان ثبت‌شده</option></select></div><div class="control-note">کاربرانی که ربات را بلاک کرده یا چت خصوصی فعال ندارند ممکن است در گزارش «ناموفق» ثبت شوند.</div>';
- if(id==='give-bonus')return '<div class="field"><label>شناسه بازیکن</label><input id="af-user" type="number" min="1" placeholder="123456789"></div><div class="field"><label>مقدار دلار</label><input id="af-amount" type="number" min="0.01" step="0.01"></div><div class="field"><label>دلیل</label><input id="af-note" maxlength="255"></div>';
+ if(id==='give-bonus')return '<div class="field"><label>بازیکنان</label><textarea id="af-user" placeholder="123,456 یا all"></textarea></div><div class="field"><label>مقدار دلار</label><input id="af-amount" type="number" min="0.01" step="0.01"></div><div class="field"><label>دلیل</label><input id="af-note" maxlength="255"></div><div class="control-note">برای همه بازیکنان واقعی مقدار <code>all</code> را وارد کن.</div>';
  if(id==='ban-player')return '<div class="field"><label>شناسه بازیکن</label><input id="af-user" type="number" min="1"></div><div class="field"><label>دلیل</label><input id="af-note" maxlength="255"></div>';
  if(id==='unban-player')return '<div class="field"><label>شناسه بازیکن</label><input id="af-user" type="number" min="1"></div>';
  if(id==='reset-rates')return '<div class="field"><label>ملت</label><select id="af-nation"><option value="all">همه ملت‌های واقعی</option>'+nationOptions+'</select></div><div class="field"><label>نرخ جدید</label><input id="af-rate" type="number" min="0.0001" max="1000" step="0.0001"></div><div class="field"><label>دلیل</label><input id="af-note" maxlength="255"></div><div class="field"><label>تأیید متنی</label><input id="af-reset" placeholder="ریست" autocomplete="off"></div>';
@@ -284,7 +284,7 @@ async function openAdminAction(id){
 function actionPayload(id){
  const nums=s=>String(s||'').split(',').map(x=>Number(x.trim())).filter(Number.isFinite);
  if(id==='broadcast')return{message:$('af-message').value.trim(),parse_mode:'HTML',target:$('af-target').value};
- if(id==='give-bonus'){const uid=$('af-user').value.trim();return{user_ids:uid?nums(uid):[],amount_xr:Number($('af-amount').value),note:$('af-note').value.trim()};}
+ if(id==='give-bonus'){const uid=$('af-user').value.trim();return{user_ids:uid==='all'?'all':nums(uid),amount_xr:Number($('af-amount').value),note:$('af-note').value.trim()};}
  if(id==='ban-player')return{user_id:Number($('af-user').value),reason:$('af-note').value.trim()};
  if(id==='unban-player')return{user_id:Number($('af-user').value)};
  if(id==='reset-rates'){const n=$('af-nation').value.trim();if($('af-reset').value.trim()!=='ریست')throw new Error('برای ریست نرخ عبارت «ریست» را وارد کن');return{nation_id:n==='all'?'all':Number(n),new_rate:Number($('af-rate').value),reason:$('af-note').value.trim()};}
