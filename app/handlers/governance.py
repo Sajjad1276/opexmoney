@@ -126,9 +126,9 @@ async def governance_active(call: CallbackQuery):
             overrides = await get_active_overrides(session)
             user = await session.get(User, call.from_user.id)
 
-    lines = ["📜 <b>قوانین فعال</b>", "\n"]
+    lines = ["📜 <b>قانون اساسی ملت</b>", "\n"]
     if not overrides:
-        lines.append("فعلاً قانون ویژه‌ای فعال نیست.\nمقدار پایه رجیستری اجرا میشه.")
+        lines.append("فعلاً قانون ویژه‌ای روی مقررات پایه سوار نیست؛ اقتصاد با قواعد اصلی ادامه می‌دهد.")
     for override in overrides[:12]:
         rule = get_rule(override.rule_key)
         scope_text = {
@@ -169,10 +169,10 @@ async def governance_new(call: CallbackQuery, state: FSMContext):
 
     await state.clear()
     await call.message.edit_text(
-        "📝 <b>ثبت طرح جدید</b>\n"
+        "📝 <b>پیشنهاد قانون تازه</b>\n"
         "\n"
-        "یک قانون از فهرست مجاز انتخاب کن.\n"
-        "هیچ قانون خارج از این فهرست قابل ثبت نیست.",
+        "یک مورد را انتخاب کن و پارامتر پیشنهادی‌ات را ثبت کن.\n"
+        "هر تغییر پس از رأی‌گیری روی اقتصاد ملت اثر می‌گذارد.",
         reply_markup=governance_rule_keyboard(
             [(key, definition.title_fa) for key, definition in RULE_REGISTRY.items()]
         ),
@@ -343,13 +343,13 @@ async def governance_voting(call: CallbackQuery):
             ).scalars().all()
 
     if not proposals:
-        text = "🗳 <b>رأی‌گیری‌های جاری</b>\n\nفعلاً رأی‌گیری بازی در جریانی نیست."
+        text = "🗳 <b>اتاق رأی‌گیری</b>\n\nفعلاً طرحی در صف رأی‌گیری نیست. وقتی طرح بعدی برسد، همین‌جا نمایش داده می‌شود."
         markup = governance_main_keyboard(False)
     else:
         text = (
-            "🗳 <b>رأی‌گیری‌های جاری</b>\n"
+            "🗳 <b>اتاق رأی‌گیری</b>\n"
             "\n"
-            "روی هر طرح بزن تا جزئیات و دکمه‌های رأی رو ببینی."
+            "طرح‌ها را باز کن، اثر پیشنهادی را ببین و موضع خودت را ثبت کن."
         )
         markup = governance_proposal_list_keyboard(proposals)
 
@@ -432,9 +432,9 @@ async def governance_history(call: CallbackQuery):
         async with session.begin():
             rows = await get_governance_history(session, offset=offset, limit=9)
 
-    lines = ["📚 <b>تاریخ قوانین</b>", "\n"]
+    lines = ["📚 <b>تاریخ قانون‌گذاری</b>", "\n"]
     if not rows:
-        lines.append("هنوز سابقه‌ای ثبت نشده.")
+        lines.append("هنوز رویدادی در دفتر قانون‌گذاری ثبت نشده است.")
     action_labels = {
         "activate": "فعال‌سازی",
         "replace": "جایگزینی",
