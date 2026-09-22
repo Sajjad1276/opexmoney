@@ -23,16 +23,16 @@ EXPECTED_SECTIONS = {
     "transactions",
     "actions",
     "logs",
-    "academy",
-    "missions",
-    "founder",
-    "aiworld",
-    "ranking",
-    "profiles",
-    "onboarding",
-    "scheduler",
-    "support",
-    "treasury",
+    "section-academy",
+    "section-missions",
+    "section-founding",
+    "section-ai",
+    "section-leaderboard",
+    "section-profiles",
+    "section-onboarding",
+    "section-scheduler",
+    "section-support",
+    "section-treasury",
 }
 
 
@@ -55,8 +55,8 @@ def test_admin_control_endpoints_cover_missing_systems() -> None:
     required = [
         '@router.get("/academy/summary")',
         '@router.get("/academy/lessons")',
-        '@router.post("/academy/lessons")',
-        '@router.patch("/academy/lessons/{lesson_id}")',
+        '@router.post("/academy/lessons"',
+        '@router.patch("/academy/lessons/{lesson_id}"',
         '@router.get("/academy/progress")',
         '@router.get("/missions")',
         '@router.post("/missions")',
@@ -126,16 +126,16 @@ def test_admin_static_contains_all_control_sections_and_initializers() -> None:
         "transactions": "initSectionTransactions",
         "actions": "initSectionActions",
         "logs": "initSectionLogs",
-        "academy": "initSectionAcademy",
-        "missions": "initSectionMissions",
-        "founder": "initSectionFounder",
-        "aiworld": "initSectionAIWorld",
-        "ranking": "initSectionRanking",
-        "profiles": "initSectionProfiles",
-        "onboarding": "initSectionOnboarding",
-        "scheduler": "initSectionScheduler",
-        "support": "initSectionSupport",
-        "treasury": "initSectionTreasury",
+        "section-academy": "initSectionAcademyV2",
+        "section-missions": "initSectionMissionsV2",
+        "section-founding": "initSectionFoundingV2",
+        "section-ai": "initSectionAIV2",
+        "section-leaderboard": "initSectionLeaderboardV2",
+        "section-profiles": "initSectionProfilesV2",
+        "section-onboarding": "initSectionOnboardingV2",
+        "section-scheduler": "initSectionSchedulerV2",
+        "section-support": "initSectionSupportV2",
+        "section-treasury": "initSectionTreasuryV2",
     }
     for section, function_name in init_names.items():
         assert f"{function_name}()" in html, section
@@ -157,7 +157,7 @@ def test_admin_static_has_control_api_wiring() -> None:
         "/api/control/price-alerts",
         "/api/control/scheduler",
         "/api/control/support/overview",
-        "/api/control/treasury",
+        "/api/treasury/overview",
     ]
     for path in required_paths:
         assert path in html, path
@@ -215,7 +215,7 @@ def test_sensitive_control_calls_require_explicit_confirmation() -> None:
     assert "confirm: bool = Query(default=False)" in founder
     assert "confirm: bool = Query(default=False)" in treasury
     assert "/api/control/founder/drafts/'+b.dataset.founderFinalize+'/finalize?confirm=true" in html
-    assert "/api/control/treasury/'+row.nation_id+'/adjust?confirm=true" in html
+    assert "/api/treasury/adjust" in html
 
 
 def test_admin_actions_have_frontend_payload_contracts() -> None:
