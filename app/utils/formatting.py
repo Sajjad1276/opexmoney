@@ -189,10 +189,10 @@ def format_market_page(user, overview: dict, active: int, trade_count: int) -> s
 
     if trade_count < 2:
         lines = [
-            "💹 <b>بازار OPEX</b>",
+            "💹 <b>بازار زنده OPEX</b>",
             "\n",
-            "اینجا با <b>دلار</b> ارز ملت‌ها رو می‌خری و می‌فروشی.",
-            "🧠 قانون ساده: وقتی قیمت یک ارز بالا بره، ارزش دارایی‌ات بیشتر می‌شه؛ اگر پایین بیاد، کمتر می‌شه.",
+            "اینجا قیمت‌ها فقط نمایش داده نمی‌شوند؛ حرکت می‌کنند.",
+            "🧠 <b>نبض بازار:</b> قیمت بالا و پایین می‌شود و دارایی تو هم با آن حرکت می‌کند.",
             "",
             f"💎 دلار تو: <b>{fmt_amount(user.xr_balance)}</b>",
             "",
@@ -216,12 +216,12 @@ def format_market_page(user, overview: dict, active: int, trade_count: int) -> s
                 )
         lines.extend([
             "",
-            "🎯 <b>حرکت پیشنهادی:</b> یک ارز رو انتخاب کن و خرید اولت رو امتحان کن.",
+            "🎯 <b>حرکت بعدی:</b> یک ارز را انتخاب کن، دلیل حرکتش را بخوان و بعد معامله کن.",
         ])
         return "\n".join(lines)
 
     lines = [
-        "💹 <b>بازار OPEX</b>",
+        "💹 <b>بازار زنده OPEX</b>",
         "\n",
         f"💰 دلار: <b>{fmt_amount(user.xr_balance)}</b> · "
         f"{html.escape(user.home_nation_id and currencies[0]['nation'].currency_code or '—')}",
@@ -307,11 +307,11 @@ def format_listed_currencies(page) -> str:
 
 
 def format_alert_currency_prompt() -> str:
-    return "🔔 <b>ثبت هشدار قیمت</b>\n\nکد ارز را بنوی.\nمثال: <code>OPX</code>"
+    return "🔔 <b>ردیاب قیمت</b>\n\nکد ارز را وارد کن.\nمثال: <code>OPX</code>"
 
 
 def format_chart_currency_prompt() -> str:
-    return "📊 <b>نمودار ارز</b>\n\nکد ارز را بنوی.\nمثال: <code>OPX</code>"
+    return "📊 <b>نقشه حرکت قیمت</b>\n\nکد ارز را وارد کن.\nمثال: <code>OPX</code>"
 
 
 def format_alert_target_prompt(code: str, current_rate: Decimal | None = None) -> str:
@@ -337,7 +337,7 @@ def format_alert_created(alert, *, command: bool = False) -> str:
 
 
 def format_alert_list(alerts) -> tuple[str, list[tuple[str, str]]]:
-    lines = ["🔔 <b>هشدارهای قیمت من</b>", "\n"]
+    lines = ["🔔 <b>دیده‌بان قیمت من</b>", "\n"]
     actions: list[tuple[str, str]] = []
     if not alerts:
         lines.append("هنوز هشداری ثبت نکردی.")
@@ -361,7 +361,7 @@ def format_buy_market(user, nations) -> str:
         "\n",
         f"💰 دلار موجود: <b>{fmt_amount(user.xr_balance)}</b>",
         "",
-        "<b>کدوم ارز می‌خوای بخری؟</b>",
+        "<b>کدام ارز را می‌خواهی وارد سبدت کنی؟</b>",
     ]
     lines.extend(
         f"🏛 <code>{html.escape(n.currency_code)}</code> · {html.escape(n.name)} · "
