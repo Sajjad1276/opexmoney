@@ -39,3 +39,30 @@ def test_treasury_back_supports_all_return_targets_without_missing_nation_import
     assert 'if return_target == "nations":' in source
     assert 'if return_target == "management":' in source
     assert "await callback.answer()" in source
+
+
+def test_first_start_game_callback_uses_canonical_registration_flow():
+    source = (ROOT / "app" / "handlers" / "start_flow.py").read_text(encoding="utf-8")
+    assert "from app.handlers.onboarding import _begin_registration" in source
+    assert '@router.callback_query(F.data == "start_game")' in source
+    callback_start = source.index('@router.callback_query(F.data == "start_game")')
+    callback_end = source.index("async def _show_help", callback_start)
+    callback_block = source[callback_start:callback_end]
+    assert "await _begin_registration(call.message, state, replace_inline=True)" in callback_block
+
+
+def test_start_help_covers_current_core_game_systems():
+    source = (ROOT / "app" / "handlers" / "start_flow.py").read_text(encoding="utf-8")
+    required_sections = (
+        "شروع بازی",
+        "بازار",
+        "ملت",
+        "جنگ",
+        "مأموریت‌های روزانه و هفتگی",
+        "آکادمی",
+        "رتبه‌بندی",
+    )
+    for section in required_sections:
+        assert section in source, f"help text is missing section: {section}"
+    assert "نرخ‌ها هر ۱۵ دقیقه" in source
+    assert "۱۰٪ خزانه ملت بازنده" in source
