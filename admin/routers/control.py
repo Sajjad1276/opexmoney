@@ -11,8 +11,8 @@ from sqlalchemy import case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from admin.auth import AdminUser, get_admin_user
-from admin.dependencies import get_db_session, get_redis, page_count
-from admin.schemas.responses import PaginatedResponse
+from admin.dependencies import get_db_session, get_redis
+from config import settings
 from app.ai import companion
 from app.database.models import (
     AITier,
@@ -25,7 +25,6 @@ from app.database.models import (
     Mission,
     Nation,
     NationFoundingDraft,
-    NationRank,
     NationMembership,
     NationTreasury,
     PriceAlert,
@@ -84,6 +83,32 @@ class TreasuryAdjust(StrictBody):
 
 def _iso(value: Any) -> str | None:
     return value.isoformat() if value is not None else None
+
+
+def _validate_quiz_json(value: str) -> str:
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=422, detail="quiz_json must be valid JSON") from exc
+    if not isinstance(parsed, list):
+        raise HTTPException(status_code=422, detail="quiz_json must be a JSON array")
+    for index, question in enumerate(parsed):
+        if not isinstance(question, dict):
+            raise HTTPException(status_code=422, detail=f"quiz_json[{index}] must be an object")
+        options = question.get("options")
+        answer = question.get("answer")
+        if not isinstance(question.get("q"), str) or not isinstance(options, list) or not options:
+            raise HTTPException(status_code=422, detail=f"quiz_json[{index}] has invalid question/options")
+        try:
+            answer_index = int(answer)
+        except (TypeError, ValueError) as exc:
+            raise HTTPException(status_code=422, detail=f"quiz_json[{index}] has invalid answer") from exc
+        if answer_index < 0 or answer_index >= len(options):
+            raise HTTPException(status_code=422, detail=f"quiz_json[{index}] answer is out of range")
+        if not all(isinstance(option, str) for option in options):
+            raise HTTPException(status_code=422, detail=f"quiz_json[{index}] options must be strings")
+    return value
+
 
 
 async def _audit(
@@ -190,6 +215,8 @@ async def update_academy_lesson(
             "xr": lesson.xr_reward,
         }
         values = body.model_dump(exclude_none=True)
+        if "quiz_json" in values:
+            values["quiz_json"] = _validate_quiz_json(values["quiz_json"])
         for key, value in values.items():
             setattr(lesson, key, value)
         await _audit(
@@ -326,6 +353,14 @@ async def update_mission(
         mission = await db.scalar(select(Mission).where(Mission.id == mission_id).with_for_update())
         if mission is None:
             raise HTTPException(status_code=404, detail="Mission not found")
+        duplicate = await db.scalar(
+            select(Mission.id).where(
+                Mission.key == body.key,
+                Mission.id != mission_id,
+            ).limit(1)
+        )
+        if duplicate is not None:
+            raise HTTPException(status_code=409, detail="Mission key already exists")
         for key, value in body.model_dump().items():
             setattr(mission, key, Decimal(str(value)) if key in {"reward_xr", "reward_currency"} else value)
         await _audit(db, admin_user, action="admin_mission_update", rule_key=f"mission.{mission_id}", new_value=body.key)
@@ -507,8 +542,8 @@ async def gemini_health(
         "ok": bool(ok),
         "checked_at": started.isoformat(),
         "provider": "gemini",
-        "model": getattr(__import__("config").settings, "ai_model", None),
-        "enabled": bool(getattr(__import__("config").settings, "ai_enabled", False)),
+        "model": settings.ai_model,
+        "enabled": bool(settings.ai_enabled),
     }
 
 
@@ -662,7 +697,13 @@ async def onboarding_summary(
     )
     first_trade = int(
         await db.scalar(
-            select(func.count(func.distinct(TransactionUser.user_id))) if False else select(func.count(func.distinct(UserActivity.user_id))).where(UserActivity.activity_type == ActivityType.TRADE)
+            select(func.count(func.distinct(UserActivity.user_id)))
+            .join(User, User.user_id == UserActivity.user_id)
+            .where(
+                UserActivity.activity_type == ActivityType.TRADE,
+                User.is_ai.is_(False),
+                User.deleted_at.is_(None),
+            )
         )
         or 0
     )
