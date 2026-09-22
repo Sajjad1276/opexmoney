@@ -31,6 +31,25 @@ def test_founder_finalization_uses_canonical_founder_service():
     assert "flag_emoji=flag_emoji" in source
 
 
+def test_founder_text_state_handlers_are_private_only():
+    source = (ROOT / "app/handlers/founder_flow.py").read_text(encoding="utf-8")
+    for state_name in (
+        "SET_USERNAME_FOUNDER",
+        "SET_CURRENCY_CODE",
+        "SET_NATION_NAME",
+        "WAITING_GROUP_ADMIN",
+        "SELECT_FLAG",
+        "CONFIRM",
+    ):
+        match = re.search(
+            rf"@founder_router\\.message\\(\\n([\\s\\S]*?)\\)\\nasync def",
+            source,
+        )
+        assert match is not None
+
+    assert source.count('F.chat.type == "private"') >= 6
+    assert 'FounderStates.WAITING_GROUP_ADMIN,\n    F.chat.type == "private",\n    F.text' in source
+
 def test_founder_button_callbacks_have_handlers():
     source = (ROOT / "app/handlers/founder_flow.py").read_text(encoding="utf-8")
     assert 'F.data.in_({"start_founder", "found_nation"})' in source
