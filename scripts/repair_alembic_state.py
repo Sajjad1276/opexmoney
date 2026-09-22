@@ -318,6 +318,28 @@ async def detect_revision(conn: asyncpg.Connection) -> str | None:
     return highest
 
 
+async def repair_known_post_0020_schema(conn: asyncpg.Connection) -> None:
+    """Repair known admin migrations when production tracking is ahead of detected schema."""
+    await conn.execute(
+        'ALTER TABLE missions ADD COLUMN IF NOT EXISTS target_type VARCHAR(20) NOT NULL DEFAULT \'custom\''
+    )
+    await conn.execute(
+        'ALTER TABLE missions ADD COLUMN IF NOT EXISTS duration_days INTEGER NOT NULL DEFAULT 0'
+    )
+    await conn.execute(
+        'ALTER TABLE missions ADD COLUMN IF NOT EXISTS reward_xp INTEGER NOT NULL DEFAULT 0'
+    )
+    await conn.execute(
+        'ALTER TABLE users ADD COLUMN IF NOT EXISTS ban_reason VARCHAR(255)'
+    )
+    await conn.execute(
+        'ALTER TABLE price_alerts ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE'
+    )
+    await conn.execute(
+        'ALTER TABLE price_alerts ADD COLUMN IF NOT EXISTS triggered_value NUMERIC(18,4)'
+    )
+
+
 async def ensure_version_tracking(
     conn: asyncpg.Connection, detected_revision: str | None
 ) -> None:
@@ -372,10 +394,21 @@ async def ensure_version_tracking(
     current_index = REVISION_CHAIN.index(current)
 
     if current_index > detected_index:
-        raise RuntimeError(
-            f"production is tracked ahead of detected schema: "
-            f"tracking={current} detected={detected_revision}"
-        )
+        await repair_known_post_0020_schema(conn)
+        repaired = await detect_revision(conn)
+        if repaired is not None and repaired == current:
+            print(
+                f"REPAIR|schema repaired to tracked revision|version={current}",
+                flush=True,
+            )
+            return
+        detected_revision = repaired or detected_revision
+        detected_index = REVISION_CHAIN.index(detected_revision)
+        if current_index > detected_index:
+            raise RuntimeError(
+                f"production is tracked ahead of detected schema after repair: "
+                f"tracking={current} detected={detected_revision}"
+            )
 
     if current_index < detected_index:
         await conn.execute("DELETE FROM alembic_version")
