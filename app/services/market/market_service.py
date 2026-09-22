@@ -83,8 +83,8 @@ async def get_market_page_data(user_id: int) -> MarketPageData:
             context = await get_user_active_nation_context(
                 session,
                 user_id,
-                repair=False,
-                lock=False,
+                repair=True,
+                lock=True,
             )
             nation_id = context[0].nation_id if context is not None else None
             if nation_id is None:
