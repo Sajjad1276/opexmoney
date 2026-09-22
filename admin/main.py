@@ -23,6 +23,7 @@ from admin.routers import (
     transactions,
     wars,
     control,
+    panel_sections,
 )
 
 logger = logging.getLogger("opex.admin")
@@ -180,6 +181,7 @@ app.include_router(nations.router)
 app.include_router(economy.router)
 app.include_router(wars.router)
 app.include_router(control.router)
+app.include_router(panel_sections.router)
 app.include_router(governance.router)
 app.include_router(transactions.router)
 app.include_router(actions.router)
