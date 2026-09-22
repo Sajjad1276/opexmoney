@@ -190,7 +190,7 @@ def build_treasury_msg(
 
     lines = [
         f"🏦 <b>خزانه {nation_name}</b>",
-        "<blockquote>⁠</blockquote>",
+        "\n",
         (
             f"💎 ذخیره دلار: "
             f"<code>{_amount_text(treasury['balance_xr'])}</code>"
@@ -203,7 +203,7 @@ def build_treasury_msg(
             f"📈 کل واریزی تاریخی: "
             f"<code>{_amount_text(treasury['total_deposited'])}</code>"
         ),
-        "<blockquote>⁠</blockquote>",
+        "\n",
         "📋 <b>آخرین تراکنش‌ها:</b>",
     ]
 
@@ -368,7 +368,7 @@ async def start_deposit(
         if callback.message is not None:
             await callback.message.edit_text(
                 "💎 <b>واریز به خزانه</b>\n"
-                "<blockquote>⁠</blockquote>\n"
+                "\n"
                 f"موجودی دلار شما: "
                 f"<code>{_amount_text(xr_balance)}</code>\n"
                 f"حداقل واریز: <code>{_amount_text(MIN_DEPOSIT)}</code> دلار\n\n"
@@ -540,7 +540,7 @@ async def start_withdraw(
         if callback.message is not None:
             await callback.message.edit_text(
                 "📤 <b>برداشت از خزانه</b>\n"
-                "<blockquote>⁠</blockquote>\n"
+                "\n"
                 f"موجودی خزانه: "
                 f"<code>{_amount_text(treasury['balance_xr'])}</code> دلار\n\n"
                 "مقدار برداشت را بنویسید:",
@@ -597,7 +597,7 @@ async def receive_withdraw_amount(
         await close_inline_panel(state, message.bot)
         confirm_message = await message.answer(
             "⚠️ <b>تأیید برداشت</b>\n"
-            "<blockquote>⁠</blockquote>\n"
+            "\n"
             f"مقدار: <code>{_amount_text(amount)}</code> دلار\n"
             "این مبلغ به موجودی دلار شما اضافه می‌شود.\n\n"
             "مطمئنید؟",
@@ -685,7 +685,7 @@ async def confirm_withdraw(
 
         success_text = (
             "✅ <b>برداشت موفق</b>\n"
-            "<blockquote>⁠</blockquote>\n"
+            "\n"
             f"{_amount_text(amount)} دلار از خزانه برداشت شد."
         )
         if callback.message is not None:
@@ -797,7 +797,7 @@ async def show_full_report(callback: CallbackQuery, state: FSMContext) -> None:
         lines = [
             f"📋 <b>گزارش کامل خزانه "
             f"{html.escape(treasury['nation_name'])}</b>",
-            "<blockquote>⁠</blockquote>",
+            "\n",
         ]
 
         if not logs:
@@ -942,7 +942,7 @@ async def treasury_back(
                     # Reuse the canonical management panel text contract.
                     member_count = nation.member_count
                     text = f"👑 <b>مدیریت {html.escape(nation.name)}</b>\n"
-                    text += "<blockquote>⁠</blockquote>\n"
+                    text += "\n"
                     text += f"👥 اعضا: <b>{member_count}</b>\n"
                     text += f"💰 خزانه: <b>{_amount_text(nation.treasury)}</b> دلار\n"
                 await callback.message.edit_text(
