@@ -81,7 +81,9 @@ def _dotted(node: ast.AST) -> str:
 
 def _callback_button_specs() -> list[tuple[str, str, Path]]:
     specs: list[tuple[str, str, Path]] = []
-    # Scan every location that can build an inline button. Buttons declared\n    # inside handlers are just as real as keyboard-module buttons.\n    for path in _files(KEYBOARDS_DIR) + _files(HANDLERS_DIR):\n        tree = _parse(path)
+    # Scan every location that can build an inline button.
+    for path in _files(KEYBOARDS_DIR) + _files(HANDLERS_DIR):
+        tree = _parse(path)
         for node in ast.walk(tree):
             if not isinstance(node, ast.Call):
                 continue
@@ -112,34 +114,30 @@ def _callback_handler_specs() -> list[tuple[str, str, Path]]:
     def _collect_filters(filter_nodes: list[ast.AST], path: Path) -> None:
         for filter_node in filter_nodes:
             if isinstance(filter_node, ast.Compare) and len(filter_node.ops) == 1:
-                if _dotted(filter_node.left) != "F.data" or not isinstance(
+                if _dotted(filter_node.left) == "F.data" and isinstance(
                     filter_node.comparators[0], ast.Constant
                 ):
-                    continue
-                value = filter_node.comparators[0].value
-                if isinstance(value, str) and isinstance(filter_node.ops[0], ast.Eq):
-                    specs.append(("exact", value, path))
-                continue
+                    value = filter_node.comparators[0].value
+                    if isinstance(value, str) and isinstance(filter_node.ops[0], ast.Eq):
+                        specs.append(("exact", value, path))
 
-            if not isinstance(filter_node, ast.Call):
-                continue
-            func = _dotted(filter_node.func)
-            if func not in {
-                "F.data.regexp",
-                "F.data.startswith",
-                "F.data.in_",
-            }:
-                continue
-            if not filter_node.args:
-                continue
-            arg = filter_node.args[0]
-            kind = func.split(".")[-1]
-            if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
-                specs.append((kind, arg.value, path))
-            elif isinstance(arg, (ast.Set, ast.List, ast.Tuple)):
-                for element in arg.elts:
-                    if isinstance(element, ast.Constant) and isinstance(element.value, str):
-                        specs.append(("exact", element.value, path))
+            if isinstance(filter_node, ast.Call):
+                func = _dotted(filter_node.func)
+                if func not in {
+                    "F.data.regexp",
+                    "F.data.startswith",
+                    "F.data.in_",
+                } or not filter_node.args:
+                    continue
+
+                arg = filter_node.args[0]
+                kind = func.split(".")[-1]
+                if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+                    specs.append((kind, arg.value, path))
+                elif isinstance(arg, (ast.Set, ast.List, ast.Tuple)):
+                    for element in arg.elts:
+                        if isinstance(element, ast.Constant) and isinstance(element.value, str):
+                            specs.append(("exact", element.value, path))
 
     for path in _files(HANDLERS_DIR) + [ROOT / "ai" / "__init__.py"]:
         if not path.exists():
@@ -148,12 +146,243 @@ def _callback_handler_specs() -> list[tuple[str, str, Path]]:
         for node in ast.walk(tree):
             if not isinstance(node, ast.Call):
                 continue
+
             dotted = _dotted(node.func)
             if dotted.endswith(".callback_query"):
                 _collect_filters(list(node.args), path)
             elif dotted.endswith(".callback_query.register"):
-                # Telegram callback handlers registered with
-                # router.callback_query.register(handler, filter, ...).
                 _collect_filters(list(node.args[1:]), path)
+
     return specs
-t
+
+
+def _reply_button_texts() -> set[str]:
+    values: set[str] = set()
+    for path in _files(KEYBOARDS_DIR):
+        if path.name != "reply.py":
+            continue
+        tree = _parse(path)
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            if _dotted(node.func) != "KeyboardButton":
+                continue
+            text_kw = next((kw.value for kw in node.keywords if kw.arg == "text"), None)
+            if isinstance(text_kw, ast.Constant) and isinstance(text_kw.value, str):
+                values.add(text_kw.value)
+    return values
+
+
+def _reply_handler_texts() -> set[str]:
+    values: set[str] = set()
+    for path in _files(HANDLERS_DIR):
+        tree = _parse(path)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Compare) and len(node.ops) == 1:
+                if _dotted(node.left) == "F.text" and isinstance(node.comparators[0], ast.Constant):
+                    if isinstance(node.comparators[0].value, str):
+                        values.add(node.comparators[0].value)
+            elif isinstance(node, ast.Call):
+                func = _dotted(node.func)
+                if func in {"F.text.in_", "F.text.casefold", "F.text.func"}:
+                    values.update(_literal_strings(node))
+    return values
+
+
+def _state_names() -> set[str]:
+    names: set[str] = set()
+    for path in _files(STATES_DIR):
+        tree = _parse(path)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef):
+                for item in node.body:
+                    if isinstance(item, ast.Assign) and isinstance(item.value, ast.Call):
+                        if _dotted(item.value.func) == "State":
+                            for target in item.targets:
+                                if isinstance(target, ast.Name):
+                                    names.add(target.id)
+    return names
+
+
+def _state_mentions() -> set[str]:
+    mentions: set[str] = set()
+    for path in _files(HANDLERS_DIR):
+        text = _read(path)
+        for state in _state_names():
+            if re.search(rf"\b{re.escape(state)}\b", text):
+                mentions.add(state)
+    return mentions
+
+
+def _registered_router_modules() -> set[str]:
+    tree = _parse(MAIN_FILE)
+    result: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and _dotted(node.func) == "dp.include_router":
+            if node.args and isinstance(node.args[0], ast.Name):
+                result.add(node.args[0].id.replace("_router", ""))
+    return result
+
+
+def _regex_matches(pattern: str, value: str) -> bool:
+    try:
+        return re.fullmatch(pattern, value) is not None
+    except re.error:
+        return False
+
+
+def _dynamic_candidates(template: str) -> list[str]:
+    """Expand known callback f-string variables into concrete candidates."""
+    placeholders = re.findall(r"\{([^{}]+)\}", template)
+    candidates = [template]
+    for expression in placeholders:
+        key = expression.strip().split(".")[-1]
+        options = _DYNAMIC_VALUE_HINTS.get(key, ("1",))
+        token = "{" + expression + "}"
+        expanded: list[str] = []
+        for candidate in candidates:
+            for option in options:
+                expanded.append(candidate.replace(token, str(option), 1))
+        candidates = expanded
+    return candidates or [template]
+
+
+def run_flow_health_test() -> FlowHealthReport:
+    report = FlowHealthReport()
+
+    handler_modules = {p.stem for p in _files(HANDLERS_DIR) if p.name != "__init__.py"}
+    missing_registration = sorted(
+        (handler_modules & EXPECTED_HANDLER_MODULES) - _registered_router_modules()
+    )
+    if missing_registration:
+        report.errors.append(
+            "Unregistered handler routers: " + ", ".join(missing_registration)
+        )
+
+    expected_router_extras = set()
+    unexpected = sorted(
+        _registered_router_modules()
+        - EXPECTED_HANDLER_MODULES
+        - expected_router_extras
+    )
+    if unexpected:
+        report.warnings.append(
+            "Router registrations not in health registry: " + ", ".join(unexpected)
+        )
+
+    button_specs = _callback_button_specs()
+    handler_specs = _callback_handler_specs()
+    exact_handlers = {
+        value for kind, value, _ in handler_specs if kind == "exact"
+    }
+    regex_handlers = [
+        (kind, value)
+        for kind, value, _ in handler_specs
+        if kind in {"regexp", "startswith"}
+    ]
+
+    duplicate_exact: dict[str, list[str]] = {}
+    for kind, value, path in handler_specs:
+        if kind == "exact":
+            duplicate_exact.setdefault(value, []).append(str(path.relative_to(ROOT)))
+    duplicated = {
+        value: paths
+        for value, paths in duplicate_exact.items()
+        if len(paths) > 1
+    }
+    for value, paths in sorted(duplicated.items()):
+        report.errors.append(
+            f"Duplicate callback handler '{value}' in: " + ", ".join(paths)
+        )
+
+    orphan_buttons: list[str] = []
+    dynamic_buttons = 0
+    for kind, value, path in button_specs:
+        if kind == "exact":
+            covered = value in exact_handlers or any(
+                pattern == value
+                or (pattern.startswith("^") and _regex_matches(pattern, value))
+                or (handler_kind == "startswith" and value.startswith(pattern))
+                for handler_kind, pattern in regex_handlers
+            )
+            if not covered:
+                orphan_buttons.append(
+                    f"{path.relative_to(ROOT)} -> {value}"
+                )
+        else:
+            dynamic_buttons += 1
+            candidates = _dynamic_candidates(value)
+
+            def _covered(candidate: str) -> bool:
+                if candidate in exact_handlers:
+                    return True
+                for handler_kind, pattern in regex_handlers:
+                    if handler_kind == "startswith" and candidate.startswith(pattern):
+                        return True
+                    if handler_kind == "regexp":
+                        try:
+                            if re.fullmatch(pattern, candidate):
+                                return True
+                        except re.error:
+                            continue
+                return False
+
+            if not any(_covered(candidate) for candidate in candidates):
+                orphan_buttons.append(
+                    f"{path.relative_to(ROOT)} -> dynamic:{value}"
+                )
+
+    if orphan_buttons:
+        report.errors.extend(
+            "Button without matching callback handler: " + item
+            for item in orphan_buttons
+        )
+
+    reply_buttons = _reply_button_texts()
+    reply_handlers = _reply_handler_texts()
+    orphan_reply = sorted(reply_buttons - reply_handlers)
+    if orphan_reply:
+        report.errors.extend(
+            "Reply button without matching message handler: " + item
+            for item in orphan_reply
+        )
+
+    states = _state_names()
+    mentions = _state_mentions()
+    intentional_unreferenced_states = {"IDLE"}
+    unused_states = sorted(states - mentions - intentional_unreferenced_states)
+    if unused_states:
+        report.warnings.extend(
+            "State has no handler-source mention: " + state
+            for state in unused_states
+        )
+
+    for path in _files(HANDLERS_DIR) + [ROOT / "ai" / "__init__.py"]:
+        if path.exists():
+            try:
+                _parse(path)
+            except SyntaxError as exc:
+                report.errors.append(
+                    f"Syntax error in {path.relative_to(ROOT)}: {exc}"
+                )
+
+    report.metrics = {
+        "handler_modules": len(handler_modules),
+        "registered_routers": len(_registered_router_modules()),
+        "callback_buttons": len(button_specs),
+        "dynamic_callback_buttons": dynamic_buttons,
+        "callback_handlers": len(handler_specs),
+        "reply_buttons": len(reply_buttons),
+        "reply_handlers": len(reply_handlers),
+        "states": len(states),
+        "state_mentions": len(mentions),
+    }
+    return report
+
+
+def assert_flow_health() -> FlowHealthReport:
+    report = run_flow_health_test()
+    if not report.ok:
+        details = "\n".join(f"- {error}" for error in report.errors)
+        raise AssertionError("FLOW_HEALTH_FAILED\n" + details)
+    return report
