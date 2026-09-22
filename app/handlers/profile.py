@@ -7,6 +7,7 @@ from aiogram import F, Router
 from aiogram.enums import ButtonStyle, ParseMode
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
+from app.database.models import User
 from app.database.session import async_session
 from app.handlers.dashboard import show_dashboard
 from app.services.player_profile_service import PlayerProfile, get_player_profile
@@ -110,7 +111,7 @@ async def profile_back(callback: CallbackQuery) -> None:
     await callback.answer()
     async with async_session() as session:
         async with session.begin():
-            user = await session.get(__import__("app.database.models", fromlist=["User"]).User, callback.from_user.id)
+            user = await session.get(User, callback.from_user.id)
 
     if user is None:
         return
