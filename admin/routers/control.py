@@ -672,6 +672,7 @@ async def founder_drafts(
 @router.post("/founder/drafts/{draft_id}/finalize")
 async def finalize_founder_draft(
     draft_id: int,
+    confirm: bool = Query(default=False),
     db: AsyncSession = Depends(get_db_session),
     admin_user: AdminUser = Depends(get_admin_user),
 ):
@@ -683,6 +684,14 @@ async def finalize_founder_draft(
     if founder_id is None:
         raise HTTPException(status_code=404, detail="Founder draft not found")
     await db.rollback()
+    if not confirm:
+        return {
+            "success": False,
+            "preview": True,
+            "message": "Send confirm=true to finalize this founder draft",
+            "draft_id": draft_id,
+            "founder_user_id": int(founder_id),
+        }
     try:
         nation, group_id = await finalize_draft(
             db,
@@ -994,9 +1003,31 @@ async def treasury_logs(
 async def treasury_adjust(
     nation_id: int,
     body: TreasuryAdjust,
+    confirm: bool = Query(default=False),
     db: AsyncSession = Depends(get_db_session),
     admin_user: AdminUser = Depends(get_admin_user),
 ):
+    if not confirm:
+        nation = await db.scalar(
+            select(Nation.nation_id, Nation.name, NationTreasury.balance_xr)
+            .outerjoin(NationTreasury, NationTreasury.nation_id == Nation.nation_id)
+            .where(Nation.nation_id == nation_id, Nation.is_active.is_(True))
+            .limit(1)
+        )
+        if nation is None:
+            raise HTTPException(status_code=404, detail="Active nation not found")
+        before = Decimal(str(nation.balance_xr or 0))
+        after = before + Decimal(str(body.amount_xr))
+        return {
+            "success": False,
+            "preview": True,
+            "message": "Send confirm=true to execute treasury adjustment",
+            "nation_id": nation_id,
+            "nation_name": nation.name,
+            "before": float(before),
+            "delta": float(body.amount_xr),
+            "after": float(after),
+        }
     async with db.begin():
         nation = await db.scalar(select(Nation).where(Nation.nation_id == nation_id).with_for_update())
         if nation is None or not nation.is_active:
