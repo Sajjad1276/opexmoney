@@ -6,10 +6,10 @@ from decimal import Decimal, InvalidOperation
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database.models import CurrencyHolding, Nation, TradePreview, Transaction, User, UserActivity
+from app.database.models import CurrencyHolding, Nation, TradePreview, User
 from app.database.session import async_session
 from app.services.mission_service import increment_mission
-from app.services.market.market_pressure import record_trade_pressure
+from app.services.world_action_service import execute_trade_action
 from app.services.temporal_service import get_peak_multiplier
 from app.services.user_service import sync_user_balance
 from app.services.rules.resolver import resolve
@@ -79,45 +79,59 @@ async def prepare_buy_preview(session: AsyncSession, *, user_id: int, nation_id:
 
 
 async def execute_buy(session: AsyncSession, *, user_id: int, nation_id: int, spend: Decimal) -> TradeExecutionResult:
-    user = (await session.execute(select(User).where(User.user_id == user_id).with_for_update())).scalar_one_or_none()
+    user = await session.get(User, user_id, with_for_update=True)
     nation = await session.get(Nation, nation_id, with_for_update=True)
-    preview = await session.scalar(select(TradePreview).where(
-        TradePreview.user_id == user_id, TradePreview.nation_id == nation_id,
-        TradePreview.side == "buy", TradePreview.spend == spend
-    ).order_by(TradePreview.created_at.desc()).limit(1)) if user is not None else None
+    preview = await session.scalar(
+        select(TradePreview)
+        .where(
+            TradePreview.user_id == user_id,
+            TradePreview.nation_id == nation_id,
+            TradePreview.side == "buy",
+            TradePreview.spend == spend,
+        )
+        .order_by(TradePreview.created_at.desc())
+        .limit(1)
+    ) if user is not None else None
+
     if user is None or nation is None or not nation.is_active or preview is None:
         raise ValueError("پیش‌نمایش منقضی شد. دوباره مقدار را وارد کن.")
-    if preview.preview_rate <= 0 or abs(nation.exchange_rate - preview.preview_rate) / preview.preview_rate > Decimal("0.01"):
+    if (
+        preview.preview_rate <= 0
+        or abs(nation.exchange_rate - preview.preview_rate) / preview.preview_rate > Decimal("0.01")
+    ):
         raise ValueError("نرخ تغییر کرده است. یک پیش‌نمایش جدید بگیر.")
-    if Decimal(str(user.xr_balance or 0)) < spend:
-        raise ValueError("موجودی کافی نیست.")
-    fee_rate, peak_multiplier = await _trade_parameters(session, user_id=user_id, nation_id=nation_id)
-    calc = calc_trade(spend, nation.exchange_rate, True, fee_rate_percent=fee_rate, benefit_multiplier=peak_multiplier)
-    holding = await session.scalar(select(CurrencyHolding).where(
-        CurrencyHolding.user_id == user_id, CurrencyHolding.nation_id == nation_id
-    ).with_for_update())
-    if holding is None:
-        holding = CurrencyHolding(user_id=user_id, nation_id=nation_id, amount=Decimal("0"))
-        session.add(holding)
-        await session.flush()
-    user.xr_balance -= spend
-    holding.amount += calc["receive"]
-    nation.trade_volume_24h += spend
-    session.add(Transaction(user_id=user_id, nation_id=nation_id, transaction_type="buy", spend_xr=spend, amount=calc["receive"], fee_xr=calc["fee"], rate=nation.exchange_rate))
-    session.add(UserActivity(user_id=user_id, nation_id=nation_id, activity_type="trade"))
+
+    result = await execute_trade_action(
+        session,
+        user_id=user_id,
+        nation_id=nation_id,
+        side="buy",
+        amount=spend,
+    )
     await session.delete(preview)
-    for key, amount in (("DAILY_TRADE_1", 1), ("WEEKLY_BUY_5", 1), ("WEEKLY_TRADE_VOLUME", int(calc["receive"])), ("FIRST_TRADE", 1)):
+
+    for key, mission_amount in (
+        ("DAILY_TRADE_1", 1),
+        ("WEEKLY_BUY_5", 1),
+        ("WEEKLY_TRADE_VOLUME", int(result.receive)),
+        ("FIRST_TRADE", 1),
+    ):
         try:
-            await increment_mission(session, user_id, key, amount=amount)
+            await increment_mission(session, user_id, key, amount=mission_amount)
         except Exception:
             continue
-    await record_trade_pressure(
-        nation_id=nation.nation_id,
-        side="buy",
-        volume=spend,
-        buyer_home_nation_id=user.home_nation_id,
+
+    return TradeExecutionResult(
+        result.nation,
+        result.user,
+        result.holding,
+        "buy",
+        result.spend,
+        result.receive,
+        result.fee,
+        result.peak_multiplier,
+        result.rate,
     )
-    return TradeExecutionResult(nation, user, holding, "buy", spend, Decimal(str(calc["receive"])), Decimal(str(calc["fee"])), peak_multiplier, nation.exchange_rate)
 
 
 async def prepare_sell_preview(session: AsyncSession, *, user_id: int, nation_id: int, amount: Decimal) -> TradePreviewResult:
@@ -137,42 +151,58 @@ async def prepare_sell_preview(session: AsyncSession, *, user_id: int, nation_id
 
 
 async def execute_sell(session: AsyncSession, *, user_id: int, nation_id: int, amount: Decimal) -> TradeExecutionResult:
-    user = (await session.execute(select(User).where(User.user_id == user_id).with_for_update())).scalar_one_or_none()
+    user = await session.get(User, user_id, with_for_update=True)
     nation = await session.get(Nation, nation_id, with_for_update=True)
-    preview = await session.scalar(select(TradePreview).where(
-        TradePreview.user_id == user_id, TradePreview.nation_id == nation_id,
-        TradePreview.side == "sell", TradePreview.spend == amount
-    ).order_by(TradePreview.created_at.desc()).limit(1)) if user is not None else None
-    holding = await session.scalar(select(CurrencyHolding).where(
-        CurrencyHolding.user_id == user_id, CurrencyHolding.nation_id == nation_id
-    ).with_for_update()) if user is not None else None
-    if user is None or nation is None or not nation.is_active or preview is None or holding is None:
+    preview = await session.scalar(
+        select(TradePreview)
+        .where(
+            TradePreview.user_id == user_id,
+            TradePreview.nation_id == nation_id,
+            TradePreview.side == "sell",
+            TradePreview.spend == amount,
+        )
+        .order_by(TradePreview.created_at.desc())
+        .limit(1)
+    ) if user is not None else None
+
+    if user is None or nation is None or not nation.is_active or preview is None:
         raise ValueError("پیش‌نمایش منقضی شد. دوباره مقدار را وارد کن.")
-    if preview.preview_rate <= 0 or abs(nation.exchange_rate - preview.preview_rate) / preview.preview_rate > Decimal("0.01"):
+    if (
+        preview.preview_rate <= 0
+        or abs(nation.exchange_rate - preview.preview_rate) / preview.preview_rate > Decimal("0.01")
+    ):
         raise ValueError("نرخ تغییر کرده است. یک پیش‌نمایش جدید بگیر.")
-    if Decimal(str(holding.amount or 0)) < amount:
-        raise ValueError("موجودی کافی نیست.")
-    fee_rate, peak_multiplier = await _trade_parameters(session, user_id=user_id, nation_id=nation_id)
-    calc = calc_trade(amount, nation.exchange_rate, False, fee_rate_percent=fee_rate, benefit_multiplier=peak_multiplier)
-    holding.amount -= amount
-    user.xr_balance += calc["receive"]
-    nation.trade_volume_24h += amount * nation.exchange_rate
-    session.add(Transaction(user_id=user_id, nation_id=nation_id, transaction_type="sell", spend_xr=amount * nation.exchange_rate, amount=amount, fee_xr=calc["fee"], rate=nation.exchange_rate))
-    session.add(UserActivity(user_id=user_id, nation_id=nation_id, activity_type="trade"))
-    await sync_user_balance(session, user_id)
+
+    result = await execute_trade_action(
+        session,
+        user_id=user_id,
+        nation_id=nation_id,
+        side="sell",
+        amount=amount,
+    )
     await session.delete(preview)
-    for key, mission_amount in (("DAILY_TRADE_1", 1), ("WEEKLY_TRADE_VOLUME", int(amount)), ("FIRST_TRADE", 1)):
+
+    for key, mission_amount in (
+        ("DAILY_TRADE_1", 1),
+        ("WEEKLY_TRADE_VOLUME", int(amount)),
+        ("FIRST_TRADE", 1),
+    ):
         try:
             await increment_mission(session, user_id, key, amount=mission_amount)
         except Exception:
             continue
-    await record_trade_pressure(
-        nation_id=nation.nation_id,
-        side="sell",
-        volume=amount * Decimal(str(nation.exchange_rate)),
-        buyer_home_nation_id=None,
+
+    return TradeExecutionResult(
+        result.nation,
+        result.user,
+        result.holding,
+        "sell",
+        result.spend,
+        result.receive,
+        result.fee,
+        result.peak_multiplier,
+        result.rate,
     )
-    return TradeExecutionResult(nation, user, holding, "sell", amount, Decimal(str(calc["receive"])), Decimal(str(calc["fee"])), peak_multiplier, nation.exchange_rate)
 
 
 async def prepare_buy_preview_for_user(*, user_id: int, nation_id: int, spend: Decimal) -> TradePreviewResult:
