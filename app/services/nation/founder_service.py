@@ -366,6 +366,7 @@ async def finalize_draft(
                 is_private=False,
                 group_chat_id=group_id,
                 flag_emoji=flag_emoji,
+                enforce_eligibility=False,
             )
 
         draft.status = "COMPLETED"
@@ -513,10 +514,13 @@ async def create_nation(
     is_private: bool,
     group_chat_id: int | None,
     flag_emoji: str = "🏴",
+    *,
+    enforce_eligibility: bool = True,
 ) -> Nation:
-    eligibility = await check_nation_creation_eligibility(session, founder_id)
-    if not eligibility.eligible:
-        raise ValueError(eligibility.reason or "شرایط تأسیس ملت کامل نیست.")
+    if enforce_eligibility:
+        eligibility = await check_nation_creation_eligibility(session, founder_id)
+        if not eligibility.eligible:
+            raise ValueError(eligibility.reason or "شرایط تأسیس ملت کامل نیست.")
 
     user = await session.get(User, founder_id, with_for_update=True)
     if user is None:
