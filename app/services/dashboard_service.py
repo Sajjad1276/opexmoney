@@ -19,8 +19,16 @@ from app.database.models import (
 )
 from app.services.market_intelligence import get_market_overview, get_risk_label
 from app.services.nation_service import get_user_active_nation_context
-from app.services.world_events import get_active_world_event
+from app.services.world_events import get_active_world_event, get_recent_world_events
 from app.utils.formatting import fmt_amount, fmt_pct, fmt_rate, to_fa
+
+
+@dataclass(frozen=True)
+@dataclass(frozen=True)
+class WorldEventView:
+    title: str
+    description: str
+    started_at: datetime
 
 
 @dataclass(frozen=True)
@@ -40,6 +48,7 @@ class LiveDashboard:
     growth_status: str
     pressure_status: str
     risk_status: str
+    recent_events: tuple[WorldEventView, ...]
 
 
 async def _resolve_verified_nation(
@@ -153,6 +162,19 @@ async def build_live_dashboard(
         session,
         nation_id=nation.nation_id if nation is not None else None,
     )
+    recent_world_events = await get_recent_world_events(
+        session,
+        nation_id=nation.nation_id if nation is not None else None,
+        limit=5,
+    )
+    recent_events = tuple(
+        WorldEventView(
+            title=html.escape(event.title),
+            description=html.escape(event.description),
+            started_at=event.started_at,
+        )
+        for event in recent_world_events
+    )
 
     if nation is None:
         winner_code, winner_change = overview["top_mover"]["winner"]
@@ -189,6 +211,7 @@ async def build_live_dashboard(
             growth_status="بدون ملت",
             pressure_status=str(overview["mood"]).replace("بازار امروز ", ""),
             risk_status="فقط بازار آزاد",
+            recent_events=recent_events,
         )
 
     holding = await session.scalar(
@@ -297,6 +320,7 @@ async def build_live_dashboard(
         growth_status=growth_status,
         pressure_status=pressure_status,
         risk_status=risk_status,
+        recent_events=recent_events,
     )
 
 
@@ -310,7 +334,12 @@ def render_live_dashboard(dashboard: LiveDashboard) -> str:
             "<i>بازار و معامله بدون ملت آزاد است.</i>\n\n"
             f"<b>حرکت مهم بازار</b>\n{dashboard.event_detail}\n\n"
             f"<b>حرکت بعدی</b>\n{dashboard.suggestion}\n\n"
-            f"<b>حال بازار:</b> {dashboard.pressure_status}"
+            f"<b>حال بازار:</b> {dashboard.pressure_status}\n\n"
+            "<b>تاریخچه جهان</b>\n"
+            + "\n".join(
+                f"• <b>{event.title}</b> · {event.started_at.strftime('%H:%M')}"
+                for event in dashboard.recent_events
+            )
         )
 
     flag = dashboard.nation_flag or "🏴"
@@ -330,5 +359,14 @@ def render_live_dashboard(dashboard: LiveDashboard) -> str:
         f"<b>نبض ملت</b>\n"
         f"رشد: {dashboard.growth_status}\n"
         f"فشار بازار: {dashboard.pressure_status}\n"
-        f"ریسک: {dashboard.risk_status}"
+        f"ریسک: {dashboard.risk_status}\n\n"
+        "<b>تاریخچه جهان</b>\n"
+        + (
+            "\n".join(
+                f"• <b>{event.title}</b> · {event.started_at.strftime('%H:%M')}"
+                for event in dashboard.recent_events
+            )
+            if dashboard.recent_events
+            else "هنوز رویداد عمومی ثبت نشده است."
+        )
     )
