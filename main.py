@@ -32,6 +32,7 @@ from app.handlers.founder import founder_router
 from app.handlers.governance import governance_router
 from app.handlers.academy import router as academy_router
 from app.handlers.admin_panel import router as admin_panel_router
+from app.middlewares.command_cleanup import CommandPanelCleanupMiddleware
 from app.handlers.owner_ai import router as owner_ai_router
 from app.handlers.chart import router as chart_router
 from app.handlers.market import router as market_router
@@ -422,6 +423,7 @@ async def main() -> None:
     ranking_redis = Redis.from_url(settings.redis_url, decode_responses=True) if settings.redis_url else None
     dp["redis"] = ranking_redis
     flow_trace = FlowTraceMiddleware()
+    dp.message.middleware(CommandPanelCleanupMiddleware())
     dp.message.middleware(flow_trace)
     dp.callback_query.middleware(flow_trace)
 
