@@ -37,6 +37,7 @@ from app.handlers.market import router as market_router
 from app.handlers.membership import membership_router
 from app.handlers.missions import router as missions_router
 from app.handlers.portfolio import router as portfolio_router
+from app.handlers.profile import router as profile_router
 from app.handlers.ranking import router as ranking_router
 from app.handlers.settings import router as settings_router
 from app.handlers.nation import nation_router
@@ -466,6 +467,7 @@ async def main() -> None:
     dp.include_router(chart_router)
     dp.include_router(missions_router)
     dp.include_router(portfolio_router)
+    dp.include_router(profile_router)
     dp.include_router(ranking_router)
     dp.include_router(settings_router)
     dp.include_router(nation_management_router)
