@@ -1,68 +1,71 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
-from decimal import Decimal
+import asyncio
+import logging
+from datetime import date
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import case, func, or_, select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import aliased
 
-from admin.auth import get_admin_user
-from admin.cache import TTL_PLAYER_DETAIL, TTL_PLAYERS, cached
+from admin.auth import AdminUser, get_admin_user
+from admin.cache import cached
 from admin.dependencies import get_db_session, get_redis, page_count
-from admin.schemas.responses import (
-    HomeNationDetails,
-    PlayerAIUsage,
-    PlayerMissionSummary,
-    PlayerProfile,
-    PlayerTransaction,
-    PlayerWarSummary,
-    PlayerXP,
-    PlayersPage,
-    PlayerListItem,
-)
+from admin.schemas.responses import PaginatedResponse, PlayerDetail, PlayerListItem, TransactionItem
 from app.database.models import (
     AIUsageLog,
-    BehaviorSnapshot,
-    Mission,
+    CurrencyHolding,
     Nation,
-    NationWar,
+    NationMembership,
     Transaction,
     User,
-    UserActivity,
     UserMissionProgress,
     UserXP,
 )
+from app.database.session import async_session
 from redis.asyncio import Redis
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/players", tags=["players"])
 
 
-SORT_FIELDS = {
-    "balance": User.balance,
-    "xr_balance": User.xr_balance,
-    "created_at": User.created_at,
-}
+async def _run_all(statement: Any) -> list[Any]:
+    async with async_session() as session:
+        result = await session.execute(statement)
+        return result.all()
 
 
-def _safe_order(value: str) -> str:
-    return value if value in {"asc", "desc"} else "desc"
+async def _run_first(statement: Any) -> Any:
+    async with async_session() as session:
+        result = await session.execute(statement)
+        return result.first()
 
 
-@router.get("", response_model=PlayersPage)
-@cached(TTL_PLAYERS, "players")
-async def list_players(
-    page: int = Query(default=1, ge=1),
-    limit: int = Query(default=20, ge=1, le=100),
-    sort: str = Query(default="balance"),
-    order: str = Query(default="desc"),
-    search: str = Query(default=""),
-    filter: str = Query(default="active"),
-    db: AsyncSession = Depends(get_db_session),
-    redis: Redis | None = Depends(get_redis),
-    admin_user: int = Depends(get_admin_user),
-) -> PlayersPage:
+async def _run_scalar(statement: Any) -> Any:
+    async with async_session() as session:
+        result = await session.execute(statement)
+        return result.scalar_one_or_none()
+
+
+def _enum_value(value: Any, default: str = "") -> str:
+    if value is None:
+        return default
+    return getattr(value, "value", str(value))
+
+
+def _iso(value: Any) -> str:
+    return value.isoformat() if value is not None else ""
+
+
+async def _player_list_rows(
+    conditions: list[Any],
+    sort_column: Any,
+    descending: bool,
+    page: int,
+    limit: int,
+) -> list[Any]:
     tx_count = (
         select(func.count(Transaction.id))
         .where(Transaction.user_id == User.user_id)
@@ -75,191 +78,232 @@ async def list_players(
         .correlate(User)
         .scalar_subquery()
     )
-
-    conditions = []
-    if filter == "active":
-        conditions.append(User.deleted_at.is_(None))
-    elif filter == "banned":
-        conditions.append(User.deleted_at.is_not(None))
-    elif filter == "ai":
-        conditions.append(User.is_ai.is_(True))
-    else:
-        raise HTTPException(status_code=400, detail="Invalid filter")
-
-    if search:
-        conditions.append(User.username.ilike(f"%{search}%"))
-
-    total = int(await db.scalar(select(func.count(User.user_id)).where(*conditions)) or 0)
-
-    sort_expr = SORT_FIELDS.get(sort)
-    if sort == "total_transactions":
-        sort_expr = tx_count
-    if sort_expr is None:
-        raise HTTPException(status_code=400, detail="Invalid sort field")
-
-    sort_expr = sort_expr.asc() if _safe_order(order) == "asc" else sort_expr.desc()
-
     stmt = (
-        select(User, Nation.name, Nation.flag_emoji, tx_count.label("tx_count"), last_activity.label("last_activity"))
+        select(
+            User.user_id,
+            User.username,
+            User.balance,
+            User.xr_balance,
+            User.role,
+            User.ai_tier,
+            Nation.name.label("home_nation_name"),
+            Nation.flag_emoji.label("home_nation_flag"),
+            User.created_at,
+            User.is_ai,
+            tx_count.label("total_transactions"),
+            last_activity.label("last_activity_at"),
+        )
         .outerjoin(Nation, Nation.nation_id == User.home_nation_id)
         .where(*conditions)
-        .order_by(sort_expr, User.user_id.asc())
+        .order_by(
+            sort_column.desc() if descending else sort_column.asc(),
+            User.user_id.asc(),
+        )
         .offset((page - 1) * limit)
         .limit(limit)
     )
-    rows = (await db.execute(stmt)).all()
+    return await _run_all(stmt)
+
+
+from app.database.models import UserActivity
+
+
+@router.get("", response_model=PaginatedResponse[PlayerListItem])
+@cached(30, "players")
+async def list_players(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=20, ge=1, le=100),
+    sort: str = Query(default="balance"),
+    order: str = Query(default="desc"),
+    search: str = Query(default=""),
+    filter: str = Query(default="active"),
+    db: AsyncSession = Depends(get_db_session),
+    redis: Redis | None = Depends(get_redis),
+    admin_user: AdminUser = Depends(get_admin_user),
+) -> PaginatedResponse[PlayerListItem]:
+    sort_columns = {
+        "balance": User.balance,
+        "xr_balance": User.xr_balance,
+        "created_at": User.created_at,
+        "username": User.username,
+    }
+    sort_column = sort_columns.get(sort, User.balance)
+    descending = order.lower() != "asc"
+
+    conditions: list[Any] = []
+    normalized_filter = filter.lower()
+    if normalized_filter == "active":
+        conditions.extend([User.deleted_at.is_(None), User.is_ai.is_(False)])
+    elif normalized_filter == "banned":
+        conditions.append(User.deleted_at.is_not(None))
+    elif normalized_filter == "ai":
+        conditions.append(User.is_ai.is_(True))
+    elif normalized_filter != "all":
+        conditions.extend([User.deleted_at.is_(None), User.is_ai.is_(False)])
+
+    if search.strip():
+        conditions.append(User.username.ilike(f"%{search.strip()}%"))
+
+    count_stmt = select(func.count(User.user_id)).where(*conditions)
+    rows_stmt_task = _player_list_rows(
+        conditions,
+        sort_column,
+        order.lower() == "desc",
+        page,
+        limit,
+    )
+    total, rows = await asyncio.gather(
+        _run_scalar(count_stmt),
+        rows_stmt_task,
+    )
 
     items = [
         PlayerListItem(
-            user_id=user.user_id,
-            username=user.username,
-            balance=user.balance,
-            xr_balance=user.xr_balance,
-            role=user.role,
-            ai_tier=user.ai_tier,
-            home_nation_name=nation_name,
-            home_nation_flag=flag,
-            created_at=user.created_at,
-            is_ai=user.is_ai,
-            total_transactions=int(tx_count_value or 0),
-            last_activity_at=last_activity_value,
+            user_id=int(row.user_id),
+            username=row.username or "",
+            balance=float(row.balance or 0),
+            xr_balance=float(row.xr_balance or 0),
+            role=_enum_value(row.role, "player"),
+            ai_tier=_enum_value(row.ai_tier, "bronze"),
+            home_nation_name=row.home_nation_name,
+            home_nation_flag=row.home_nation_flag,
+            created_at=_iso(row.created_at),
+            is_ai=bool(row.is_ai),
+            total_transactions=int(row.total_transactions or 0),
+            last_activity_at=row.last_activity_at.isoformat() if row.last_activity_at else None,
         )
-        for user, nation_name, flag, tx_count_value, last_activity_value in rows
+        for row in rows
     ]
-    return PlayersPage(items=items, total=total, page=page, pages=page_count(total, limit))
+    total_int = int(total or 0)
+    return PaginatedResponse(
+        items=items,
+        total=total_int,
+        page=page,
+        pages=page_count(total_int, limit),
+    )
 
 
-@router.get("/{user_id}", response_model=PlayerProfile)
-@cached(TTL_PLAYER_DETAIL, "player-detail")
+@router.get("/{user_id}", response_model=PlayerDetail)
+@cached(15, "players:detail")
 async def player_detail(
     user_id: int,
     db: AsyncSession = Depends(get_db_session),
     redis: Redis | None = Depends(get_redis),
-    admin_user: int = Depends(get_admin_user),
-) -> PlayerProfile:
-    user = await db.scalar(select(User).where(User.user_id == user_id))
-    if user is None:
+    admin_user: AdminUser = Depends(get_admin_user),
+) -> PlayerDetail:
+    user_stmt = (
+        select(
+            User.user_id,
+            User.username,
+            User.balance,
+            User.xr_balance,
+            User.role,
+            User.ai_tier,
+            User.created_at,
+            User.is_ai,
+            User.deleted_at,
+            Nation.name.label("home_nation_name"),
+            Nation.flag_emoji.label("home_nation_flag"),
+        )
+        .outerjoin(Nation, Nation.nation_id == User.home_nation_id)
+        .where(User.user_id == user_id)
+        .limit(1)
+    )
+    xp_stmt = select(UserXP.total_xp, UserXP.level).where(UserXP.user_id == user_id).limit(1)
+    membership_stmt = (
+        select(NationMembership.role)
+        .where(
+            NationMembership.user_id == user_id,
+            NationMembership.is_active.is_(True),
+        )
+        .order_by(NationMembership.id.desc())
+        .limit(1)
+    )
+    tx_stmt = (
+        select(
+            Transaction.id,
+            Transaction.transaction_type,
+            Transaction.spend_xr,
+            Transaction.amount,
+            Transaction.fee_xr,
+            Transaction.rate,
+            Nation.name,
+            Nation.flag_emoji,
+            Transaction.created_at,
+        )
+        .join(Nation, Nation.nation_id == Transaction.nation_id)
+        .where(Transaction.user_id == user_id)
+        .order_by(Transaction.created_at.desc(), Transaction.id.desc())
+        .limit(10)
+    )
+    mission_stmt = select(func.count(UserMissionProgress.id)).where(
+        UserMissionProgress.user_id == user_id,
+        UserMissionProgress.completed.is_(True),
+    )
+    usage_stmt = select(
+        AIUsageLog.advisor_questions_used,
+        AIUsageLog.portfolio_scans_used,
+        AIUsageLog.war_analysis_used,
+    ).where(
+        AIUsageLog.user_id == user_id,
+        AIUsageLog.date == date.today(),
+    ).limit(1)
+
+    user_row, xp_row, membership_row, tx_rows, mission_count, usage_row = await asyncio.gather(
+        _run_first(user_stmt),
+        _run_first(xp_stmt),
+        _run_first(membership_stmt),
+        _run_all(tx_stmt),
+        _run_scalar(mission_stmt),
+        _run_first(usage_stmt),
+    )
+
+    if user_row is None:
         raise HTTPException(status_code=404, detail="Player not found")
 
-    nation = None
-    if user.home_nation_id is not None:
-        nation = await db.scalar(select(Nation).where(Nation.nation_id == user.home_nation_id))
-
-    tx_rows = (
-        await db.execute(
-            select(Transaction, Nation.name)
-            .outerjoin(Nation, Nation.nation_id == Transaction.nation_id)
-            .where(Transaction.user_id == user_id)
-            .order_by(Transaction.created_at.desc())
-            .limit(10)
+    transactions = [
+        TransactionItem(
+            id=int(row.id),
+            transaction_type=row.transaction_type,
+            spend_xr=float(row.spend_xr or 0),
+            amount=float(row.amount or 0),
+            fee_xr=float(row.fee_xr or 0),
+            rate=float(row.rate or 0),
+            nation_name=row.name or "",
+            nation_flag=row.flag_emoji,
+            created_at=_iso(row.created_at),
         )
-    ).all()
-    last_transactions = [
-        PlayerTransaction(
-            id=tx.id,
-            nation_id=tx.nation_id,
-            nation_name=nation_name,
-            transaction_type=tx.transaction_type,
-            spend_xr=tx.spend_xr,
-            amount=tx.amount,
-            fee_xr=tx.fee_xr,
-            rate=tx.rate,
-            created_at=tx.created_at,
-        )
-        for tx, nation_name in tx_rows
+        for row in tx_rows
     ]
 
-    mission_completion_count = int(
-        await db.scalar(
-            select(func.count(UserMissionProgress.id)).where(
-                UserMissionProgress.user_id == user_id,
-                UserMissionProgress.completed.is_(True),
-            )
-        )
-        or 0
+    return PlayerDetail(
+        user_id=int(user_row.user_id),
+        username=user_row.username or "",
+        balance=float(user_row.balance or 0),
+        xr_balance=float(user_row.xr_balance or 0),
+        role=_enum_value(user_row.role, "player"),
+        ai_tier=_enum_value(user_row.ai_tier, "bronze"),
+        home_nation_name=user_row.home_nation_name,
+        home_nation_flag=user_row.home_nation_flag,
+        created_at=_iso(user_row.created_at),
+        is_ai=bool(user_row.is_ai),
+        total_transactions=len(transactions),
+        last_activity_at=None,
+        xp_total=int(getattr(xp_row, "total_xp", 0) or 0),
+        xp_level=getattr(xp_row, "level", "beginner") or "beginner",
+        active_nation_role=_enum_value(
+            getattr(membership_row, "role", None),
+            "",
+        ) or None,
+        last_10_transactions=transactions,
+        mission_completed_count=int(mission_count or 0),
+        ai_usage_today={
+            "advisor": int(getattr(usage_row, "advisor_questions_used", 0) or 0),
+            "portfolio": int(getattr(usage_row, "portfolio_scans_used", 0) or 0),
+            "war": int(getattr(usage_row, "war_analysis_used", 0) or 0),
+        },
+        is_banned=user_row.deleted_at is not None,
     )
 
-    current_war = None
-    if user.home_nation_id is not None:
-        war_row = (
-            await db.execute(
-                select(NationWar, Nation.name, Nation.flag_emoji)
-                .join(
-                    Nation,
-                    Nation.nation_id
-                    == case(
-                        (NationWar.nation_id == user.home_nation_id, NationWar.opponent_nation_id),
-                        else_=NationWar.nation_id,
-                    ),
-                )
-                .where(
-                    NationWar.status == "active",
-                    or_(
-                        NationWar.nation_id == user.home_nation_id,
-                        NationWar.opponent_nation_id == user.home_nation_id,
-                    ),
-                )
-                .order_by(NationWar.ends_at.asc())
-                .limit(1)
-            )
-        ).first()
-        if war_row:
-            war, opponent_name, opponent_flag = war_row
-            current_war = PlayerWarSummary(
-                war_id=war.id,
-                status=war.status,
-                nation_id=user.home_nation_id,
-                opponent_nation_id=war.opponent_nation_id if war.nation_id == user.home_nation_id else war.nation_id,
-                opponent_name=opponent_name,
-                opponent_flag=opponent_flag,
-                ends_at=war.ends_at,
-            )
 
-    today = datetime.now(timezone.utc).date()
-    usage = await db.scalar(
-        select(AIUsageLog).where(AIUsageLog.user_id == user_id, AIUsageLog.date == today)
-    )
-    xp = await db.scalar(select(UserXP).where(UserXP.user_id == user_id))
-
-    home_nation = None
-    if nation is not None:
-        home_nation = HomeNationDetails(
-            nation_id=nation.nation_id,
-            name=nation.name,
-            flag_emoji=nation.flag_emoji,
-            currency_code=nation.currency_code,
-            exchange_rate=nation.exchange_rate,
-            member_count=nation.member_count,
-            is_active=nation.is_active,
-            is_ai=nation.is_ai,
-        )
-
-    return PlayerProfile(
-        user_id=user.user_id,
-        username=user.username,
-        home_nation_id=user.home_nation_id,
-        balance=user.balance,
-        xr_balance=user.xr_balance,
-        role=user.role,
-        is_ai=user.is_ai,
-        ai_strategy=user.ai_strategy,
-        ai_tier=user.ai_tier,
-        deleted_at=user.deleted_at,
-        created_at=user.created_at,
-        home_nation=home_nation,
-        last_transactions=last_transactions,
-        mission_completion_count=mission_completion_count,
-        current_war=current_war,
-        ai_usage_today=(
-            PlayerAIUsage(
-                date=usage.date,
-                advisor_questions_used=usage.advisor_questions_used,
-                portfolio_scans_used=usage.portfolio_scans_used,
-                war_analysis_used=usage.war_analysis_used,
-            )
-            if usage
-            else None
-        ),
-        total_xp=xp.total_xp if xp else 0,
-        level=xp.level if xp else "beginner",
-    )
+# ── END OF players.py ──
