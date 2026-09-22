@@ -45,8 +45,11 @@ async def persist_scheduler_job_state(
         "updated_at": _now_iso(),
     }
     if job is not None:
-        values["paused"] = "1" if job.next_run_time is None else "0"
-        values["next_run"] = job.next_run_time.isoformat() if job.next_run_time else ""
+        next_run_time = getattr(job, "next_run_time", None)
+        if next_run_time is None:
+            next_run_time = getattr(job, "next_fire_time", None)
+        values["paused"] = "1" if next_run_time is None else "0"
+        values["next_run"] = next_run_time.isoformat() if next_run_time else ""
     if status in {"success", "error", "missed"}:
         values["last_run"] = _now_iso()
     if error:
@@ -67,11 +70,14 @@ def install_scheduler_monitor(
 
     async def seed() -> None:
         for job in scheduler.get_jobs():
+            next_run_time = getattr(job, "next_run_time", None)
+            if next_run_time is None:
+                next_run_time = getattr(job, "next_fire_time", None)
             await persist_scheduler_job_state(
                 scheduler,
                 redis,
                 job.id,
-                status="paused" if job.next_run_time is None else "scheduled",
+                status="paused" if next_run_time is None else "scheduled",
             )
 
     def listener(event) -> None:
