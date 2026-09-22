@@ -190,7 +190,7 @@ def format_market_page(user, overview: dict, active: int, trade_count: int) -> s
     if trade_count < 2:
         lines = [
             "💹 <b>بازار OPEX</b>",
-            "<blockquote>⁠</blockquote>",
+            "\n",
             "اینجا با <b>دلار</b> ارز ملت‌ها رو می‌خری و می‌فروشی.",
             "🧠 قانون ساده: وقتی قیمت یک ارز بالا بره، ارزش دارایی‌ات بیشتر می‌شه؛ اگر پایین بیاد، کمتر می‌شه.",
             "",
@@ -222,13 +222,13 @@ def format_market_page(user, overview: dict, active: int, trade_count: int) -> s
 
     lines = [
         "💹 <b>بازار OPEX</b>",
-        "<blockquote>⁠</blockquote>",
+        "\n",
         f"💰 دلار: <b>{fmt_amount(user.xr_balance)}</b> · "
         f"{html.escape(user.home_nation_id and currencies[0]['nation'].currency_code or '—')}",
         "",
-        "<blockquote>⁠</blockquote>",
+        "\n",
         overview["mood"],
-        "<blockquote>⁠</blockquote>",
+        "\n",
     ]
     winner_code, winner_pct = overview["top_mover"]["winner"]
     loser_code, loser_pct = overview["top_mover"]["loser"]
@@ -264,7 +264,7 @@ def format_market_page(user, overview: dict, active: int, trade_count: int) -> s
             break
 
     lines.extend([
-        "<blockquote>⁠</blockquote>",
+        "\n",
         f"⏱ بروزرسانی نرخ‌ها هر ۱۵ دقیقه · 👥 {to_fa(active)} عضو فعال ملت اصلی",
     ])
     return "\n".join(lines)
@@ -337,7 +337,7 @@ def format_alert_created(alert, *, command: bool = False) -> str:
 
 
 def format_alert_list(alerts) -> tuple[str, list[tuple[str, str]]]:
-    lines = ["🔔 <b>هشدارهای قیمت من</b>", "<blockquote>⁠</blockquote>"]
+    lines = ["🔔 <b>هشدارهای قیمت من</b>", "\n"]
     actions: list[tuple[str, str]] = []
     if not alerts:
         lines.append("هنوز هشداری ثبت نکردی.")
@@ -358,7 +358,7 @@ def format_alert_list(alerts) -> tuple[str, list[tuple[str, str]]]:
 def format_buy_market(user, nations) -> str:
     lines = [
         "📈 <b>خرید ارز</b>",
-        "<blockquote>⁠</blockquote>",
+        "\n",
         f"💰 دلار موجود: <b>{fmt_amount(user.xr_balance)}</b>",
         "",
         "<b>کدوم ارز می‌خوای بخری؟</b>",
@@ -374,7 +374,7 @@ def format_buy_market(user, nations) -> str:
 def format_buy_currency(nation, user) -> str:
     return (
         f"📈 <b>خرید <code>{html.escape(nation.currency_code)}</code></b>\n"
-        "<blockquote>⁠</blockquote>\n"
+        "\n"
         f"💹 نرخ: <code>1 {html.escape(nation.currency_code)} = {fmt_rate(nation.exchange_rate)} دلار</code>\n"
         f"💰 موجودی: <b>{fmt_amount(user.xr_balance)} دلار</b>\n\n"
         "<b>چقدر دلار خرج می‌کنی؟</b>\n<i>حداقل 10 دلار</i>"
@@ -385,18 +385,18 @@ def format_buy_preview(result) -> str:
     signal = "\n📈 <i>بازار الان با تو راه میاد.</i>\n" if result.peak_multiplier > Decimal("1") else ""
     return (
         "📈 <b>تأیید خرید</b>\n"
-        "<blockquote>⁠</blockquote>\n"
+        "\n"
         f"📤 پرداخت:   <b>{fmt_amount(result.spend)} دلار</b>\n"
         f"📥 دریافت:   <b>{fmt_amount(result.receive)} {html.escape(result.nation.currency_code)}</b>\n\n"
-        "<blockquote>⁠</blockquote>\n"
+        "\n"
         f"💹 نرخ: <code>1 {html.escape(result.nation.currency_code)} = {fmt_rate(result.nation.exchange_rate)} دلار</code>\n"
         f"📋 کارمزد: <b>{fmt_amount(result.fee)} دلار</b> ({_rule_percent(result.fee_rate)})\n"
         f"{signal}\n"
-        "<blockquote>⁠</blockquote>\n"
+        "\n"
         "<b>موجودی بعد از معامله:</b>\n"
         f"دلار: <b>{fmt_amount(result.user.xr_balance - result.spend)}</b>\n"
         f"{html.escape(result.nation.currency_code)}: <b>{fmt_amount(result.current_holding + result.receive)}</b>\n"
-        "<blockquote>⁠</blockquote>"
+        "\n"
     )
 
 
@@ -404,11 +404,11 @@ def format_buy_completed(result) -> str:
     signal = "\n📈 بازار الان با تو راه میاد." if result.peak_multiplier > Decimal("1") else ""
     return (
         "✅ <b>خرید انجام شد.</b>\n"
-        "<blockquote>⁠</blockquote>\n"
+        "\n"
         f"📤 پرداختی: <s>{fmt_amount(result.spend)} دلار</s>\n"
         f"📥 دریافتی: <b>{fmt_amount(result.receive)} {html.escape(result.nation.currency_code)}</b>\n"
         f"{signal}\n"
-        "<blockquote>⁠</blockquote>\n"
+        "\n"
         "💰 موجودی:\n"
         f"دلار: <b>{fmt_amount(result.user.xr_balance)}</b>\n"
         f"{html.escape(result.nation.currency_code)}: <b>{fmt_amount(result.holding.amount)}</b>"
@@ -416,9 +416,9 @@ def format_buy_completed(result) -> str:
 
 
 def format_sell_market(active_holdings, inactive_holdings) -> str:
-    lines = ["📉 <b>فروش ارز</b>", "<blockquote>⁠</blockquote>"]
+    lines = ["📉 <b>فروش ارز</b>", "\n"]
     if not active_holdings and not inactive_holdings:
-        return "📉 <b>فروش ارز</b>\n<blockquote>⁠</blockquote>\nهنوز ارزی برای فروش نداری.\n\nاز 📈 خرید ارز شروع کن."
+        return "📉 <b>فروش ارز</b>\n\nهنوز ارزی برای فروش نداری.\n\nاز 📈 خرید ارز شروع کن."
     if active_holdings:
         lines.append("<b>ارزهای قابل فروش:</b>")
         lines.extend(
@@ -437,7 +437,7 @@ def format_sell_market(active_holdings, inactive_holdings) -> str:
 def format_sell_currency(nation, holding) -> str:
     return (
         f"📉 <b>فروش <code>{html.escape(nation.currency_code)}</code></b>\n"
-        "<blockquote>⁠</blockquote>\n"
+        "\n"
         f"💹 نرخ: <code>1 {html.escape(nation.currency_code)} = {fmt_rate(nation.exchange_rate)} دلار</code>\n"
         f"💰 موجودی: <b>{fmt_amount(holding.amount)} {html.escape(nation.currency_code)}</b>\n\n"
         "<b>چقدر می‌فروشی؟</b>"
@@ -450,18 +450,18 @@ def format_sell_preview(result) -> str:
     signal = "\n📈 <i>بازار الان با تو راه میاد.</i>\n" if result.peak_multiplier > Decimal("1") else ""
     return (
         "📉 <b>تأیید فروش</b>\n"
-        "<blockquote>⁠</blockquote>\n"
+        "\n"
         f"📤 فروش:     <b>{fmt_amount(result.spend)} {html.escape(result.nation.currency_code)}</b>\n"
         f"📥 دریافت:   <b>{fmt_amount(result.receive)} دلار</b>\n\n"
-        "<blockquote>⁠</blockquote>\n"
+        "\n"
         f"💹 نرخ: <code>1 {html.escape(result.nation.currency_code)} = {fmt_rate(result.nation.exchange_rate)} دلار</code>\n"
         f"📋 کارمزد: <b>{fmt_amount(result.fee)} دلار</b> ({_rule_percent(result.fee_rate)})\n"
         f"{signal}\n"
-        "<blockquote>⁠</blockquote>\n"
+        "\n"
         "<b>موجودی بعد از معامله:</b>\n"
         f"دلار: <b>{fmt_amount(xr_after)}</b>\n"
         f"{html.escape(result.nation.currency_code)}: <b>{fmt_amount(currency_after)}</b>\n"
-        "<blockquote>⁠</blockquote>"
+        "\n"
     )
 
 
@@ -469,11 +469,11 @@ def format_sell_completed(result) -> str:
     signal = "\n📈 بازار الان با تو راه میاد." if result.peak_multiplier > Decimal("1") else ""
     return (
         "✅ <b>فروش انجام شد.</b>\n"
-        "<blockquote>⁠</blockquote>\n"
+        "\n"
         f"📤 فروختی:  <b>{fmt_amount(result.spend)} {html.escape(result.nation.currency_code)}</b>\n"
         f"📥 دریافتی: <b>{fmt_amount(result.receive)} دلار</b>\n"
         f"{signal}\n"
-        "<blockquote>⁠</blockquote>\n"
+        "\n"
         "💰 موجودی:\n"
         f"دلار: <b>{fmt_amount(result.user.xr_balance)}</b>\n"
         f"{html.escape(result.nation.currency_code)}: <b>{fmt_amount(result.holding.amount)}</b>"
@@ -481,7 +481,7 @@ def format_sell_completed(result) -> str:
 
 
 def format_market_history(user, rows) -> str:
-    lines = ["📜 <b>تاریخچه</b>", "<blockquote>⁠</blockquote>"]
+    lines = ["📜 <b>تاریخچه</b>", "\n"]
     if not rows:
         lines.append("هنوز معامله‌ای انجام ندادی.")
     for transaction, code in rows:
