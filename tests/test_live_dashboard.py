@@ -9,6 +9,11 @@ from sqlalchemy import delete, select
 from app.database.models import (
     CurrencyHolding,
     Nation,
+    WorldEvent,
+    WorldEventEffectType,
+    WorldEventScope,
+    WorldEventSource,
+    WorldEventType,
     NationMember,
     NationMemberRole,
     NationTelegramMember,
@@ -62,6 +67,11 @@ async def cleanup():
             )
 
             if nation_ids:
+                await session.execute(
+                    delete(WorldEvent).where(
+                        WorldEvent.affected_nation_id.in_(nation_ids)
+                    )
+                )
                 await session.execute(
                     delete(Nation).where(
                         Nation.nation_id.in_(nation_ids)
@@ -146,3 +156,4 @@ async def test_live_dashboard_requires_verified_human_membership():
     assert "Live Dashboard" in rendered
     assert CURRENCY in rendered
     assert "رتبه ملت" in rendered
+    assert "تاریخچه جهان" in rendered
