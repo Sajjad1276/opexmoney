@@ -154,7 +154,7 @@ async def get_player_profile(
     )
     reputation_knowledge = min(
         100,
-        int((Decimal(lessons_completed) ** Decimal("0.5")) * Decimal("25"))
+        int(Decimal(lessons_completed).sqrt() * Decimal("25"))
         + min(25, int(Decimal(str(xp or 0)) / Decimal("100"))),
     )
     reputation_military = min(
