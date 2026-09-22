@@ -269,9 +269,11 @@ async def broadcast(
     admin_user: AdminUser = Depends(get_admin_user),
 ) -> ActionResult:
     redis_client = _require_redis(redis)
-    await check_action_rate_limit("broadcast", redis_client)
 
     if not confirm:
+        return _dry_run()
+
+    await check_action_rate_limit("broadcast", redis_client)
         return _dry_run()
 
     try:
@@ -347,9 +349,11 @@ async def give_bonus(
     admin_user: AdminUser = Depends(get_admin_user),
 ) -> ActionResult:
     redis_client = _require_redis(redis)
-    await check_action_rate_limit("give-bonus", redis_client)
 
     if not confirm:
+        return _dry_run()
+
+    await check_action_rate_limit("give-bonus", redis_client)
         return _dry_run()
 
     try:
@@ -439,9 +443,11 @@ async def ban_player(
     admin_user: AdminUser = Depends(get_admin_user),
 ) -> ActionResult:
     redis_client = _require_redis(redis)
-    await check_action_rate_limit("ban-player", redis_client)
 
     if not confirm:
+        return _dry_run()
+
+    await check_action_rate_limit("ban-player", redis_client)
         return _dry_run()
 
     try:
@@ -511,9 +517,11 @@ async def unban_player(
     admin_user: AdminUser = Depends(get_admin_user),
 ) -> ActionResult:
     redis_client = _require_redis(redis)
-    await check_action_rate_limit("unban-player", redis_client)
 
     if not confirm:
+        return _dry_run()
+
+    await check_action_rate_limit("unban-player", redis_client)
         return _dry_run()
 
     try:
@@ -582,9 +590,11 @@ async def reset_rates(
     admin_user: AdminUser = Depends(get_admin_user),
 ) -> ActionResult:
     redis_client = _require_redis(redis)
-    await check_action_rate_limit("reset-rates", redis_client)
 
     if not confirm:
+        return _dry_run()
+
+    await check_action_rate_limit("reset-rates", redis_client)
         return _dry_run()
 
     try:
@@ -675,9 +685,11 @@ async def end_war(
     admin_user: AdminUser = Depends(get_admin_user),
 ) -> ActionResult:
     redis_client = _require_redis(redis)
-    await check_action_rate_limit("end-war", redis_client)
 
     if not confirm:
+        return _dry_run()
+
+    await check_action_rate_limit("end-war", redis_client)
         return _dry_run()
 
     try:
@@ -760,9 +772,11 @@ async def create_event(
     admin_user: AdminUser = Depends(get_admin_user),
 ) -> ActionResult:
     redis_client = _require_redis(redis)
-    await check_action_rate_limit("create-event", redis_client)
 
     if not confirm:
+        return _dry_run()
+
+    await check_action_rate_limit("create-event", redis_client)
         return _dry_run()
 
     try:
@@ -844,9 +858,11 @@ async def send_mission_reward(
     admin_user: AdminUser = Depends(get_admin_user),
 ) -> ActionResult:
     redis_client = _require_redis(redis)
-    await check_action_rate_limit("send-mission-reward", redis_client)
 
     if not confirm:
+        return _dry_run()
+
+    await check_action_rate_limit("send-mission-reward", redis_client)
         return _dry_run()
 
     try:
