@@ -38,6 +38,9 @@ _DYNAMIC_VALUE_HINTS = {
     "choice": ("for", "against", "abstain"),
     "status": ("active", "pending"),
     "role": ("founder", "minister", "trader", "citizen"),
+    "tab": ("nations", "rich", "traders"),
+    "return_target": ("dashboard", "nations", "management"),
+    "amount_str": ("1.0", "100"),
 }
 
 
