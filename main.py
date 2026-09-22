@@ -23,7 +23,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 from ai import companion
-from app.database.models import User
+from app.database.models import Nation, User, WorldEvent
 from app.database.session import async_session, engine
 from app.diagnostics.flow_trace import FlowTraceMiddleware
 from app.diagnostics.support_telemetry import close_support_telemetry, record_error
@@ -174,11 +174,18 @@ async def run_rate_job() -> None:
         logger.exception("Behavior snapshot failed")
 
 
-async def run_world_event_job() -> None:
+async def run_world_event_job(bot: Bot) -> None:
     try:
+        group_id = None
         async with async_session() as session:
             async with session.begin():
                 event = await generate_market_world_event(session)
+                if event is not None and event.affected_nation_id is not None:
+                    group_id = await session.scalar(
+                        select(Nation.group_id).where(
+                            Nation.nation_id == event.affected_nation_id
+                        )
+                    )
         if event is not None:
             logger.info(
                 "World event created | type=%s nation=%s title=%s",
@@ -186,6 +193,28 @@ async def run_world_event_job() -> None:
                 event.affected_nation_id,
                 event.title,
             )
+            if group_id is not None:
+                try:
+                    await bot.send_message(
+                        int(group_id),
+                        f"اخبار جهان OPEX\n\n<b>{event.title}</b>\n{event.description}",
+                        parse_mode=ParseMode.HTML,
+                    )
+                    async with async_session() as session:
+                        async with session.begin():
+                            saved = await session.get(
+                                WorldEvent,
+                                event.event_id,
+                                with_for_update=True,
+                            )
+                            if saved is not None:
+                                saved.announced_in_group = True
+                except Exception:
+                    logger.exception(
+                        "World event group announcement failed | event=%s group=%s",
+                        event.event_id,
+                        group_id,
+                    )
     except Exception:
         logger.exception("World event generation failed")
 
@@ -299,6 +328,7 @@ def build_scheduler(bot: Bot) -> AsyncIOScheduler:
     scheduler.add_job(
         run_world_event_job,
         CronTrigger(minute="2,17,32,47"),
+        args=[bot],
         id="world_event_engine_15m",
         replace_existing=True,
         max_instances=1,
