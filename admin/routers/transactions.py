@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import hashlib
+import asyncio
 import logging
 from datetime import date, datetime, time, timedelta, timezone
 from typing import Any
@@ -13,7 +13,7 @@ from admin.auth import AdminUser, get_admin_user
 from admin.cache import cached
 from admin.dependencies import get_db_session, get_redis, page_count
 from admin.schemas.responses import PaginatedResponse, TransactionItem
-from app.database.models import Nation, Transaction
+from app.database.models import Nation, Transaction, User
 from app.database.session import async_session
 from redis.asyncio import Redis
 
@@ -104,6 +104,7 @@ async def list_transactions(
             Nation.flag_emoji,
             Transaction.created_at,
         )
+        .join(User, User.user_id == Transaction.user_id)
         .join(Nation, Nation.nation_id == Transaction.nation_id)
         .where(*conditions)
         .order_by(Transaction.created_at.desc(), Transaction.id.desc())
@@ -111,7 +112,7 @@ async def list_transactions(
         .limit(limit)
     )
 
-    total, rows = await __import__("asyncio").gather(
+    total, rows = await asyncio.gather(
         _run_scalar(count_stmt),
         _run_all(data_stmt),
     )
