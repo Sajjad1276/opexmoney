@@ -87,13 +87,15 @@ async def get_market_page_data(user_id: int) -> MarketPageData:
                 lock=True,
             )
             nation_id = context[0].nation_id if context is not None else None
-            if nation_id is None:
-                return MarketPageData(user, {"currencies": []}, 0, 0)
 
             overview = await get_market_overview(session, nation_id, limit=20)
             trade_count = int(await session.scalar(
                 select(func.count(Transaction.id)).where(Transaction.user_id == user_id)
             ) or 0)
+
+            if nation_id is None:
+                return MarketPageData(user, overview, trade_count, 0)
+
             from app.services.economic_engine import get_active_members
             active = await get_active_members(session, nation_id)
             return MarketPageData(user, overview, trade_count, active)
