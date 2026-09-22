@@ -21,7 +21,7 @@ async def _transaction(session: AsyncSession):
     if session.in_transaction():
         yield
         return
-    async with _transaction(session):
+    async with session.begin():
         yield
 
 
@@ -47,7 +47,16 @@ async def get_or_create_draft(
     session: AsyncSession,
     founder_user_id: int,
 ) -> NationFoundingDraft:
+    if session.in_transaction():
+        return await _get_or_create_draft(session, founder_user_id)
     async with session.begin():
+        return await _get_or_create_draft(session, founder_user_id)
+
+
+async def _get_or_create_draft(
+    session: AsyncSession,
+    founder_user_id: int,
+) -> NationFoundingDraft:
         user = await session.get(User, founder_user_id, with_for_update=True)
         if user is None or not (user.username or "").strip():
             raise ValueError("اول باید وارد بازی بشی و اسم معامله‌گرت رو ثبت کنی.")
