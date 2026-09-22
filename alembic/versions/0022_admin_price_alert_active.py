@@ -24,7 +24,12 @@ def upgrade() -> None:
             server_default=sa.text("true"),
         ),
     )
+    op.add_column(
+        "price_alerts",
+        sa.Column("triggered_value", sa.Numeric(18, 4), nullable=True),
+    )
 
 
 def downgrade() -> None:
+    op.drop_column("price_alerts", "triggered_value")
     op.drop_column("price_alerts", "is_active")
