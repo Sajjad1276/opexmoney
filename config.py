@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     )
     ai_model: str = "gemini-3.1-flash-lite"
     ai_timeout_seconds: float = 12.0
+    owner_ai_timeout_seconds: float = 120.0
     ai_cache_ttl_seconds: int = 120
     ai_last_message_ttl_seconds: int = 1800
     support_ai_enabled: bool = True
