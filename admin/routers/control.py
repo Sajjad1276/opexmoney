@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from admin.auth import AdminUser, get_admin_user
 from admin.dependencies import get_db_session, get_redis
 from config import settings
-from app.ai import companion
+from ai import companion
 from app.database.models import (
     AITier,
     ActivityType,
