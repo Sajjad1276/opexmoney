@@ -66,3 +66,11 @@ def test_start_help_covers_current_core_game_systems():
         assert section in source, f"help text is missing section: {section}"
     assert "نرخ‌ها هر ۱۵ دقیقه" in source
     assert "۱۰٪ خزانه ملت بازنده" in source
+
+
+def test_onboarding_imports_all_symbols_used_by_registration_flow():
+    source = (ROOT / "app" / "handlers" / "onboarding.py").read_text(encoding="utf-8")
+    assert "suggested_name_keyboard" in source.split("from app.keyboards.inline import", 1)[1].split("\n", 1)[0] or "suggested_name_keyboard, " in source
+    assert "from app.filters.profanity import profanity_filter" in source
+    assert "suggested_name_keyboard(suggested)" in source
+    assert "profanity_filter(name)" in source
