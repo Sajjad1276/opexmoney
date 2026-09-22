@@ -1,24 +1,20 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta, timezone
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select
+from sqlalchemy import case, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from admin.auth import get_admin_user
-from admin.cache import (
-    TTL_BEHAVIOR,
-    TTL_MARKET_STATES,
-    TTL_RATE_HISTORY,
-    TTL_WORLD_EVENTS,
-    cached,
-)
+from admin.auth import AdminUser, get_admin_user
+from admin.cache import cached
 from admin.dependencies import get_db_session, get_redis
 from admin.schemas.responses import (
     BehaviorSnapshotItem,
     MarketStateItem,
-    RateHistoryItem,
+    RateHistoryPoint,
     WorldEventItem,
 )
 from app.database.models import (
@@ -28,155 +24,224 @@ from app.database.models import (
     RateHistory,
     WorldEvent,
 )
+from app.database.session import async_session
 from redis.asyncio import Redis
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/economy", tags=["economy"])
 
 
-def _enum_value(value):
-    return value.value if hasattr(value, "value") else value
+async def _run_all(statement: Any) -> list[Any]:
+    async with async_session() as session:
+        result = await session.execute(statement)
+        return result.all()
+
+
+async def _run_first(statement: Any) -> Any:
+    async with async_session() as session:
+        result = await session.execute(statement)
+        return result.first()
+
+
+def _iso(value: Any) -> str:
+    return value.isoformat() if value is not None else ""
+
+
+def _enum_value(value: Any) -> str:
+    return getattr(value, "value", str(value)) if value is not None else ""
 
 
 @router.get("/market-states", response_model=list[MarketStateItem])
-@cached(TTL_MARKET_STATES, "economy-market-states")
+@cached(30, "economy:market-states")
 async def market_states(
     db: AsyncSession = Depends(get_db_session),
     redis: Redis | None = Depends(get_redis),
-    admin_user: int = Depends(get_admin_user),
+    admin_user: AdminUser = Depends(get_admin_user),
 ) -> list[MarketStateItem]:
-    rows = (
-        await db.execute(
-            select(CurrencyMarketState, Nation.name)
-            .outerjoin(Nation, Nation.currency_code == CurrencyMarketState.currency_code)
-            .order_by(CurrencyMarketState.currency_code.asc())
+    rate_change = case(
+        (CurrencyMarketState.previous_rate != 0,
+         (CurrencyMarketState.calculated_rate - CurrencyMarketState.previous_rate)
+         / CurrencyMarketState.previous_rate * 100),
+        else_=0.0,
+    ).label("rate_change")
+
+    stmt = (
+        select(
+            CurrencyMarketState.currency_code,
+            Nation.name.label("nation_name"),
+            Nation.flag_emoji.label("nation_flag"),
+            CurrencyMarketState.buy_pressure,
+            CurrencyMarketState.sell_pressure,
+            CurrencyMarketState.liquidity,
+            CurrencyMarketState.confidence,
+            CurrencyMarketState.volatility,
+            CurrencyMarketState.foreign_demand,
+            CurrencyMarketState.calculated_rate,
+            CurrencyMarketState.previous_rate,
+            rate_change,
+            CurrencyMarketState.updated_at,
         )
-    ).all()
+        .outerjoin(Nation, Nation.currency_code == CurrencyMarketState.currency_code)
+        .order_by(CurrencyMarketState.calculated_rate.desc())
+    )
+
+    rows = await _run_all(stmt)
     return [
         MarketStateItem(
-            currency_code=state.currency_code,
-            nation_name=nation_name,
-            buy_pressure=state.buy_pressure,
-            sell_pressure=state.sell_pressure,
-            liquidity=state.liquidity,
-            confidence=state.confidence,
-            volatility=state.volatility,
-            foreign_demand=state.foreign_demand,
-            national_activity=state.national_activity,
-            calculated_rate=state.calculated_rate,
-            previous_rate=state.previous_rate,
-            updated_at=state.updated_at,
+            currency_code=row.currency_code,
+            nation_name=row.nation_name or "",
+            nation_flag=row.nation_flag,
+            buy_pressure=float(row.buy_pressure or 0),
+            sell_pressure=float(row.sell_pressure or 0),
+            liquidity=float(row.liquidity or 0),
+            confidence=float(row.confidence or 0),
+            volatility=float(row.volatility or 0),
+            foreign_demand=float(row.foreign_demand or 0),
+            calculated_rate=float(row.calculated_rate or 0),
+            previous_rate=float(row.previous_rate or 0),
+            rate_change=float(row.rate_change or 0),
+            updated_at=_iso(row.updated_at),
         )
-        for state, nation_name in rows
+        for row in rows
     ]
 
 
-@router.get("/rate-history/{nation_id}", response_model=list[RateHistoryItem])
-@cached(TTL_RATE_HISTORY, "economy-rate-history")
+@router.get("/rate-history/{nation_id}", response_model=list[RateHistoryPoint])
+@cached(60, "economy:ratehist")
 async def rate_history(
     nation_id: int,
     hours: int = Query(default=24, ge=1, le=168),
     db: AsyncSession = Depends(get_db_session),
     redis: Redis | None = Depends(get_redis),
-    admin_user: int = Depends(get_admin_user),
-) -> list[RateHistoryItem]:
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
-    nation = await db.scalar(select(Nation).where(Nation.nation_id == nation_id))
-    if nation is None:
+    admin_user: AdminUser = Depends(get_admin_user),
+) -> list[RateHistoryPoint]:
+    nation_stmt = select(Nation.nation_id).where(
+        Nation.nation_id == nation_id,
+        Nation.deleted_at.is_(None),
+    ).limit(1)
+    rows_stmt = (
+        select(
+            RateHistory.rate,
+            RateHistory.volume,
+            RateHistory.calculated_at,
+            RateHistory.dominant_cause,
+            RateHistory.pressure_signal,
+        )
+        .where(
+            RateHistory.nation_id == nation_id,
+            RateHistory.calculated_at > datetime.now(timezone.utc) - timedelta(hours=hours),
+        )
+        .order_by(RateHistory.calculated_at.asc(), RateHistory.id.asc())
+        .limit(10000)
+    )
+
+    nation_row, rows = await __import__("asyncio").gather(
+        _run_first(nation_stmt),
+        _run_all(rows_stmt),
+    )
+
+    if nation_row is None:
         raise HTTPException(status_code=404, detail="Nation not found")
 
-    rows = (
-        await db.execute(
-            select(RateHistory)
-            .where(
-                RateHistory.nation_id == nation_id,
-                RateHistory.calculated_at >= cutoff,
-            )
-            .order_by(RateHistory.calculated_at.desc())
-        )
-    ).scalars().all()
     return [
-        RateHistoryItem(
-            id=item.id,
-            nation_id=item.nation_id,
-            nation_name=nation.name,
-            rate=item.rate,
-            volume=item.volume,
-            active_members=item.active_members,
-            calculated_at=item.calculated_at,
-            dominant_cause=item.dominant_cause,
-            pressure_signal=item.pressure_signal,
-            foreign_signal=item.foreign_signal,
-            activity_score=item.activity_score,
-            trade_score=item.trade_score,
-            growth_score=item.growth_score,
+        RateHistoryPoint(
+            rate=float(row.rate or 0),
+            volume=float(row.volume or 0),
+            calculated_at=_iso(row.calculated_at),
+            dominant_cause=row.dominant_cause,
+            pressure_signal=float(row.pressure_signal) if row.pressure_signal is not None else None,
         )
-        for item in rows
+        for row in rows
     ]
 
 
 @router.get("/behavior-snapshots", response_model=list[BehaviorSnapshotItem])
-@cached(TTL_BEHAVIOR, "economy-behavior")
+@cached(120, "economy:behavior")
 async def behavior_snapshots(
     limit: int = Query(default=48, ge=1, le=168),
     db: AsyncSession = Depends(get_db_session),
     redis: Redis | None = Depends(get_redis),
-    admin_user: int = Depends(get_admin_user),
+    admin_user: AdminUser = Depends(get_admin_user),
 ) -> list[BehaviorSnapshotItem]:
-    rows = (
-        await db.execute(
-            select(BehaviorSnapshot)
-            .order_by(BehaviorSnapshot.at.desc())
-            .limit(limit)
+    stmt = (
+        select(
+            BehaviorSnapshot.at,
+            BehaviorSnapshot.active_players_count,
+            BehaviorSnapshot.buy_tx_count,
+            BehaviorSnapshot.sell_tx_count,
+            BehaviorSnapshot.total_volume,
+            BehaviorSnapshot.avg_net_worth,
+            BehaviorSnapshot.gini_coefficient,
+            BehaviorSnapshot.top10_wealth_share,
         )
-    ).scalars().all()
+        .order_by(BehaviorSnapshot.at.desc(), BehaviorSnapshot.id.desc())
+        .limit(limit)
+    )
+    rows = await _run_all(stmt)
     return [
         BehaviorSnapshotItem(
-            id=item.id,
-            at=item.at,
-            active_players_count=item.active_players_count,
-            buy_tx_count=item.buy_tx_count,
-            sell_tx_count=item.sell_tx_count,
-            export_tx_count=item.export_tx_count,
-            import_tx_count=item.import_tx_count,
-            total_volume=item.total_volume,
-            avg_net_worth=item.avg_net_worth,
-            median_net_worth=item.median_net_worth,
-            gini_coefficient=item.gini_coefficient,
-            top10_wealth_share=item.top10_wealth_share,
+            at=_iso(row.at),
+            active_players_count=int(row.active_players_count),
+            buy_tx_count=int(row.buy_tx_count),
+            sell_tx_count=int(row.sell_tx_count),
+            total_volume=float(row.total_volume or 0),
+            avg_net_worth=float(row.avg_net_worth or 0),
+            gini_coefficient=float(row.gini_coefficient or 0),
+            top10_wealth_share=float(row.top10_wealth_share or 0),
         )
-        for item in rows
+        for row in rows
     ]
 
 
 @router.get("/world-events", response_model=list[WorldEventItem])
-@cached(TTL_WORLD_EVENTS, "economy-world-events")
+@cached(30, "economy:world-events")
 async def world_events(
     active_only: bool = Query(default=True),
     db: AsyncSession = Depends(get_db_session),
     redis: Redis | None = Depends(get_redis),
-    admin_user: int = Depends(get_admin_user),
+    admin_user: AdminUser = Depends(get_admin_user),
 ) -> list[WorldEventItem]:
-    stmt = select(WorldEvent)
+    stmt = (
+        select(
+            WorldEvent.event_id,
+            WorldEvent.event_type,
+            WorldEvent.scope,
+            WorldEvent.title,
+            WorldEvent.description,
+            WorldEvent.effect_type,
+            WorldEvent.effect_magnitude,
+            WorldEvent.started_at,
+            WorldEvent.ends_at,
+            WorldEvent.is_active,
+            Nation.name.label("affected_nation_name"),
+            WorldEvent.affected_currency,
+        )
+        .outerjoin(Nation, Nation.nation_id == WorldEvent.affected_nation_id)
+        .order_by(WorldEvent.started_at.desc(), WorldEvent.event_id.desc())
+        .limit(50)
+    )
     if active_only:
         stmt = stmt.where(WorldEvent.is_active.is_(True))
-    rows = (await db.execute(stmt.order_by(WorldEvent.started_at.desc()))).scalars().all()
+
+    rows = await _run_all(stmt)
     return [
         WorldEventItem(
-            event_id=item.event_id,
-            event_type=_enum_value(item.event_type),
-            scope=_enum_value(item.scope),
-            affected_nation_id=item.affected_nation_id,
-            affected_currency=item.affected_currency,
-            title=item.title,
-            description=item.description,
-            effect_type=_enum_value(item.effect_type),
-            effect_magnitude=item.effect_magnitude,
-            duration_minutes=item.duration_minutes,
-            started_at=item.started_at,
-            ends_at=item.ends_at,
-            is_active=item.is_active,
-            source=_enum_value(item.source),
-            announced_in_group=item.announced_in_group,
+            event_id=str(row.event_id),
+            event_type=_enum_value(row.event_type),
+            scope=_enum_value(row.scope),
+            title=row.title,
+            description=row.description,
+            effect_type=_enum_value(row.effect_type),
+            effect_magnitude=float(row.effect_magnitude or 0),
+            started_at=_iso(row.started_at),
+            ends_at=_iso(row.ends_at),
+            is_active=bool(row.is_active),
+            affected_nation_name=row.affected_nation_name,
+            affected_currency=row.affected_currency,
         )
-        for item in rows
+        for row in rows
     ]
+
+
+# ── END OF economy.py ──
