@@ -38,3 +38,19 @@ def test_owner_ai_supports_repository_search_fallback() -> None:
     assert "Owner AI code search failed; fallback scan" in source
     assert "async def _scan_repository_for_query" in source
     assert "async def _plain_recovery_answer" in source
+
+
+def test_owner_ai_uses_dedicated_long_timeout_and_modern_models() -> None:
+    config_source = open("config.py", encoding="utf-8").read()
+    source = open("app/services/owner_ai_service.py", encoding="utf-8").read()
+    assert "owner_ai_timeout_seconds: float = 120.0" in config_source
+    assert "settings.owner_ai_timeout_seconds" in source
+    assert '"gemini-3.8-flash"' in source
+    assert '"gemini-3.7-flash"' in source
+    assert "def _owner_ai_client" in source
+
+
+def test_scheduler_monitor_does_not_require_legacy_next_run_time_property() -> None:
+    source = open("app/schedulers/admin_control.py", encoding="utf-8").read()
+    assert 'getattr(job, "next_run_time", None)' in source
+    assert 'getattr(job, "next_fire_time", None)' in source
