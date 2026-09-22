@@ -24,7 +24,6 @@ from app.utils.formatting import fmt_amount, fmt_pct, fmt_rate, to_fa
 
 
 @dataclass(frozen=True)
-@dataclass(frozen=True)
 class WorldEventView:
     title: str
     description: str
@@ -181,6 +180,7 @@ async def build_live_dashboard(
         if world_event is not None:
             event_title = html.escape(world_event.title)
             event_detail = html.escape(world_event.description)
+            suggestion = "رویداد جهان را بررسی کن. بازار می‌تواند به آن واکنش نشان دهد."
         elif winner_code:
             event_title = "مهم‌ترین حرکت بازار"
             event_detail = (
