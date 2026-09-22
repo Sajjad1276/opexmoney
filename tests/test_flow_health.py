@@ -192,5 +192,6 @@ def test_required_main_menu_sections_exist():
         "🎯 مأموریت",
         "🌍 ملت من",
         "🏆 رتبه‌بندی",
+        "👤 پروفایل",
     }
     assert required.issubset(set(texts))
