@@ -216,3 +216,53 @@ def test_sensitive_control_calls_require_explicit_confirmation() -> None:
     assert "confirm: bool = Query(default=False)" in treasury
     assert "/api/control/founder/drafts/'+b.dataset.founderFinalize+'/finalize?confirm=true" in html
     assert "/api/control/treasury/'+row.nation_id+'/adjust?confirm=true" in html
+
+
+def test_admin_actions_have_frontend_payload_contracts() -> None:
+    html = _read(STATIC)
+    required = {
+        "broadcast": ["af-message", "af-target"],
+        "give-bonus": ["af-user", "af-amount", "af-note"],
+        "ban-player": ["af-user", "af-note"],
+        "unban-player": ["af-user"],
+        "reset-rates": ["af-nation", "af-rate", "af-note", "af-reset"],
+        "end-war": ["af-war", "af-result", "af-note"],
+        "create-event": [
+            "af-event-type",
+            "af-scope",
+            "af-title",
+            "af-description",
+            "af-effect",
+            "af-magnitude",
+            "af-duration",
+            "af-event-nation",
+            "af-currency",
+        ],
+        "send-mission-reward": ["af-user-ids", "af-mission-key", "af-override"],
+    }
+    for action, ids in required.items():
+        assert action in html, action
+        for field_id in ids:
+            assert f'id="{field_id}"' in html, (action, field_id)
+
+    assert "function actionPayload(id)" in html
+    assert "actionEndpoint[id]+'?confirm=false'" in html
+    assert "actionEndpoint[id]+'?confirm=true'" in html
+
+
+def test_admin_action_endpoints_match_router_contracts() -> None:
+    html = _read(STATIC)
+    actions = _read(ROOT / "admin" / "routers" / "actions.py")
+    mapping = {
+        "broadcast": '"/broadcast"',
+        "give-bonus": '"/give-bonus"',
+        "ban-player": '"/ban-player"',
+        "unban-player": '"/unban-player"',
+        "reset-rates": '"/reset-rates"',
+        "end-war": '"/end-war"',
+        "create-event": '"/create-event"',
+        "send-mission-reward": '"/send-mission-reward"',
+    }
+    for action, route in mapping.items():
+        assert action in html, action
+        assert f"@router.post({route}" in actions, route
