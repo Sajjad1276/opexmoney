@@ -10,6 +10,5 @@
       "source": "/(.*)",
       "destination": "/api/index.py"
     }
-  ],
-  "buildCommand": "python scripts/vercel_bootstrap.py"
+  ]
 }
