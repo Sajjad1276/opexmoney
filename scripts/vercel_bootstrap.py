@@ -5,7 +5,6 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from urllib.parse import urlsplit
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -36,20 +35,29 @@ def _production_base_url(settings) -> str:
 
 
 async def _verify_redis(settings) -> None:
-    from redis.asyncio import Redis
-    if not settings.redis_url:
+    if not (settings.upstash_redis_rest_url and settings.upstash_redis_rest_token):
         raise RuntimeError(
-            "Redis credentials are missing. Connect Upstash for Redis to the "
-            "Production Vercel environment."
+            "Upstash REST credentials are missing. Connect Upstash Redis to "
+            "the Production Vercel environment."
         )
 
-    redis = Redis.from_url(settings.redis_url, decode_responses=True)
+    from upstash_redis.asyncio import Redis
+
+    redis = Redis(
+        url=settings.upstash_redis_rest_url,
+        token=settings.upstash_redis_rest_token,
+        allow_telemetry=False,
+    )
     try:
         pong = await redis.ping()
-        if pong is not True:
-            raise RuntimeError("Redis ping did not return PONG.")
+        if pong != "PONG":
+            raise RuntimeError(f"Upstash Redis ping failed: {pong!r}")
     finally:
-        await redis.aclose()
+        close = getattr(redis, "aclose", None) or getattr(redis, "close", None)
+        if close is not None:
+            result = close()
+            if hasattr(result, "__await__"):
+                await result
 
 
 async def _configure_telegram(settings) -> None:

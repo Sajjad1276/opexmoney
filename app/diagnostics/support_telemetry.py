@@ -7,9 +7,7 @@ from collections import defaultdict, deque
 from datetime import datetime, timezone
 from typing import Any
 
-from redis.asyncio import Redis
-
-from config import settings
+from app.core.redis import ServerlessRedis, get_redis, close_redis
 
 logger = logging.getLogger("opexmoney.support.telemetry")
 
@@ -18,16 +16,8 @@ _MAX_ERRORS = 5
 
 _events: dict[int, deque[dict[str, Any]]] = defaultdict(lambda: deque(maxlen=_MAX_EVENTS))
 _errors: dict[int, deque[dict[str, Any]]] = defaultdict(lambda: deque(maxlen=_MAX_ERRORS))
-_redis: Redis | None = None
-
-
-def _redis_client() -> Redis | None:
-    global _redis
-    if not settings.redis_url:
-        return None
-    if _redis is None:
-        _redis = Redis.from_url(settings.redis_url, decode_responses=True)
-    return _redis
+def _redis_client() -> ServerlessRedis | None:
+    return get_redis()
 
 
 def _now() -> str:
@@ -137,10 +127,7 @@ async def get_recent_telemetry(user_id: int) -> dict[str, list[dict[str, Any]]]:
 
 
 async def close_support_telemetry() -> None:
-    global _redis
-    if _redis is not None:
-        await _redis.aclose()
-        _redis = None
+    await close_redis()
 
 
 __all__ = [
