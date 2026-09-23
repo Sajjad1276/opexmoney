@@ -9,13 +9,11 @@ from urllib.parse import urlsplit
 
 from redis.asyncio import Redis
 
-from config import settings
-
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def _production_base_url() -> str:
+def _production_base_url(settings) -> str:
     hostname = (
         os.getenv("VERCEL_PROJECT_PRODUCTION_URL")
         or os.getenv("VERCEL_URL")
@@ -39,7 +37,7 @@ def _production_base_url() -> str:
     return hostname.rstrip("/")
 
 
-async def _verify_redis() -> None:
+async def _verify_redis(settings) -> None:
     if not settings.redis_url:
         raise RuntimeError(
             "Redis credentials are missing. Connect Upstash for Redis to the "
@@ -55,10 +53,10 @@ async def _verify_redis() -> None:
         await redis.aclose()
 
 
-async def _configure_telegram() -> None:
+async def _configure_telegram(settings) -> None:
     from aiogram import Bot
 
-    webhook_url = f"{_production_base_url()}/api/telegram/webhook"
+    webhook_url = f"{_production_base_url(settings)}/api/telegram/webhook"
     bot = Bot(token=settings.bot_token)
     try:
         me = await bot.get_me()
@@ -119,6 +117,8 @@ async def _main() -> None:
         )
         return
 
+    from config import settings
+
     _verify_runtime_imports()
     _run_migrations()
 
@@ -129,10 +129,10 @@ async def _main() -> None:
         await session.execute(text("SELECT 1"))
     print("VERCEL_BOOTSTRAP|database=ok", flush=True)
 
-    await _verify_redis()
+    await _verify_redis(settings)
     print("VERCEL_BOOTSTRAP|redis=ok", flush=True)
 
-    await _configure_telegram()
+    await _configure_telegram(settings)
     print("VERCEL_BOOTSTRAP|complete", flush=True)
 
 
