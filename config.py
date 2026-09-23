@@ -12,6 +12,10 @@ class Settings(BaseSettings):
     owner_ai_enabled: bool = True
     railway_api_token: str | None = None
 
+    telegram_webhook_url: str | None = None
+    telegram_webhook_secret: str | None = None
+    telegram_webhook_setup_token: str | None = None
+
     ai_enabled: bool = True
     gemini_api_key: str | None = Field(
         default=None,
@@ -51,8 +55,6 @@ class Settings(BaseSettings):
     rate_max: Decimal = Decimal("50.00")
     rate_base_step: Decimal = Decimal("0.04")
 
-    # Nation founding eligibility. Kept configurable so game design can change
-    # without touching persistence or handlers.
     nation_creation_trade_threshold: Decimal = Decimal("500")
     nation_creation_cost: Decimal = Decimal("500")
     bot_username: str = "OpexMoney_bot"
