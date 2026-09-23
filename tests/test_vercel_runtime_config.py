@@ -3,7 +3,8 @@ from __future__ import annotations
 from config import Settings
 
 
-def test_upstash_rest_credentials_become_tls_redis_url() -> None:
+def test_upstash_rest_credentials_become_tls_redis_url(monkeypatch) -> None:
+    monkeypatch.delenv("REDIS_URL", raising=False)
     settings = Settings(
         bot_token="123:token",
         database_url="postgresql://example",
