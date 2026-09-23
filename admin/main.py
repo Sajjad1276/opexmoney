@@ -5,6 +5,7 @@ import time
 from contextlib import asynccontextmanager
 from hmac import compare_digest
 from pathlib import Path
+import os
 
 from aiogram import Bot
 from aiogram.client.default import DefaultBotProperties
@@ -36,6 +37,7 @@ from admin.routers import (
     panel_sections,
 )
 from config import settings
+from app.core.redis import create_redis_client, ServerlessRedis
 
 logger = logging.getLogger("opex.admin")
 logging.basicConfig(
@@ -61,10 +63,8 @@ async def lifespan(app: FastAPI):
         logger.exception("ADMIN_STARTUP|database=failed")
 
     try:
-        from redis import asyncio as aioredis
-
-        if settings.redis_url:
-            redis = aioredis.from_url(settings.redis_url, decode_responses=False)
+        redis = create_redis_client()
+        if redis is not None:
             await redis.ping()
             app.state.redis = redis
             redis_ok = True
@@ -75,6 +75,39 @@ async def lifespan(app: FastAPI):
     except Exception:
         app.state.redis = None
         logger.exception("ADMIN_STARTUP|redis=failed")
+
+    if (
+        db_ok
+        and redis_ok
+        and settings.bot_token
+        and os.getenv("VERCEL_ENV") == "production"
+    ):
+        try:
+            bot = Bot(
+                token=settings.bot_token,
+                default=DefaultBotProperties(parse_mode=ParseMode.HTML),
+            )
+            try:
+                webhook_url = (
+                    settings.telegram_webhook_url
+                    or os.getenv("VERCEL_PROJECT_PRODUCTION_URL")
+                    or os.getenv("VERCEL_URL")
+                )
+                if webhook_url:
+                    if not webhook_url.startswith(("http://", "https://")):
+                        webhook_url = f"https://{webhook_url}"
+                    webhook_url = webhook_url.rstrip("/") + "/api/telegram/webhook"
+                    await bot.set_webhook(
+                        url=webhook_url,
+                        secret_token=settings.telegram_webhook_secret,
+                        allowed_updates=[],
+                        drop_pending_updates=False,
+                    )
+                    logger.info("ADMIN_STARTUP|telegram_webhook=%s", webhook_url)
+            finally:
+                await bot.session.close()
+        except Exception:
+            logger.exception("ADMIN_STARTUP|telegram_webhook=failed")
 
     app.state.db_ok = db_ok
     app.state.redis_ok = redis_ok
@@ -227,8 +260,8 @@ async def telegram_setup(request: Request):
 
     if not settings.bot_token:
         raise HTTPException(status_code=500, detail="BOT_TOKEN is not configured")
-    if not settings.redis_url:
-        raise HTTPException(status_code=500, detail="REDIS_URL is not configured")
+    if create_redis_client() is None:
+        raise HTTPException(status_code=500, detail="Redis credentials are not configured")
     if not settings.telegram_webhook_secret:
         raise HTTPException(
             status_code=500,
