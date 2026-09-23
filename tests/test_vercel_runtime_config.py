@@ -8,8 +8,8 @@ def test_upstash_rest_credentials_become_tls_redis_url(monkeypatch) -> None:
     settings = Settings(_env_file=None,
         bot_token="123:token",
         database_url="postgresql://example",
-        upstash_redis_rest_url="https://example.upstash.io",
-        upstash_redis_rest_token="secret/token",
+        UPSTASH_REDIS_REST_URL="https://example.upstash.io",
+        UPSTASH_REDIS_REST_TOKEN="secret/token",
     )
 
     assert settings.redis_url == (
