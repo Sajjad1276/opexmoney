@@ -5,8 +5,6 @@ import logging
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
-from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.fsm.storage.redis import RedisStorage
 from aiogram.types import BotCommand, BotCommandScopeAllPrivateChats, MenuButtonCommands
 
 from app.diagnostics.flow_trace import FlowTraceMiddleware
@@ -34,18 +32,17 @@ from app.handlers.support import router as support_router
 from app.handlers.treasury import router as treasury_router
 from app.middlewares.command_cleanup import CommandPanelCleanupMiddleware
 from config import settings
-from redis.asyncio import Redis
+from app.core.redis import ServerlessRedis, create_redis_client
+from app.storage.upstash_fsm import UpstashFSMStorage
 
 logger = logging.getLogger("opexmoney.webhook")
 
 
-def _build_dispatcher(storage) -> tuple[Dispatcher, Redis | None]:
+def _build_dispatcher(storage) -> tuple[Dispatcher, ServerlessRedis | None]:
     dp = Dispatcher(storage=storage)
 
     ranking_redis = (
-        Redis.from_url(settings.redis_url, decode_responses=True)
-        if settings.redis_url
-        else None
+        create_redis_client()
     )
     dp["redis"] = ranking_redis
 
@@ -79,13 +76,14 @@ def _build_dispatcher(storage) -> tuple[Dispatcher, Redis | None]:
     return dp, ranking_redis
 
 
-def build_webhook_runtime() -> tuple[Bot, Dispatcher, object, Redis | None]:
+def build_webhook_runtime() -> tuple[Bot, Dispatcher, UpstashFSMStorage, ServerlessRedis]:
     if not settings.bot_token:
         raise RuntimeError("BOT_TOKEN is not configured")
-    if not settings.redis_url:
-        raise RuntimeError("REDIS_URL is required for the Vercel webhook runtime")
+    redis = create_redis_client()
+    if redis is None:
+        raise RuntimeError("Upstash/Redis credentials are not configured for the Vercel webhook runtime")
 
-    storage = RedisStorage.from_url(settings.redis_url)
+    storage = UpstashFSMStorage(redis)
     dp, ranking_redis = _build_dispatcher(storage)
     bot = Bot(
         token=settings.bot_token,
