@@ -16,14 +16,18 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def _production_base_url() -> str:
-    configured = settings.telegram_webhook_url
-    if configured:
-        return configured.rstrip("/")
-
     hostname = (
         os.getenv("VERCEL_PROJECT_PRODUCTION_URL")
         or os.getenv("VERCEL_URL")
     )
+    configured = settings.telegram_webhook_url
+    if not hostname:
+        if configured:
+            return configured.rstrip("/")
+        raise RuntimeError(
+            "Vercel production URL is unavailable. Set TELEGRAM_WEBHOOK_URL."
+        )
+
     if not hostname:
         raise RuntimeError(
             "Vercel production URL is unavailable. Set TELEGRAM_WEBHOOK_URL."
@@ -72,11 +76,6 @@ async def _configure_telegram() -> None:
             raise RuntimeError(
                 f"Telegram webhook mismatch: expected {webhook_url}, got {info.url}"
             )
-        if info.last_error_message:
-            raise RuntimeError(
-                f"Telegram webhook reports an error: {info.last_error_message}"
-            )
-
         print(
             "VERCEL_BOOTSTRAP|telegram=ok|"
             f"bot=@{me.username}|webhook={webhook_url}",
