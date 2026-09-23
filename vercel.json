@@ -10,5 +10,6 @@
       "source": "/(.*)",
       "destination": "/api/index.py"
     }
-  ]
+  ],
+  "buildCommand": "if [ \"$VERCEL_ENV\" = \"production\" ]; then python scripts/vercel_bootstrap.py; else true; fi"
 }

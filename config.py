@@ -1,13 +1,22 @@
 from decimal import Decimal
 
-from pydantic import AliasChoices, Field
+from pydantic import AliasChoices, Field, model_validator
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     bot_token: str
-    database_url: str
+    database_url: str = Field(validation_alias=AliasChoices("DATABASE_URL", "POSTGRES_URL"))
     redis_url: str | None = None
+    upstash_redis_rest_url: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("UPSTASH_REDIS_REST_URL", "KV_REST_API_URL"),
+    )
+    upstash_redis_rest_token: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("UPSTASH_REDIS_REST_TOKEN", "KV_REST_API_TOKEN"),
+    )
     owner_id: int | None = None
     owner_ai_enabled: bool = True
     railway_api_token: str | None = None
@@ -60,6 +69,37 @@ class Settings(BaseSettings):
     bot_username: str = "OpexMoney_bot"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    @model_validator(mode="after")
+    def normalize_vercel_integrations(self):
+        if not self.redis_url:
+            rest_url = self.upstash_redis_rest_url
+            token = self.upstash_redis_rest_token
+            if rest_url and token:
+                from urllib.parse import quote, urlsplit
+
+                parsed = urlsplit(rest_url if "://" in rest_url else f"https://{rest_url}")
+                if parsed.hostname:
+                    self.redis_url = (
+                        f"rediss://default:{quote(token, safe='')}@"
+                        f"{parsed.hostname}:6379"
+                    )
+
+        if not self.telegram_webhook_secret:
+            import hashlib
+
+            self.telegram_webhook_secret = hashlib.sha256(
+                f"{self.bot_token}:opex:webhook".encode()
+            ).hexdigest()
+
+        if not self.telegram_webhook_setup_token:
+            import hashlib
+
+            self.telegram_webhook_setup_token = hashlib.sha256(
+                f"{self.bot_token}:opex:setup".encode()
+            ).hexdigest()
+
+        return self
 
     @property
     def sqlalchemy_database_url(self) -> str:
