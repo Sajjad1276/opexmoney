@@ -92,7 +92,10 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"^https://.*\\.up\\.railway\\.app$|^http://localhost:3000$",
+    allow_origin_regex=(
+        r"^https://([a-z0-9-]+\.)*(vercel\.app|up\.railway\.app)$"
+        r"|^http://localhost:3000$"
+    ),
     allow_credentials=True,
     allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
     allow_headers=["*"],
@@ -142,12 +145,26 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     return JSONResponse(status_code=422, content={"detail": exc.errors()})
 
 
-@app.get("/", include_in_schema=False)
-async def root():
-    response = RedirectResponse(url="/static/index.html?v=20260922-dashboard", status_code=307)
+def _panel_redirect() -> RedirectResponse:
+    response = RedirectResponse(
+        url="/static/index.html?v=20260923-vercel",
+        status_code=307,
+    )
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
     return response
+
+
+@app.get("/", include_in_schema=False)
+async def root():
+    return _panel_redirect()
+
+
+@app.get("/admin", include_in_schema=False)
+async def admin_root():
+    return _panel_redirect()
+
 
 @app.middleware("http")
 async def static_cache_control(request: Request, call_next):
