@@ -3,9 +3,14 @@ from __future__ import annotations
 import logging
 import time
 from contextlib import asynccontextmanager
+from hmac import compare_digest
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from aiogram import Bot
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
+from aiogram.types import Update
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -13,6 +18,11 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
 from app.database.session import async_session
+from app.bot_webhook import (
+    build_webhook_runtime,
+    close_webhook_runtime,
+    configure_webhook_bot_menu,
+)
 from admin.routers import (
     actions,
     economy,
@@ -25,6 +35,7 @@ from admin.routers import (
     control,
     panel_sections,
 )
+from config import settings
 
 logger = logging.getLogger("opex.admin")
 logging.basicConfig(
@@ -51,7 +62,6 @@ async def lifespan(app: FastAPI):
 
     try:
         from redis import asyncio as aioredis
-        from config import settings
 
         if settings.redis_url:
             redis = aioredis.from_url(settings.redis_url, decode_responses=False)
@@ -86,7 +96,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="OPEX MONEY Admin API",
-    version="1.0.0",
+    version="1.1.0",
     lifespan=lifespan,
 )
 
@@ -202,6 +212,116 @@ async def health(request: Request):
         "redis": redis_ok,
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
+
+
+def _require_setup_token(request: Request) -> None:
+    expected = settings.telegram_webhook_setup_token
+    received = request.headers.get("X-Telegram-Webhook-Setup-Token", "")
+    if not expected or not received or not compare_digest(received, expected):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+
+@app.post("/api/telegram/setup")
+async def telegram_setup(request: Request):
+    _require_setup_token(request)
+
+    if not settings.bot_token:
+        raise HTTPException(status_code=500, detail="BOT_TOKEN is not configured")
+    if not settings.redis_url:
+        raise HTTPException(status_code=500, detail="REDIS_URL is not configured")
+    if not settings.telegram_webhook_secret:
+        raise HTTPException(
+            status_code=500,
+            detail="TELEGRAM_WEBHOOK_SECRET is not configured",
+        )
+
+    webhook_url = settings.telegram_webhook_url
+    if not webhook_url:
+        webhook_url = str(request.base_url).rstrip("/") + "/api/telegram/webhook"
+
+    bot = Bot(
+        token=settings.bot_token,
+        default=DefaultBotProperties(parse_mode=ParseMode.HTML),
+    )
+    try:
+        await bot.set_webhook(
+            url=webhook_url,
+            secret_token=settings.telegram_webhook_secret,
+            allowed_updates=[],
+            drop_pending_updates=False,
+        )
+        await configure_webhook_bot_menu(bot)
+        info = await bot.get_webhook_info()
+        return {
+            "ok": True,
+            "url": info.url,
+            "pending_update_count": info.pending_update_count,
+            "last_error_message": info.last_error_message,
+            "max_connections": info.max_connections,
+        }
+    finally:
+        await bot.session.close()
+
+
+@app.get("/api/telegram/status")
+async def telegram_status(request: Request):
+    _require_setup_token(request)
+
+    bot = Bot(
+        token=settings.bot_token,
+        default=DefaultBotProperties(parse_mode=ParseMode.HTML),
+    )
+    try:
+        info = await bot.get_webhook_info()
+        me = await bot.get_me()
+        return {
+            "ok": True,
+            "bot": {
+                "id": me.id,
+                "username": me.username,
+                "name": me.full_name,
+            },
+            "webhook": {
+                "url": info.url,
+                "pending_update_count": info.pending_update_count,
+                "last_error_date": info.last_error_date,
+                "last_error_message": info.last_error_message,
+                "max_connections": info.max_connections,
+            },
+        }
+    finally:
+        await bot.session.close()
+
+
+@app.post("/api/telegram/webhook")
+async def telegram_webhook(request: Request):
+    expected = settings.telegram_webhook_secret
+    received = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
+
+    if not expected or not received or not compare_digest(received, expected):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    body = await request.json()
+    bot = None
+    dp = None
+    storage = None
+    ranking_redis = None
+
+    try:
+        bot, dp, storage, ranking_redis = build_webhook_runtime()
+        update = Update.model_validate(body, context={"bot": bot})
+        await dp.feed_update(bot, update)
+        return {"ok": True}
+    except Exception:
+        logger.exception("TELEGRAM_WEBHOOK|update_processing_failed")
+        raise
+    finally:
+        if bot is not None and storage is not None:
+            await close_webhook_runtime(
+                bot=bot,
+                storage=storage,
+                ranking_redis=ranking_redis,
+            )
 
 
 app.include_router(stats.router)
