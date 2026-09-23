@@ -5,7 +5,7 @@ from config import Settings
 
 def test_upstash_rest_credentials_become_tls_redis_url(monkeypatch) -> None:
     monkeypatch.delenv("REDIS_URL", raising=False)
-    settings = Settings(
+    settings = Settings(_env_file=None,
         bot_token="123:token",
         database_url="postgresql://example",
         upstash_redis_rest_url="https://example.upstash.io",
