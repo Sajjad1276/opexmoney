@@ -135,7 +135,7 @@ async def configure_webhook_bot_menu(bot: Bot) -> None:
 async def close_webhook_runtime(
     bot: Bot,
     storage,
-    ranking_redis: Redis | None,
+    ranking_redis: ServerlessRedis | None,
 ) -> None:
     try:
         await storage.close()
