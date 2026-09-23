@@ -99,7 +99,7 @@ class ServerlessRedis:
         while True:
             cursor, keys = await self._backend.scan(
                 cursor,
-                match=match,
+                match=match or "*",
                 count=count,
             )
             for key in keys:
