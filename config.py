@@ -7,7 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     bot_token: str
-    database_url: str
+    database_url: str = Field(validation_alias=AliasChoices("DATABASE_URL", "POSTGRES_URL"))
     redis_url: str | None = None
     upstash_redis_rest_url: str | None = Field(
         default=None,
