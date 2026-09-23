@@ -1,9 +1,10 @@
 from pathlib import Path
 
 
-def test_vercel_webhook_runtime_uses_redis_and_aiogram_dispatcher():
+def test_vercel_webhook_runtime_uses_serverless_redis_and_aiogram_dispatcher():
     source = Path("app/bot_webhook.py").read_text(encoding="utf-8")
-    assert "RedisStorage.from_url(settings.redis_url)" in source
+    assert "create_redis_client()" in source
+    assert "UpstashFSMStorage(redis)" in source
     assert "dp = Dispatcher(storage=storage)" in source
     assert "dp.include_router(start_router)" in source
     assert "dp.include_router(market_router)" in source
