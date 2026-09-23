@@ -109,7 +109,7 @@ def _verify_runtime_imports() -> None:
 
 
 async def _main() -> None:
-    if os.getenv("VERCEL_ENV") not in {None, "", "production"}:
+    if os.getenv("VERCEL_ENV") != "production":
         print(
             f"VERCEL_BOOTSTRAP|skip|environment={os.getenv('VERCEL_ENV')}",
             flush=True,
