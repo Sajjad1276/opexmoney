@@ -7,8 +7,6 @@ import sys
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from redis.asyncio import Redis
-
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -38,6 +36,7 @@ def _production_base_url(settings) -> str:
 
 
 async def _verify_redis(settings) -> None:
+    from redis.asyncio import Redis
     if not settings.redis_url:
         raise RuntimeError(
             "Redis credentials are missing. Connect Upstash for Redis to the "
