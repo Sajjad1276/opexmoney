@@ -260,7 +260,8 @@ async def telegram_setup(request: Request):
 
     if not settings.bot_token:
         raise HTTPException(status_code=500, detail="BOT_TOKEN is not configured")
-    if create_redis_client() is None:
+    redis = getattr(request.app.state, "redis", None) or create_redis_client()
+    if redis is None:
         raise HTTPException(status_code=500, detail="Redis credentials are not configured")
     if not settings.telegram_webhook_secret:
         raise HTTPException(
